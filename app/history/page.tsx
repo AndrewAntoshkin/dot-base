@@ -31,7 +31,9 @@ export default function HistoryPage() {
 
   const fetchGenerations = async () => {
     try {
-      const response = await fetch(`/api/generations/list?page=${page}&limit=20`);
+      const response = await fetch(`/api/generations/list?page=${page}&limit=20`, {
+        credentials: 'include',
+      });
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations);

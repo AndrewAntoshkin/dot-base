@@ -27,7 +27,9 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
 
   const refreshGenerations = async () => {
     try {
-      const response = await fetch('/api/generations/list?limit=50');
+      const response = await fetch('/api/generations/list?limit=50', {
+        credentials: 'include',
+      });
       if (response.ok) {
         const data = await response.json();
         // API возвращает { generations: [...] }, а не просто массив
@@ -50,7 +52,10 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
       );
 
       // Call API
-      await fetch(`/api/generations/${id}/view`, { method: 'POST' });
+      await fetch(`/api/generations/${id}/view`, { 
+        method: 'POST',
+        credentials: 'include',
+      });
     } catch (error) {
       console.error('Error marking as viewed:', error);
       // Refresh on error

@@ -346,6 +346,7 @@ export function SettingsForm({
       const response = await fetch('/api/generations/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           action: model.action,
           model_id: model.id,

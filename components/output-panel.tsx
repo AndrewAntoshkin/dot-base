@@ -42,7 +42,9 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
 
     const fetchGeneration = async () => {
       try {
-        const response = await fetch(`/api/generations/${generationId}`);
+        const response = await fetch(`/api/generations/${generationId}`, {
+          credentials: 'include',
+        });
         if (response.ok) {
           const data = await response.json();
           setGeneration(data);
