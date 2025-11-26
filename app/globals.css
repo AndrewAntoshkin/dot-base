@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Figma design colors */
+    --background: 0 0% 2%; /* #050505 */
+    --foreground: 0 0% 100%; /* #FFFFFF */
+
+    --card: 0 0% 6.3%; /* #101010 */
+    --card-foreground: 0 0% 100%;
+
+    --popover: 0 0% 6.3%; /* #101010 */
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 0 0% 100%; /* #FFFFFF */
+    --primary-foreground: 0 0% 0%; /* #000000 */
+
+    --secondary: 0 0% 12.2%; /* #1f1f1f */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 18.4%; /* #2f2f2f */
+    --muted-foreground: 0 0% 58.4%; /* #959595 */
+
+    --accent: 0 0% 12.2%; /* #1f1f1f */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 31.4%; /* #505050 */
+    --input: 0 0% 31.4%; /* #505050 */
+    --ring: 0 0% 100%;
+
+    --radius: 0.5rem;
+
+    /* Figma spacing */
+    --spacing-none: 0px;
+    --spacing-sm: 4px;
+    --spacing-md: 8px;
+    --spacing-lg: 12px;
+    --spacing-xl: 16px;
+    --spacing-2xl: 24px;
+    --spacing-3xl: 32px;
+    --spacing-4xl: 80px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-inter), sans-serif;
+  }
+  
+  .font-ibm-mono {
+    font-family: var(--font-ibm-plex-mono), monospace;
+  }
+  
+  .font-gloock {
+    font-family: var(--font-gloock), serif;
+  }
+  
+  .font-inter {
+    font-family: var(--font-inter), sans-serif;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted));
+}
+

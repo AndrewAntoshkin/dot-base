@@ -1,0 +1,69 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { Loader2, Check, X } from 'lucide-react';
+import { useGenerations } from '@/contexts/generations-context';
+
+interface GenerationsQueueProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
+  const router = useRouter();
+  const { unviewedGenerations, markAsViewed } = useGenerations();
+
+  const handleGenerationClick = async (id: string) => {
+    // Mark as viewed before navigating
+    await markAsViewed(id);
+    // Navigate to main page with generation ID to fill form
+    router.push(`/?generationId=${id}`);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+      />
+
+      {/* Dropdown */}
+      <div className="absolute right-0 top-[56px] w-[240px] bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-lg z-50 overflow-hidden">
+        {unviewedGenerations.length === 0 ? (
+          <div className="p-4 text-center">
+            <p className="font-inter text-sm text-[#656565]">
+              Все просмотрено
+            </p>
+          </div>
+        ) : (
+          <div className="py-2">
+            {unviewedGenerations.slice(0, 10).map((generation) => (
+              <button
+                key={generation.id}
+                onClick={() => handleGenerationClick(generation.id)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#2f2f2f] transition-colors"
+              >
+                <span className="font-inter text-sm text-white truncate">
+                  {generation.model_name}
+                </span>
+                
+                {generation.status === 'processing' || generation.status === 'pending' ? (
+                  <Loader2 className="h-4 w-4 text-white animate-spin shrink-0 ml-2" />
+                ) : generation.status === 'completed' ? (
+                  <Check className="h-4 w-4 text-green-500 shrink-0 ml-2" />
+                ) : generation.status === 'failed' ? (
+                  <X className="h-4 w-4 text-red-500 shrink-0 ml-2" />
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
