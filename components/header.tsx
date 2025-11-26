@@ -2,16 +2,41 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { Loader2, LogOut } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
+import { createBrowserClient } from '@supabase/ssr';
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { unviewedCount, hasActiveGenerations } = useGenerations();
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email || null);
+      }
+    };
+    getUser();
+  }, [supabase]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
   
   return (
     <header className="sticky top-0 z-50 bg-[#101010]">
@@ -81,9 +106,43 @@ export function Header() {
               Галерея
             </Link>
 
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full overflow-hidden">
-              <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500" />
+            {/* User menu */}
+            <div className="relative">
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
+              >
+                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">
+                    {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Dropdown menu */}
+              {isUserMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-xl z-20 overflow-hidden">
+                    {userEmail && (
+                      <div className="px-4 py-3 border-b border-[#2f2f2f]">
+                        <p className="font-inter text-sm text-[#959595]">Вы вошли как:</p>
+                        <p className="font-inter text-sm text-white truncate mt-1">{userEmail}</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-3 flex items-center gap-2 font-inter text-sm text-white hover:bg-[#2f2f2f] transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Выйти
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Generations Queue Dropdown */}

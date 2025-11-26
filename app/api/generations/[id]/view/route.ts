@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 
 export async function POST(
   request: NextRequest,
@@ -7,16 +9,45 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    
+    // Get current user
+    const cookieStore = cookies();
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {}
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createServiceRoleClient();
 
-    // Mark generation as viewed
+    // Mark generation as viewed - только свою генерацию
     const { error } = await supabase
       .from('generations')
       .update({
         viewed: true,
         viewed_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { cookies } from 'next/headers';
 
 export async function GET(
   request: NextRequest,
@@ -8,14 +10,42 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    
+    // Get current user
+    const cookieStore = cookies();
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {}
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createServiceRoleClient();
 
-    // ВРЕМЕННО: убрана авторизация для разработки
-    // Получить генерацию
+    // Получить генерацию только своего пользователя
     const { data: generation, error } = await supabase
       .from('generations')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (error || !generation) {
@@ -87,14 +117,42 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    
+    // Get current user
+    const cookieStore = cookies();
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {}
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createServiceRoleClient();
 
-    // ВРЕМЕННО: убрана авторизация для разработки
-    // Получить генерацию
+    // Получить генерацию только своего пользователя
     const { data: generation } = await supabase
       .from('generations')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (!generation) {

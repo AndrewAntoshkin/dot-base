@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 const createGenerationSchema = z.object({
@@ -14,43 +16,40 @@ const createGenerationSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServiceRoleClient();
+    // Get current user from session
+    const cookieStore = cookies();
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore - can happen in Server Components
+            }
+          },
+        },
+      }
+    );
 
-    // ВРЕМЕННО: Создаем тестового пользователя для разработки
-    let userId = 'test-user-id';
+    const { data: { user } } = await supabaseAuth.auth.getUser();
     
-    // Проверяем есть ли тестовый пользователь
-    let { data: userData } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_username', 'testuser')
-      .single();
-
-    if (!userData) {
-      // Создаем тестового пользователя
-      const { data: newUser } = await supabase
-        .from('users')
-        .insert({
-          telegram_username: 'testuser',
-          telegram_first_name: 'Test',
-          telegram_last_name: 'User',
-          is_active: true,
-          credits: 1000,
-        })
-        .select()
-        .single();
-      
-      userData = newUser;
-    }
-
-    if (!userData) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Failed to create test user' },
-        { status: 500 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
 
-    userId = userData.id;
+    const userId = user.id;
+    const supabase = createServiceRoleClient();
 
     const body = await request.json();
     const validatedData = createGenerationSchema.parse(body);
