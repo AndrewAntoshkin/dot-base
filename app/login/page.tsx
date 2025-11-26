@@ -96,13 +96,19 @@ export default function LoginPage() {
         </div>
 
         {/* Right side - Featured image */}
-        <div className="flex-1 p-8">
-          <div className="relative w-full h-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a]">
-            {/* Placeholder gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-900/20 via-red-900/20 to-blue-900/20" />
+        <div className="flex-1 p-8 hidden lg:block">
+          <div className="relative w-full h-full rounded-3xl overflow-hidden">
+            {/* Background image */}
+            <Image
+              src="/generation-10138132-7a00-46a1-8681-9ce07511f008.png"
+              alt="Featured artwork"
+              fill
+              className="object-cover"
+              priority
+            />
             
             {/* Card overlay */}
-            <div className="absolute bottom-4 left-4 w-[477px] backdrop-blur-md bg-[rgba(26,26,26,0.5)] rounded-2xl p-5 flex flex-col gap-4">
+            <div className="absolute bottom-4 left-4 right-4 lg:right-auto lg:w-[477px] backdrop-blur-md bg-[rgba(26,26,26,0.5)] rounded-2xl p-5 flex flex-col gap-4">
               <div className="bg-[#1a1a1a] px-4 py-2 rounded-lg w-fit">
                 <span className="font-inter font-medium text-[14px] text-white">Nano Banana Pro</span>
               </div>
@@ -220,9 +226,15 @@ export default function LoginPage() {
 
       {/* Right side - Featured image */}
       <div className="flex-1 p-8 hidden lg:block">
-        <div className="relative w-full h-full rounded-3xl overflow-hidden bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a]">
-          {/* Placeholder gradient background - replace with actual image */}
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-900/30 via-red-900/30 to-blue-900/30" />
+        <div className="relative w-full h-full rounded-3xl overflow-hidden">
+          {/* Background image */}
+          <Image
+            src="/generation-10138132-7a00-46a1-8681-9ce07511f008.png"
+            alt="Featured artwork"
+            fill
+            className="object-cover"
+            priority
+          />
           
           {/* Card overlay */}
           <div className="absolute bottom-4 left-4 right-4 lg:right-auto lg:w-[477px] backdrop-blur-md bg-[rgba(26,26,26,0.5)] rounded-2xl p-5 flex flex-col gap-4">
