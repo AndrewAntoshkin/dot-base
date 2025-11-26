@@ -1,12 +1,14 @@
 import Replicate from 'replicate';
 import { ReplicateTokenPool } from './token-pool';
 
+type WebhookEventType = 'start' | 'output' | 'logs' | 'completed';
+
 export interface ReplicateRunOptions {
   model: string;
   input: Record<string, any>;
   version?: string;
   webhook?: string;
-  webhook_events_filter?: string[];
+  webhook_events_filter?: WebhookEventType[];
 }
 
 export interface ReplicatePrediction {
