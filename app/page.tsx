@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
@@ -10,7 +10,7 @@ import { Header } from '@/components/header';
 import { ActionType, getModelById } from '@/lib/models-config';
 import { useGenerations } from '@/contexts/generations-context';
 
-export default function Home() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const generationIdParam = searchParams.get('generationId');
   
@@ -224,6 +224,18 @@ export default function Home() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+        <div className="text-white">Загрузка...</div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
 
