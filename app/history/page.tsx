@@ -84,16 +84,18 @@ export default function HistoryPage() {
             <Loader2 className="h-8 w-8 animate-spin text-white" />
           </div>
         ) : generations.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="font-inter text-sm text-[#959595] mb-4">
-              У вас пока нет генераций
-            </p>
-            <Link
-              href="/"
-              className="inline-block h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors"
-            >
-              Создать первую генерацию
-            </Link>
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="font-inter text-base text-[#959595] mb-6">
+                У вас пока нет генераций
+              </p>
+              <Link
+                href="/"
+                className="inline-block bg-[#f0f0f5] rounded-xl px-4 py-3 font-inter font-medium text-base text-[#141414] hover:bg-white transition-colors"
+              >
+                Создать первую генерацию
+              </Link>
+            </div>
           </div>
         ) : (
           <>
