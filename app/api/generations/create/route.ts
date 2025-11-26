@@ -16,6 +16,8 @@ const createGenerationSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== CREATE GENERATION START ===');
+    
     // Get current user from session
     const cookieStore = cookies();
     const supabaseAuth = createServerClient(
@@ -39,16 +41,20 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    
+    console.log('User auth check:', { hasUser: !!user, authError });
     
     if (!user) {
+      console.error('No user found, returning 401');
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized - please log in' },
         { status: 401 }
       );
     }
 
     const userId = user.id;
+    console.log('User ID:', userId);
     const supabase = createServiceRoleClient();
 
     const body = await request.json();
