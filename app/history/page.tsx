@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -30,119 +30,15 @@ function isVideoAction(action: string): boolean {
   return action.startsWith('video_');
 }
 
-// Компонент для отображения превью видео (первый кадр)
-function VideoThumbnail({ src, alt }: { src: string; alt: string }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const captureFrame = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    if (!video || !canvas) return;
-    
-    try {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
-      // Устанавливаем размер canvas равным видео
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Рисуем первый кадр
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Конвертируем в data URL
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      setThumbnailUrl(dataUrl);
-      setIsLoading(false);
-    } catch (err) {
-      console.error('Error capturing video frame:', err);
-      setError(true);
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const handleLoadedData = () => {
-      // Переходим к первому кадру
-      video.currentTime = 0.1; // Немного вперёд для надёжности
-    };
-
-    const handleSeeked = () => {
-      captureFrame();
-    };
-
-    const handleError = () => {
-      setError(true);
-      setIsLoading(false);
-    };
-
-    video.addEventListener('loadeddata', handleLoadedData);
-    video.addEventListener('seeked', handleSeeked);
-    video.addEventListener('error', handleError);
-
-    return () => {
-      video.removeEventListener('loadeddata', handleLoadedData);
-      video.removeEventListener('seeked', handleSeeked);
-      video.removeEventListener('error', handleError);
-    };
-  }, [captureFrame]);
-
-  if (error) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
-        <div className="flex flex-col items-center gap-2">
-          <Play className="h-8 w-8 text-[#656565]" />
-          <span className="font-inter text-xs text-[#656565]">Видео</span>
-        </div>
-      </div>
-    );
-  }
-
+// Простой компонент для отображения видео-плейсхолдера
+function VideoPlaceholder() {
   return (
-    <>
-      {/* Скрытый video элемент для захвата кадра */}
-      <video
-        ref={videoRef}
-        src={src}
-        muted
-        playsInline
-        preload="metadata"
-        crossOrigin="anonymous"
-        className="hidden"
-      />
-      <canvas ref={canvasRef} className="hidden" />
-      
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#656565]" />
-        </div>
-      )}
-      
-      {thumbnailUrl && (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={thumbnailUrl}
-            alt={alt}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          {/* Иконка Play поверх превью */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-            <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
-              <Play className="h-5 w-5 text-black ml-0.5" fill="currentColor" />
-            </div>
-          </div>
-        </>
-      )}
-    </>
+    <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
+      <div className="flex flex-col items-center gap-2">
+        <Play className="h-10 w-10 text-[#656565]" />
+        <span className="font-inter text-sm text-[#656565]">Видео</span>
+      </div>
+    </div>
   );
 }
 
@@ -268,13 +164,10 @@ export default function HistoryPage() {
                 >
                   <div className="bg-[#101010] rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
                     {/* Image/Video with badge - square 1:1 */}
-                    <div className="relative aspect-square bg-[#151515]">
+                    <div className="relative aspect-square bg-[#151515] rounded-xl overflow-hidden">
                       {generation.output_urls?.[0] ? (
                         isVideoUrl(generation.output_urls[0]) ? (
-                          <VideoThumbnail
-                            src={generation.output_urls[0]}
-                            alt={generation.prompt || 'Generated video'}
-                          />
+                          <VideoPlaceholder />
                         ) : (
                           <Image
                             src={generation.output_urls[0]}
