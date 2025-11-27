@@ -202,13 +202,48 @@ export async function DELETE(
       }
     }
 
-    // Обновить статус на cancelled
-    await supabase
-      .from('generations')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
+    // Удалить файлы из Storage (если есть)
+    if (generation.output_urls && generation.output_urls.length > 0) {
+      try {
+        // Извлекаем имена файлов из URL
+        const fileNames = generation.output_urls
+          .map((url: string) => {
+            // URL формата: https://xxx.supabase.co/storage/v1/object/public/generations/filename.ext
+            const match = url.match(/\/generations\/([^?]+)/);
+            return match ? match[1] : null;
+          })
+          .filter(Boolean);
 
-    return NextResponse.json({ success: true });
+        if (fileNames.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('generations')
+            .remove(fileNames);
+          
+          if (storageError) {
+            console.error('Error deleting files from storage:', storageError);
+          }
+        }
+      } catch (storageErr) {
+        console.error('Error processing storage deletion:', storageErr);
+      }
+    }
+
+    // Удалить запись из базы данных
+    const { error: deleteError } = await supabase
+      .from('generations')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (deleteError) {
+      console.error('Error deleting generation:', deleteError);
+      return NextResponse.json(
+        { error: 'Failed to delete generation' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, deleted: true });
   } catch (error: any) {
     console.error('Delete generation error:', error);
     return NextResponse.json(
