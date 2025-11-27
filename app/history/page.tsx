@@ -25,6 +25,11 @@ function isVideoUrl(url: string): boolean {
   return videoExtensions.some(ext => lowercaseUrl.includes(ext));
 }
 
+// Проверка, является ли action видео действием
+function isVideoAction(action: string): boolean {
+  return action.startsWith('video_');
+}
+
 // Компонент для отображения превью видео (первый кадр)
 function VideoThumbnail({ src, alt }: { src: string; alt: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -232,7 +237,11 @@ export default function HistoryPage() {
                 <div
                   key={generation.id}
                   className="group cursor-pointer"
-                  onClick={() => router.push(`/?generationId=${generation.id}`)}
+                  onClick={() => {
+                    // Направляем на правильную страницу в зависимости от типа генерации
+                    const basePath = isVideoAction(generation.action) ? '/video' : '/';
+                    router.push(`${basePath}?generationId=${generation.id}`);
+                  }}
                 >
                   <div className="bg-[#101010] rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
                     {/* Image/Video with badge - square 1:1 */}

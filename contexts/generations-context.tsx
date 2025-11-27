@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 interface Generation {
   id: string;
   model_name: string;
+  action: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   created_at: string;
   viewed: boolean;

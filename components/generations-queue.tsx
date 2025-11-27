@@ -9,15 +9,21 @@ interface GenerationsQueueProps {
   onClose: () => void;
 }
 
+// Проверка, является ли action видео действием
+const isVideoAction = (action: string): boolean => {
+  return action?.startsWith('video_');
+};
+
 export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
   const router = useRouter();
   const { unviewedGenerations, markAsViewed } = useGenerations();
 
-  const handleGenerationClick = async (id: string) => {
+  const handleGenerationClick = async (id: string, action: string) => {
     // Mark as viewed before navigating
     await markAsViewed(id);
-    // Navigate to main page with generation ID to fill form
-    router.push(`/?generationId=${id}`);
+    // Navigate to correct page based on action type
+    const basePath = isVideoAction(action) ? '/video' : '/';
+    router.push(`${basePath}?generationId=${id}`);
     onClose();
   };
 
@@ -44,7 +50,7 @@ export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
             {unviewedGenerations.slice(0, 10).map((generation) => (
               <button
                 key={generation.id}
-                onClick={() => handleGenerationClick(generation.id)}
+                onClick={() => handleGenerationClick(generation.id, generation.action)}
                 className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#2f2f2f] transition-colors"
               >
                 <span className="font-inter text-sm text-white truncate">

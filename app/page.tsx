@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
 import { SettingsForm } from '@/components/settings-form';
@@ -10,8 +10,14 @@ import { Header } from '@/components/header';
 import { ActionType, getModelById } from '@/lib/models-config';
 import { useGenerations } from '@/contexts/generations-context';
 
+// Проверка, является ли action видео действием
+const isVideoAction = (action: string): boolean => {
+  return action.startsWith('video_');
+};
+
 function HomeContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const generationIdParam = searchParams.get('generationId');
   
   const [selectedAction, setSelectedAction] = useState<ActionType>('create');
@@ -30,6 +36,12 @@ function HomeContent() {
         const response = await fetch(`/api/generations/${generationIdParam}`);
         if (response.ok) {
           const generation = await response.json();
+          
+          // Если это видео генерация - редирект на /video
+          if (isVideoAction(generation.action)) {
+            router.replace(`/video?generationId=${generationIdParam}`);
+            return;
+          }
           
           // Set action and model
           setSelectedAction(generation.action);
@@ -50,7 +62,7 @@ function HomeContent() {
     };
 
     loadGeneration();
-  }, [generationIdParam]);
+  }, [generationIdParam, router]);
 
   const handleGenerationCreated = (generationId: string, generation: any) => {
     setCurrentGenerationId(generationId);
@@ -59,6 +71,7 @@ function HomeContent() {
       addGeneration({
         id: generation.id,
         model_name: generation.model_name,
+        action: generation.action || selectedAction,
         status: generation.status,
         created_at: generation.created_at,
         viewed: false, // Новая генерация всегда непросмотренная
@@ -102,9 +115,10 @@ function HomeContent() {
         // Add to global context
         addGeneration({
           id: result.id,
-          model_name: result.model_name,
-          status: result.status,
-          created_at: result.created_at,
+          model_name: model.name,
+          action: model.action,
+          status: result.status || 'processing',
+          created_at: result.created_at || new Date().toISOString(),
           viewed: false,
         });
         
