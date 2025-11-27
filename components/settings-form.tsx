@@ -608,7 +608,7 @@ export function SettingsForm({
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       {/* Only fields, no buttons */}
       {model.settings.map((setting) => (
         <div key={setting.name} className="flex flex-col gap-2 shrink-0">
@@ -628,6 +628,6 @@ export function SettingsForm({
           {error}
         </div>
       )}
-    </>
+    </div>
   );
 }
