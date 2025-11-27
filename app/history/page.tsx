@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { formatDate } from '@/lib/utils';
-import { Loader2, Download, Play } from 'lucide-react';
+import { Loader2, Download, Play, Trash2 } from 'lucide-react';
 
 interface Generation {
   id: string;
@@ -196,6 +196,29 @@ export default function HistoryPage() {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Удалить эту генерацию?')) return;
+    
+    try {
+      const response = await fetch(`/api/generations/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        // Удаляем из локального состояния
+        setGenerations(prev => prev.filter(g => g.id !== id));
+      } else {
+        console.error('Delete failed');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#050505]">
       <Header />
@@ -285,18 +308,27 @@ export default function HistoryPage() {
                         {generation.prompt || 'Без промпта'}
                       </p>
 
-                      {/* Date and download button */}
+                      {/* Date and action buttons */}
                       <div className="flex items-center justify-between">
                         <span className="font-inter text-xs text-[#656565]">
                           {formatDate(generation.created_at)}
                         </span>
-                        <button
-                          onClick={(e) => handleDownload(e, generation.output_urls?.[0] || '', generation.id)}
-                          className="p-2 rounded-lg border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
-                          title="Скачать"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => handleDelete(e, generation.id)}
+                            className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] hover:border-red-500/50 transition-colors"
+                            title="Удалить"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDownload(e, generation.output_urls?.[0] || '', generation.id)}
+                            className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+                            title="Скачать"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
