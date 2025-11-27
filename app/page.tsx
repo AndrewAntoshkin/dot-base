@@ -131,7 +131,7 @@ function HomeContent() {
           {/* Top content area */}
           <div className="flex-1 flex flex-col py-8">
             {/* Header */}
-            <div className="mb-6 shrink-0">
+            <div className="mb-6 shrink-0 animate-fade-in-up">
               <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
                 INPUT
               </h2>
@@ -140,31 +140,37 @@ function HomeContent() {
             {/* Form fields */}
             <div className="flex-1 flex flex-col gap-6">
               {/* Action Selector */}
-              <ActionSelector
-                value={selectedAction}
-                onChange={(action) => {
-                  setSelectedAction(action);
-                  setSelectedModelId('');
-                }}
-              />
+              <div className="animate-fade-in-up animate-delay-100">
+                <ActionSelector
+                  value={selectedAction}
+                  onChange={(action) => {
+                    setSelectedAction(action);
+                    setSelectedModelId('');
+                  }}
+                />
+              </div>
 
               {/* Model Selector */}
-              <ModelSelector
-                action={selectedAction}
-                value={selectedModelId}
-                onChange={setSelectedModelId}
-              />
+              <div className="animate-fade-in-up animate-delay-200">
+                <ModelSelector
+                  action={selectedAction}
+                  value={selectedModelId}
+                  onChange={setSelectedModelId}
+                />
+              </div>
 
               {/* Settings Form - только поля, без кнопок */}
               {selectedModelId && (
-                <SettingsForm
-                  modelId={selectedModelId}
-                  onGenerationCreated={handleGenerationCreated}
-                  onFormDataChange={setFormData}
-                  onSubmitStart={() => setIsGenerating(true)}
-                  onError={() => setIsGenerating(false)}
-                  initialData={formData}
-                />
+                <div className="animate-fade-in-up animate-delay-300">
+                  <SettingsForm
+                    modelId={selectedModelId}
+                    onGenerationCreated={handleGenerationCreated}
+                    onFormDataChange={setFormData}
+                    onSubmitStart={() => setIsGenerating(true)}
+                    onError={() => setIsGenerating(false)}
+                    initialData={formData}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -212,16 +218,18 @@ function HomeContent() {
 
         {/* RIGHT PANEL - OUTPUT */}
         <div className="flex-1 py-8 pl-0 pr-20 overflow-y-auto">
-          <div className="mb-6">
+          <div className="mb-6 animate-fade-in-up">
             <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
               OUTPUT
             </h2>
           </div>
 
-          <OutputPanel 
-            generationId={currentGenerationId} 
-            onRegenerate={handleRegenerate}
-          />
+          <div className="animate-fade-in-up animate-delay-200">
+            <OutputPanel 
+              generationId={currentGenerationId} 
+              onRegenerate={handleRegenerate}
+            />
+          </div>
         </div>
       </main>
     </div>
