@@ -4,16 +4,10 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
-
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== UPLOAD API START ===');
+    
     // Auth check
     const cookieStore = cookies();
     const supabaseAuth = createServerClient(
@@ -40,11 +34,16 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabaseAuth.auth.getUser();
     
     if (!user) {
+      console.log('Upload: Unauthorized');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log('Upload: User authenticated:', user.id);
+
     const body = await request.json();
     const { files } = body; // Array of base64 strings
+
+    console.log('Upload: Received files count:', files?.length || 0);
 
     if (!files || !Array.isArray(files) || files.length === 0) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 });
@@ -52,20 +51,27 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceRoleClient();
     const uploadedUrls: string[] = [];
+    const errors: string[] = [];
 
-    for (const base64Data of files) {
-      if (!base64Data || typeof base64Data !== 'string') continue;
+    for (let i = 0; i < files.length; i++) {
+      const base64Data = files[i];
+      if (!base64Data || typeof base64Data !== 'string') {
+        errors.push(`File ${i}: invalid data`);
+        continue;
+      }
 
       // Parse base64 data
       const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) {
-        console.error('Invalid base64 format');
+        errors.push(`File ${i}: invalid base64 format`);
         continue;
       }
 
       const mimeType = matches[1];
       const base64Content = matches[2];
       const buffer = Buffer.from(base64Content, 'base64');
+
+      console.log(`Upload: Processing file ${i}, type: ${mimeType}, size: ${buffer.length} bytes`);
 
       // Determine file extension
       const extMap: Record<string, string> = {
@@ -93,7 +99,8 @@ export async function POST(request: NextRequest) {
         });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+        console.error(`Upload error for file ${i}:`, uploadError);
+        errors.push(`File ${i}: ${uploadError.message}`);
         continue;
       }
 
@@ -104,12 +111,22 @@ export async function POST(request: NextRequest) {
 
       if (urlData?.publicUrl) {
         uploadedUrls.push(urlData.publicUrl);
+        console.log(`Upload: File ${i} uploaded successfully:`, urlData.publicUrl);
       }
     }
 
-    return NextResponse.json({ urls: uploadedUrls });
+    console.log('Upload: Complete. Uploaded:', uploadedUrls.length, 'Errors:', errors.length);
+
+    if (uploadedUrls.length === 0 && errors.length > 0) {
+      return NextResponse.json(
+        { error: 'Failed to upload files', details: errors },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ urls: uploadedUrls, errors: errors.length > 0 ? errors : undefined });
   } catch (error: any) {
-    console.error('Upload error:', error);
+    console.error('=== UPLOAD API ERROR ===', error);
     return NextResponse.json(
       { error: error.message || 'Upload failed' },
       { status: 500 }

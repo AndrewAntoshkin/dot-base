@@ -378,6 +378,7 @@ export function SettingsForm({
         
         if (setting.type === 'file' && fieldValue && fieldValue.startsWith('data:')) {
           // Загружаем одиночный файл
+          console.log(`Uploading file for ${setting.name}...`);
           const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -385,19 +386,25 @@ export function SettingsForm({
             body: JSON.stringify({ files: [fieldValue] }),
           });
           
+          const uploadResult = await uploadResponse.json();
+          
           if (!uploadResponse.ok) {
-            throw new Error('Не удалось загрузить файл');
+            console.error('Upload failed:', uploadResult);
+            throw new Error(uploadResult.error || 'Не удалось загрузить файл');
           }
           
-          const { urls } = await uploadResponse.json();
-          if (urls && urls.length > 0) {
-            processedSettings[setting.name] = urls[0];
+          if (uploadResult.urls && uploadResult.urls.length > 0) {
+            processedSettings[setting.name] = uploadResult.urls[0];
+            console.log(`File uploaded: ${uploadResult.urls[0]}`);
+          } else {
+            throw new Error('Файл не был загружен');
           }
         } else if (setting.type === 'file_array' && Array.isArray(fieldValue) && fieldValue.length > 0) {
           // Фильтруем только base64 строки
           const base64Files = fieldValue.filter((f: string) => f && f.startsWith('data:'));
           
           if (base64Files.length > 0) {
+            console.log(`Uploading ${base64Files.length} files for ${setting.name}...`);
             const uploadResponse = await fetch('/api/upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -405,13 +412,18 @@ export function SettingsForm({
               body: JSON.stringify({ files: base64Files }),
             });
             
+            const uploadResult = await uploadResponse.json();
+            
             if (!uploadResponse.ok) {
-              throw new Error('Не удалось загрузить файлы');
+              console.error('Upload failed:', uploadResult);
+              throw new Error(uploadResult.error || 'Не удалось загрузить файлы');
             }
             
-            const { urls } = await uploadResponse.json();
-            if (urls && urls.length > 0) {
-              processedSettings[setting.name] = urls;
+            if (uploadResult.urls && uploadResult.urls.length > 0) {
+              processedSettings[setting.name] = uploadResult.urls;
+              console.log(`Files uploaded: ${uploadResult.urls.length}`);
+            } else {
+              throw new Error('Файлы не были загружены');
             }
           }
         }
