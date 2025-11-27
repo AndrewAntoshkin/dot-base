@@ -2394,30 +2394,8 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 7. Hailuo 2.3 Fast
-  {
-    id: 'hailuo-2.3-fast-t2v',
-    name: 'hailuo-2.3-fast',
-    displayName: 'Hailuo 2.3 Fast',
-    replicateModel: 'minimax/hailuo-2.3-fast',
-    action: 'video_create',
-    description: 'MiniMax - быстрая генерация',
-    settings: [
-      {
-        name: 'prompt',
-        label: 'Prompt',
-        type: 'textarea',
-        required: true,
-        placeholder: 'Опишите видео...',
-      },
-      {
-        name: 'prompt_optimizer',
-        label: 'Оптимизация промпта',
-        type: 'checkbox',
-        default: true,
-      },
-    ],
-  },
+  // REMOVED: Hailuo 2.3 Fast - это только I2V модель, требует first_frame_image
+  // Используйте Hailuo 2.3 (не Fast) для T2V или другие модели
 ];
 
 /**
