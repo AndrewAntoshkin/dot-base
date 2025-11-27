@@ -18,9 +18,17 @@ interface Generation {
   prompt: string | null;
   model_id: string;
   model_name: string;
+  action: string;
   created_at: string;
   processing_time_ms: number | null;
   settings: Record<string, any>;
+}
+
+// Функция определения типа медиа по URL
+function isVideoUrl(url: string): boolean {
+  const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+  const lowercaseUrl = url.toLowerCase();
+  return videoExtensions.some(ext => lowercaseUrl.includes(ext));
 }
 
 export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
@@ -74,11 +82,13 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
 
     const link = document.createElement('a');
     link.href = blobUrl;
-    // Добавляем индекс если несколько изображений
+    // Добавляем индекс если несколько файлов
     const suffix = generation.output_urls && generation.output_urls.length > 1 
       ? `-${selectedImageIndex + 1}` 
       : '';
-    link.download = `generation-${generation.id}${suffix}.png`;
+    // Определяем расширение по типу контента
+    const extension = isVideoUrl(url) ? 'mp4' : 'png';
+    link.download = `generation-${generation.id}${suffix}.${extension}`;
     link.click();
 
     URL.revokeObjectURL(blobUrl);
@@ -216,54 +226,75 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
     );
   }
 
-  // Получаем URL текущего выбранного изображения
-  const currentImageUrl = generation.output_urls?.[selectedImageIndex] || generation.output_urls?.[0];
+  // Получаем URL текущего выбранного результата
+  const currentMediaUrl = generation.output_urls?.[selectedImageIndex] || generation.output_urls?.[0];
+  const isVideo = currentMediaUrl ? isVideoUrl(currentMediaUrl) : false;
 
-  // Completed state - result with image in gray area (660px height)
+  // Completed state - result with image/video in gray area (660px height)
   return (
     <div className="flex flex-col w-full">
-      {/* Gray area 660px - image container */}
-      {currentImageUrl && (
+      {/* Gray area 660px - media container */}
+      {currentMediaUrl && (
         <div className="relative w-full h-[660px] bg-[#0a0a0a] rounded-2xl overflow-hidden mb-4 flex items-center justify-center">
-          <Image
-            src={currentImageUrl}
-            alt="Generated image"
-            width={1200}
-            height={660}
-            className={
-              imageAspectRatio === 'landscape'
-                ? 'w-full h-auto' // Горизонтальная - по ширине в края
-                : 'h-[660px] w-auto' // Вертикальная или квадрат - по высоте полностью
-            }
-            onLoad={handleImageLoad}
-            priority
-          />
+          {isVideo ? (
+            <video
+              src={currentMediaUrl}
+              controls
+              autoPlay
+              loop
+              muted
+              className="max-w-full max-h-[660px] w-auto h-auto"
+            />
+          ) : (
+            <Image
+              src={currentMediaUrl}
+              alt="Generated image"
+              width={1200}
+              height={660}
+              className={
+                imageAspectRatio === 'landscape'
+                  ? 'w-full h-auto' // Горизонтальная - по ширине в края
+                  : 'h-[660px] w-auto' // Вертикальная или квадрат - по высоте полностью
+              }
+              onLoad={handleImageLoad}
+              priority
+            />
+          )}
         </div>
       )}
 
       {/* Thumbnails row - 40x40px with gap 8px - КЛИКАБЕЛЬНЫЕ с белой обводкой */}
       {generation.output_urls && generation.output_urls.length > 1 && (
         <div className="flex gap-2 items-center mb-4 ml-1 py-1">
-          {generation.output_urls.map((url, index) => (
-            <button
-              key={index}
-              onClick={() => setSelectedImageIndex(index)}
-              className={`
-                relative w-10 h-10 rounded-lg overflow-hidden shrink-0 transition-all
-                ${selectedImageIndex === index 
-                  ? 'ring-2 ring-white ring-offset-2 ring-offset-[#050505]' 
-                  : 'opacity-70 hover:opacity-100'
-                }
-              `}
-            >
-              <Image
-                src={url}
-                alt={`Output ${index + 1}`}
-                fill
-                className="object-cover"
-              />
-            </button>
-          ))}
+          {generation.output_urls.map((url, index) => {
+            const isThumbVideo = isVideoUrl(url);
+            return (
+              <button
+                key={index}
+                onClick={() => setSelectedImageIndex(index)}
+                className={`
+                  relative w-10 h-10 rounded-lg overflow-hidden shrink-0 transition-all
+                  ${selectedImageIndex === index 
+                    ? 'ring-2 ring-white ring-offset-2 ring-offset-[#050505]' 
+                    : 'opacity-70 hover:opacity-100'
+                  }
+                `}
+              >
+                {isThumbVideo ? (
+                  <div className="w-full h-full bg-[#1f1f1f] flex items-center justify-center">
+                    <span className="text-xs">🎬</span>
+                  </div>
+                ) : (
+                  <Image
+                    src={url}
+                    alt={`Output ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
