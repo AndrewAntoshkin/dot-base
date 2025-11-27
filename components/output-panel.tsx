@@ -132,7 +132,7 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
           {/* Step 1 - Выбор модели */}
           <div className="flex-1 flex flex-col py-2">
             <Image
-              src="/numbers/1.svg"
+              src="/numbers/1.png"
               alt="1"
               width={36}
               height={64}
@@ -151,7 +151,7 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
           {/* Step 2 - Промпт */}
           <div className="flex-1 flex flex-col py-2">
             <Image
-              src="/numbers/2.svg"
+              src="/numbers/2.png"
               alt="2"
               width={55}
               height={64}
@@ -170,7 +170,7 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
           {/* Step 3 - Настройки */}
           <div className="flex-1 flex flex-col py-2">
             <Image
-              src="/numbers/3.svg"
+              src="/numbers/3.png"
               alt="3"
               width={53}
               height={64}
