@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 
 export async function GET(
@@ -68,9 +69,33 @@ export async function GET(
 
         // Обновить статус если изменился
         if (prediction.status === 'succeeded') {
-          const outputUrls = Array.isArray(prediction.output)
-            ? prediction.output
-            : [prediction.output];
+          // Обработка вывода от Replicate (может быть строка, массив или объект)
+          let replicateUrls: string[] = [];
+          const output = prediction.output;
+          
+          if (typeof output === 'string') {
+            replicateUrls = [output];
+          } else if (Array.isArray(output)) {
+            replicateUrls = output.filter(url => typeof url === 'string');
+          } else if (output && typeof output === 'object') {
+            // Некоторые модели возвращают объект с URL внутри
+            const possibleUrlFields = ['url', 'video', 'output', 'result'];
+            for (const field of possibleUrlFields) {
+              if ((output as any)[field] && typeof (output as any)[field] === 'string') {
+                replicateUrls = [(output as any)[field]];
+                break;
+              }
+            }
+          }
+
+          // Сохранить медиа в storage
+          let outputUrls = replicateUrls;
+          if (replicateUrls.length > 0) {
+            const savedUrls = await saveGenerationMedia(replicateUrls, generation.id);
+            if (savedUrls.length > 0) {
+              outputUrls = savedUrls;
+            }
+          }
 
           await supabase
             .from('generations')
