@@ -213,15 +213,32 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
 
   // Failed state
   if (generation.status === 'failed') {
+    // Определяем тип ошибки для понятного feedback
+    const errorMsg = generation.error_message || 'Неизвестная ошибка';
+    const isRetryError = errorMsg.toLowerCase().includes('retry') || errorMsg.toLowerCase().includes('multiple');
+    const isSafetyError = errorMsg.toLowerCase().includes('safety') || errorMsg.toLowerCase().includes('blocked') || errorMsg.toLowerCase().includes('flagged');
+    
+    let suggestion = '';
+    if (isRetryError) {
+      suggestion = 'Попробуйте: упростить промпт, использовать другое изображение или изменить настройки.';
+    } else if (isSafetyError) {
+      suggestion = 'Контент заблокирован фильтром безопасности. Измените промпт или изображение.';
+    }
+    
     return (
       <div className="flex items-center justify-center min-h-[660px]">
-        <div className="text-center">
+        <div className="text-center max-w-md px-4">
           <p className="font-inter font-medium text-base text-red-500 mb-2">
             Ошибка генерации
           </p>
-          <p className="font-inter text-sm text-[#959595]">
-            {generation.error_message}
+          <p className="font-inter text-sm text-[#959595] mb-3">
+            {errorMsg}
           </p>
+          {suggestion && (
+            <p className="font-inter text-xs text-[#656565]">
+              💡 {suggestion}
+            </p>
+          )}
         </div>
       </div>
     );
