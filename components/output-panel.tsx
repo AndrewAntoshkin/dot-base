@@ -127,61 +127,62 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
 
   if (!generationId && !generation) {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="bg-[#101010] rounded-2xl p-20 min-h-[660px] flex items-center justify-center">
-          <div className="flex gap-2 w-full">
-            {/* Card 1 - Выбор модели */}
-            <div className="flex-1 bg-[#101010] rounded-[20px] p-2 flex flex-col">
-              <div className="h-40 bg-[#151515] rounded-xl mb-4" />
-              <div className="px-3 py-4 flex flex-col gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <p className="font-inter font-medium text-xs text-[#656565]">
-                    Шаг 1
-                  </p>
-                  <p className="font-inter font-medium text-base text-white">
-                    Выбор модели
-                  </p>
-                </div>
-                <p className="font-inter text-sm text-[silver]">
-                  Выберите действие и модель для начала генерации
-                </p>
-              </div>
+      <div className="flex items-center justify-center min-h-[660px] px-20">
+        <div className="flex gap-12 w-full">
+          {/* Step 1 - Выбор модели */}
+          <div className="flex-1 flex flex-col py-2">
+            <Image
+              src="/numbers/1.svg"
+              alt="1"
+              width={36}
+              height={64}
+              className="mb-0"
+            />
+            <div className="flex flex-col gap-2 py-6">
+              <h3 className="font-inter font-semibold text-xl text-white">
+                Выбор модели
+              </h3>
+              <p className="font-inter text-sm text-[#9c9c9c] leading-5">
+                Выберите действие и модель для начала генерации
+              </p>
             </div>
+          </div>
 
-            {/* Card 2 - Промпт */}
-            <div className="flex-1 bg-[#101010] rounded-[20px] p-2 flex flex-col">
-              <div className="h-40 bg-[#151515] rounded-xl mb-4" />
-              <div className="px-3 py-4 flex flex-col gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <p className="font-inter font-medium text-xs text-[#656565]">
-                    Шаг 2
-                  </p>
-                  <p className="font-inter font-medium text-base text-white">
-                    Промпт
-                  </p>
-                </div>
-                <p className="font-inter text-sm text-[silver]">
-                  Опишите что вы хотите создать или изменить
-                </p>
-              </div>
+          {/* Step 2 - Промпт */}
+          <div className="flex-1 flex flex-col py-2">
+            <Image
+              src="/numbers/2.svg"
+              alt="2"
+              width={55}
+              height={64}
+              className="mb-0"
+            />
+            <div className="flex flex-col gap-2 py-6">
+              <h3 className="font-inter font-semibold text-xl text-white">
+                Промпт
+              </h3>
+              <p className="font-inter text-sm text-[#9c9c9c] leading-5">
+                Опишите что вы хотите создать или изменить
+              </p>
             </div>
+          </div>
 
-            {/* Card 3 - Настройки */}
-            <div className="flex-1 bg-[#101010] rounded-[20px] p-2 flex flex-col">
-              <div className="h-40 bg-[#151515] rounded-xl mb-4" />
-              <div className="px-3 py-4 flex flex-col gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <p className="font-inter font-medium text-xs text-[#656565]">
-                    Шаг 3
-                  </p>
-                  <p className="font-inter font-medium text-base text-white">
-                    Настройки
-                  </p>
-                </div>
-                <p className="font-inter text-sm text-[silver]">
-                  Настройте параметры генерации для лучшего результата
-                </p>
-              </div>
+          {/* Step 3 - Настройки */}
+          <div className="flex-1 flex flex-col py-2">
+            <Image
+              src="/numbers/3.svg"
+              alt="3"
+              width={53}
+              height={64}
+              className="mb-0"
+            />
+            <div className="flex flex-col gap-2 py-6">
+              <h3 className="font-inter font-semibold text-xl text-white">
+                Настройки
+              </h3>
+              <p className="font-inter text-sm text-[#9c9c9c] leading-5">
+                Настройте параметры генерации для лучшего результата
+              </p>
             </div>
           </div>
         </div>
