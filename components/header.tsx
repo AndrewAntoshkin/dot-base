@@ -59,18 +59,20 @@ export function Header() {
           <nav className="flex items-start gap-1">
             <Link
               href="/"
-              className={`px-3 py-2 rounded font-inter font-medium text-base text-white tracking-[-0.32px] ${
-                pathname === '/' ? 'bg-[#1f1f1f]' : ''
+              className={`px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
+                pathname === '/' ? 'bg-[#1f1f1f] text-white' : 'text-[#656565] hover:text-white'
               }`}
             >
               Image
             </Link>
-            <span
-              className="px-3 py-2 rounded font-inter font-medium text-base text-[#656565] tracking-[-0.32px] cursor-not-allowed"
-              title="Coming soon"
+            <Link
+              href="/video"
+              className={`px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
+                pathname === '/video' ? 'bg-[#1f1f1f] text-white' : 'text-[#656565] hover:text-white'
+              }`}
             >
               Video
-            </span>
+            </Link>
             <span
               className="px-3 py-2 rounded font-inter font-medium text-base text-[#656565] tracking-[-0.32px] cursor-not-allowed"
               title="Coming soon"
