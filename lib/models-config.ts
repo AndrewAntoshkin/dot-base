@@ -45,7 +45,7 @@ export interface Model {
 }
 
 /**
- * СОЗДАТЬ ИЗОБРАЖЕНИЕ - 12 моделей
+ * СОЗДАТЬ ИЗОБРАЖЕНИЕ - 14 моделей
  */
 export const CREATE_MODELS: Model[] = [
   // 1. FLUX 2 Pro
@@ -982,6 +982,118 @@ export const CREATE_MODELS: Model[] = [
         default: 'latest',
         options: [
           { value: 'latest', label: 'Последняя' },
+        ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 13. Z-Image Turbo (PrunaAI)
+  {
+    id: 'z-image-turbo',
+    name: 'z-image-turbo',
+    displayName: 'Z-Image Turbo',
+    replicateModel: 'prunaai/z-image-turbo',
+    action: 'create',
+    runs: '3.6K runs',
+    price: '$0.009 per image',
+    description: 'Супербыстрая генерация (8 шагов), отлично рендерит текст на EN/CN',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изображение...',
+        description: 'Детальные описания работают лучше. Поддерживает текст на EN и CN.',
+      },
+      {
+        name: 'width',
+        label: 'Ширина',
+        type: 'slider',
+        default: 1024,
+        min: 512,
+        max: 1536,
+        step: 64,
+      },
+      {
+        name: 'height',
+        label: 'Высота',
+        type: 'slider',
+        default: 1024,
+        min: 512,
+        max: 1536,
+        step: 64,
+      },
+      {
+        name: 'num_inference_steps',
+        label: 'Шаги',
+        type: 'slider',
+        default: 9,
+        min: 4,
+        max: 20,
+        description: '8-9 шагов оптимально для turbo модели',
+      },
+      {
+        name: 'guidance_scale',
+        label: 'Guidance Scale',
+        type: 'slider',
+        default: 0,
+        min: 0,
+        max: 5,
+        step: 0.5,
+        description: '0.0 рекомендуется для turbo моделей',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости',
+      },
+    ],
+  },
+
+  // 14. Gen4 Image Turbo (Runway)
+  {
+    id: 'gen4-image-turbo',
+    name: 'gen4-image-turbo',
+    displayName: 'Gen4 Image Turbo',
+    replicateModel: 'runwayml/gen4-image-turbo',
+    action: 'create',
+    runs: '82.3K runs',
+    description: 'Runway - быстрая генерация с референсами (до 3 изображений)',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изображение... Используйте @ref1, @ref2 для ссылок на референсы',
+        description: 'Естественные описания. Используйте @ref1 для ссылки на референс.',
+      },
+      {
+        name: 'reference_images',
+        label: 'Референсные изображения',
+        type: 'file_array',
+        description: 'До 3 изображений для сохранения персонажа/локации',
+        maxFiles: 3,
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '1:1', label: '1:1' },
+          { value: '21:9', label: '21:9' },
         ],
       },
       {
