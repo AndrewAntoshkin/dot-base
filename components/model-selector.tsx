@@ -45,7 +45,14 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
               value={model.id}
               className="font-inter text-[14px] text-white focus:bg-[#1f1f1f]"
             >
-              {model.displayName}
+              <span className="flex items-center gap-2">
+                {model.displayName}
+                {model.id === 'nano-banana-pro' && (
+                  <span className="bg-red-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                    HOT 🔥
+                  </span>
+                )}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
