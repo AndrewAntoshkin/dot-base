@@ -369,6 +369,54 @@ export function SettingsForm({
       // Определяем, это видео модель или нет
       const isVideoAction = model.action.startsWith('video_');
       
+      // Подготавливаем settings - конвертируем base64 файлы в URL через upload API
+      const processedSettings = { ...formData };
+      
+      // Найти все file и file_array поля с base64 данными
+      for (const setting of model.settings) {
+        const fieldValue = formData[setting.name];
+        
+        if (setting.type === 'file' && fieldValue && fieldValue.startsWith('data:')) {
+          // Загружаем одиночный файл
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ files: [fieldValue] }),
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error('Не удалось загрузить файл');
+          }
+          
+          const { urls } = await uploadResponse.json();
+          if (urls && urls.length > 0) {
+            processedSettings[setting.name] = urls[0];
+          }
+        } else if (setting.type === 'file_array' && Array.isArray(fieldValue) && fieldValue.length > 0) {
+          // Фильтруем только base64 строки
+          const base64Files = fieldValue.filter((f: string) => f && f.startsWith('data:'));
+          
+          if (base64Files.length > 0) {
+            const uploadResponse = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ files: base64Files }),
+            });
+            
+            if (!uploadResponse.ok) {
+              throw new Error('Не удалось загрузить файлы');
+            }
+            
+            const { urls } = await uploadResponse.json();
+            if (urls && urls.length > 0) {
+              processedSettings[setting.name] = urls;
+            }
+          }
+        }
+      }
+      
       const response = await fetch('/api/generations/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -377,9 +425,9 @@ export function SettingsForm({
           action: model.action,
           model_id: model.id,
           prompt: formData.prompt,
-          input_image_url: formData.image || formData.start_image || formData.first_frame_image,
-          input_video_url: isVideoAction ? formData.video : undefined,
-          settings: formData,
+          input_image_url: processedSettings.image || processedSettings.input_image || processedSettings.start_image || processedSettings.first_frame_image,
+          input_video_url: isVideoAction ? processedSettings.video : undefined,
+          settings: processedSettings,
         }),
       });
 
