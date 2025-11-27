@@ -20,24 +20,31 @@ function FileUploader({
   value,
   onChange,
   description,
+  acceptVideo = false,
 }: {
   settingName: string;
   value: string | null | undefined;
   onChange: (value: string | null) => void;
   description?: string;
+  acceptVideo?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Определяем, это видео или изображение по settingName
+  const isVideoField = settingName.toLowerCase().includes('video') || acceptVideo;
+  const acceptType = isVideoField ? 'image/*,video/*' : 'image/*';
+
   const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) return;
+    const isValidType = file.type.startsWith('image/') || (isVideoField && file.type.startsWith('video/'));
+    if (!isValidType) return;
     
     const reader = new FileReader();
     reader.onloadend = () => {
       onChange(reader.result as string);
     };
     reader.readAsDataURL(file);
-  }, [onChange]);
+  }, [onChange, isVideoField]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -72,15 +79,26 @@ function FileUploader({
     e.target.value = '';
   }, [handleFile]);
 
+  // Определяем тип содержимого для превью
+  const isVideoContent = value?.startsWith('data:video/');
+
   if (value) {
     return (
       <div className="relative">
         <div className="relative rounded-[10px] overflow-hidden bg-[#101010]">
-          <img
-            src={value}
-            alt="Uploaded"
-            className="w-full h-48 object-contain bg-[#0a0a0a]"
-          />
+          {isVideoContent ? (
+            <video
+              src={value}
+              className="w-full h-48 object-contain bg-[#0a0a0a]"
+              controls
+            />
+          ) : (
+            <img
+              src={value}
+              alt="Uploaded"
+              className="w-full h-48 object-contain bg-[#0a0a0a]"
+            />
+          )}
           <button
             type="button"
             onClick={() => onChange(null)}
@@ -114,13 +132,13 @@ function FileUploader({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={acceptType}
           onChange={handleInputChange}
           className="hidden"
         />
         <ImageIcon className="w-5 h-5 text-[#959595]" />
         <span className="font-inter text-[14px] text-[#959595]">
-          Выберите на устройстве
+          {isVideoField ? 'Выберите файл' : 'Выберите на устройстве'}
         </span>
       </div>
       {description && (
@@ -139,6 +157,7 @@ function MultiFileUploader({
   description,
   selectedIndex,
   onSelectIndex,
+  acceptVideo = false,
 }: {
   settingName: string;
   value: string[];
@@ -147,6 +166,7 @@ function MultiFileUploader({
   description?: string;
   selectedIndex?: number;
   onSelectIndex?: (index: number) => void;
+  acceptVideo?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -154,11 +174,14 @@ function MultiFileUploader({
   const valueRef = useRef(value);
   valueRef.current = value;
 
+  // Определяем, это видео или изображение по settingName
+  const isVideoField = settingName.toLowerCase().includes('video') || acceptVideo;
+
   const handleFiles = useCallback(async (files: FileList) => {
     const currentValue = valueRef.current;
     const remainingSlots = maxFiles - currentValue.length;
     const filesToProcess = Array.from(files)
-      .filter(file => file.type.startsWith('image/'))
+      .filter(file => file.type.startsWith('image/') || (isVideoField && file.type.startsWith('video/')))
       .slice(0, remainingSlots);
     
     if (filesToProcess.length === 0) return;
@@ -241,14 +264,14 @@ function MultiFileUploader({
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept={isVideoField ? 'image/*,video/*' : 'image/*'}
             multiple
             onChange={handleInputChange}
             className="hidden"
           />
           <ImageIcon className="w-5 h-5 text-[#959595]" />
           <span className="font-inter text-[14px] text-[#959595]">
-            Добавить изображения ({value.length}/{maxFiles})
+            {isVideoField ? `Добавить файлы (${value.length}/${maxFiles})` : `Добавить изображения (${value.length}/${maxFiles})`}
           </span>
         </div>
       )}
@@ -343,6 +366,9 @@ export function SettingsForm({
     setError(null);
 
     try {
+      // Определяем, это видео модель или нет
+      const isVideoAction = model.action.startsWith('video_');
+      
       const response = await fetch('/api/generations/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -351,7 +377,8 @@ export function SettingsForm({
           action: model.action,
           model_id: model.id,
           prompt: formData.prompt,
-          input_image_url: formData.image,
+          input_image_url: formData.image || formData.start_image || formData.first_frame_image,
+          input_video_url: isVideoAction ? formData.video : undefined,
           settings: formData,
         }),
       });

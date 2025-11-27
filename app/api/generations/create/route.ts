@@ -7,10 +7,14 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 const createGenerationSchema = z.object({
-  action: z.enum(['create', 'edit', 'upscale', 'remove_bg']),
+  action: z.enum([
+    'create', 'edit', 'upscale', 'remove_bg',
+    'video_create', 'video_i2v', 'video_edit', 'video_upscale'
+  ]),
   model_id: z.string(),
   prompt: z.string().optional(),
   input_image_url: z.string().optional(),
+  input_video_url: z.string().optional(),
   settings: z.record(z.any()).optional(),
 });
 
@@ -87,6 +91,10 @@ export async function POST(request: NextRequest) {
       replicateInput.image = validatedData.input_image_url;
     }
 
+    if (validatedData.input_video_url) {
+      replicateInput.video = validatedData.input_video_url;
+    }
+
     // Создать запись в БД
     const { data: generation, error: insertError } = await supabase
       .from('generations')
@@ -98,6 +106,7 @@ export async function POST(request: NextRequest) {
         replicate_model: model.replicateModel,
         prompt: validatedData.prompt,
         input_image_url: validatedData.input_image_url,
+        input_video_url: validatedData.input_video_url,
         settings: validatedData.settings || {},
         status: 'pending',
         replicate_input: replicateInput,
@@ -158,6 +167,13 @@ export async function POST(request: NextRequest) {
         status: 'processing',
       });
     } catch (replicateError: any) {
+      console.error('=== REPLICATE ERROR ===');
+      console.error('Error message:', replicateError.message);
+      console.error('Error name:', replicateError.name);
+      console.error('Error stack:', replicateError.stack);
+      console.error('Full error object:', JSON.stringify(replicateError, null, 2));
+      console.error('Error response:', replicateError.response?.data);
+      
       // Обновить статус на failed
       await supabase
         .from('generations')
@@ -168,7 +184,15 @@ export async function POST(request: NextRequest) {
         .eq('id', generation.id);
 
       return NextResponse.json(
-        { error: 'Failed to start generation', details: replicateError.message },
+        { 
+          error: 'Failed to start generation', 
+          details: replicateError.message,
+          fullError: process.env.NODE_ENV === 'development' ? {
+            name: replicateError.name,
+            message: replicateError.message,
+            response: replicateError.response?.data
+          } : undefined
+        },
         { status: 500 }
       );
     }

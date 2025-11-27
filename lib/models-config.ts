@@ -4,7 +4,7 @@
  * Обновлено: 2025-11-26
  */
 
-export type ActionType = 'create' | 'edit' | 'upscale' | 'remove_bg';
+export type ActionType = 'create' | 'edit' | 'upscale' | 'remove_bg' | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale';
 
 export type SettingType = 
   | 'text' 
@@ -2082,6 +2082,1159 @@ export const REMOVE_BG_MODELS: Model[] = [
 ];
 
 /**
+ * СОЗДАТЬ ВИДЕО (Text-to-Video) - 7 моделей
+ */
+export const VIDEO_CREATE_MODELS: Model[] = [
+  // 1. Google Veo 3.1 Fast
+  {
+    id: 'veo-3.1-fast',
+    name: 'veo-3.1-fast',
+    displayName: 'Veo 3.1 Fast',
+    replicateModel: 'google/veo-3.1-fast',
+    action: 'video_create',
+    description: 'Google - быстрая генерация видео с аудио',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '8', label: '8 секунд' },
+        ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости',
+      },
+    ],
+  },
+
+  // 2. Kling v2.5 Turbo Pro
+  {
+    id: 'kling-v2.5-turbo-pro-t2v',
+    name: 'kling-v2.5-turbo-pro',
+    displayName: 'Kling v2.5 Turbo Pro',
+    replicateModel: 'kwaivgi/kling-v2.5-turbo-pro',
+    action: 'video_create',
+    description: 'Kuaishou - высококачественное видео',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Соответствие промпту',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 3. Hailuo 2.3
+  {
+    id: 'hailuo-2.3-t2v',
+    name: 'hailuo-2.3',
+    displayName: 'Hailuo 2.3',
+    replicateModel: 'minimax/hailuo-2.3',
+    action: 'video_create',
+    description: 'MiniMax - качественное видео с управлением камерой',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+        ],
+      },
+      {
+        name: 'prompt_optimizer',
+        label: 'Оптимизация промпта',
+        type: 'checkbox',
+        default: true,
+      },
+    ],
+  },
+
+  // 4. Kling v2.1
+  {
+    id: 'kling-v2.1-t2v',
+    name: 'kling-v2.1',
+    displayName: 'Kling v2.1',
+    replicateModel: 'kwaivgi/kling-v2.1',
+    action: 'video_create',
+    description: 'Kuaishou - стабильное видео 1080p',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 5. Wan 2.5 T2V
+  {
+    id: 'wan-2.5-t2v',
+    name: 'wan-2.5-t2v',
+    displayName: 'Wan 2.5 T2V',
+    replicateModel: 'wan-video/wan-2.5-t2v',
+    action: 'video_create',
+    description: 'Wan - текст в видео высокого качества',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: '',
+      },
+      {
+        name: 'size',
+        label: 'Размер',
+        type: 'select',
+        default: '1280x720',
+        options: [
+          { value: '1280x720', label: '1280×720 (720p)' },
+          { value: '720x1280', label: '720×1280 (Vertical)' },
+          { value: '1024x1024', label: '1024×1024 (Square)' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 6. Kling v2.0
+  {
+    id: 'kling-v2.0-t2v',
+    name: 'kling-v2.0',
+    displayName: 'Kling v2.0',
+    replicateModel: 'kwaivgi/kling-v2.0',
+    action: 'video_create',
+    description: 'Kuaishou - базовая версия 720p',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+      },
+    ],
+  },
+
+  // 7. Hailuo 2.3 Fast
+  {
+    id: 'hailuo-2.3-fast-t2v',
+    name: 'hailuo-2.3-fast',
+    displayName: 'Hailuo 2.3 Fast',
+    replicateModel: 'minimax/hailuo-2.3-fast',
+    action: 'video_create',
+    description: 'MiniMax - быстрая генерация',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'prompt_optimizer',
+        label: 'Оптимизация промпта',
+        type: 'checkbox',
+        default: true,
+      },
+    ],
+  },
+];
+
+/**
+ * КАРТИНКА → ВИДЕО (Image-to-Video) - 8 моделей
+ */
+export const VIDEO_I2V_MODELS: Model[] = [
+  // 1. Kling v2.5 Turbo Pro I2V
+  {
+    id: 'kling-v2.5-turbo-pro-i2v',
+    name: 'kling-v2.5-turbo-pro',
+    displayName: 'Kling v2.5 Turbo Pro',
+    replicateModel: 'kwaivgi/kling-v2.5-turbo-pro',
+    action: 'video_i2v',
+    description: 'Kuaishou - анимация изображения',
+    settings: [
+      {
+        name: 'start_image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Первый кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 2. Seedance 1 Pro Fast
+  {
+    id: 'seedance-1-pro-fast',
+    name: 'seedance-1-pro-fast',
+    displayName: 'Seedance 1 Pro Fast',
+    replicateModel: 'bytedance/seedance-1-pro-fast',
+    action: 'video_i2v',
+    description: 'ByteDance - быстрая анимация до 1080p',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        description: 'Опционально для I2V',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '480p', label: '480p' },
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '21:9', label: '21:9' },
+          { value: '9:21', label: '9:21' },
+        ],
+        description: 'Игнорируется при использовании изображения',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'slider',
+        default: 5,
+        min: 2,
+        max: 12,
+      },
+      {
+        name: 'fps',
+        label: 'FPS',
+        type: 'number',
+        default: 24,
+      },
+      {
+        name: 'camera_fixed',
+        label: 'Фиксированная камера',
+        type: 'checkbox',
+        default: false,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 3. Wan 2.5 I2V Fast
+  {
+    id: 'wan-2.5-i2v-fast',
+    name: 'wan-2.5-i2v-fast',
+    displayName: 'Wan 2.5 I2V Fast',
+    replicateModel: 'wan-video/wan-2.5-i2v-fast',
+    action: 'video_i2v',
+    description: 'Wan - быстрая анимация изображений',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: '',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '720p',
+        options: [
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'audio',
+        label: 'Аудио файл',
+        type: 'file',
+        description: 'WAV/MP3, 3-30 сек, до 15MB',
+      },
+      {
+        name: 'enable_prompt_expansion',
+        label: 'Улучшение промпта',
+        type: 'checkbox',
+        default: true,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 4. Hailuo 2.3 Fast I2V
+  {
+    id: 'hailuo-2.3-fast-i2v',
+    name: 'hailuo-2.3-fast',
+    displayName: 'Hailuo 2.3 Fast',
+    replicateModel: 'minimax/hailuo-2.3-fast',
+    action: 'video_i2v',
+    description: 'MiniMax - быстрая анимация',
+    settings: [
+      {
+        name: 'first_frame_image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Первый кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'prompt_optimizer',
+        label: 'Оптимизация промпта',
+        type: 'checkbox',
+        default: true,
+      },
+    ],
+  },
+
+  // 5. Seedance 1 Pro
+  {
+    id: 'seedance-1-pro',
+    name: 'seedance-1-pro',
+    displayName: 'Seedance 1 Pro',
+    replicateModel: 'bytedance/seedance-1-pro',
+    action: 'video_i2v',
+    description: 'ByteDance - премиум качество',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        description: 'Опционально для I2V',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '480p', label: '480p' },
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'slider',
+        default: 5,
+        min: 2,
+        max: 12,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 6. Kling v2.0 I2V
+  {
+    id: 'kling-v2.0-i2v',
+    name: 'kling-v2.0',
+    displayName: 'Kling v2.0',
+    replicateModel: 'kwaivgi/kling-v2.0',
+    action: 'video_i2v',
+    description: 'Kuaishou - базовая анимация',
+    settings: [
+      {
+        name: 'start_image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Первый кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+      },
+    ],
+  },
+
+  // 7. Video-01 Director
+  {
+    id: 'video-01-director',
+    name: 'video-01-director',
+    displayName: 'Video-01 Director',
+    replicateModel: 'minimax/video-01-director',
+    action: 'video_i2v',
+    description: 'MiniMax - управление камерой [Pan left/right]',
+    settings: [
+      {
+        name: 'first_frame_image',
+        label: 'Изображение',
+        type: 'file',
+        description: 'Первый кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: '[Pan left] Опишите движение... [Zoom in]',
+        description: 'Используйте [Движение] для контроля камеры',
+      },
+      {
+        name: 'prompt_optimizer',
+        label: 'Оптимизация промпта',
+        type: 'checkbox',
+        default: true,
+      },
+    ],
+  },
+
+  // 8. Runway Gen4 Turbo
+  {
+    id: 'gen4-turbo-i2v',
+    name: 'gen4-turbo',
+    displayName: 'Runway Gen4 Turbo',
+    replicateModel: 'runwayml/gen4-turbo',
+    action: 'video_i2v',
+    description: 'Runway - премиум анимация',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Первый кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '1:1', label: '1:1' },
+          { value: '21:9', label: '21:9' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+];
+
+/**
+ * РЕДАКТИРОВАТЬ ВИДЕО - 6 моделей
+ */
+export const VIDEO_EDIT_MODELS: Model[] = [
+  // 1. Luma Modify Video
+  {
+    id: 'luma-modify-video',
+    name: 'modify-video',
+    displayName: 'Luma Modify Video',
+    replicateModel: 'luma/modify-video',
+    action: 'video_edit',
+    description: 'Luma - стиль и трансформация видео',
+    settings: [
+      {
+        name: 'video',
+        label: 'Видео',
+        type: 'file',
+        required: true,
+        description: 'Макс. 100MB, 30 сек',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        placeholder: 'Опишите изменения...',
+        description: 'make it anime, make it cinematic...',
+      },
+      {
+        name: 'mode',
+        label: 'Режим',
+        type: 'select',
+        default: 'flex_1',
+        options: [
+          { value: 'adhere_1', label: 'Adhere 1 (очень близко)' },
+          { value: 'adhere_2', label: 'Adhere 2' },
+          { value: 'adhere_3', label: 'Adhere 3' },
+          { value: 'flex_1', label: 'Flex 1 (баланс)' },
+          { value: 'flex_2', label: 'Flex 2' },
+          { value: 'flex_3', label: 'Flex 3' },
+          { value: 'reimagine_1', label: 'Reimagine 1 (творческий)' },
+          { value: 'reimagine_2', label: 'Reimagine 2' },
+          { value: 'reimagine_3', label: 'Reimagine 3' },
+        ],
+        description: 'Насколько близко к оригиналу',
+      },
+      {
+        name: 'first_frame',
+        label: 'Первый кадр',
+        type: 'file',
+        description: 'Модифицированный первый кадр для направления',
+      },
+    ],
+  },
+
+  // 2. Luma Reframe Video
+  {
+    id: 'luma-reframe-video',
+    name: 'reframe-video',
+    displayName: 'Luma Reframe Video',
+    replicateModel: 'luma/reframe-video',
+    action: 'video_edit',
+    description: 'Luma - изменение соотношения сторон',
+    settings: [
+      {
+        name: 'video',
+        label: 'Видео',
+        type: 'file',
+        required: true,
+        description: 'Макс. 30 сек',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        placeholder: 'Опишите контекст...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9 (YouTube)' },
+          { value: '9:16', label: '9:16 (TikTok/Reels)' },
+          { value: '1:1', label: '1:1 (Square)' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '21:9', label: '21:9 (Cinematic)' },
+          { value: '9:21', label: '9:21' },
+        ],
+      },
+    ],
+  },
+
+  // 3. MMAudio - Add Sound
+  {
+    id: 'mmaudio',
+    name: 'mmaudio',
+    displayName: 'MMAudio',
+    replicateModel: 'zsxkib/mmaudio',
+    action: 'video_edit',
+    description: 'Добавить звук к видео с помощью AI',
+    settings: [
+      {
+        name: 'video',
+        label: 'Видео',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        placeholder: 'Опишите желаемый звук...',
+        default: '',
+        description: 'galloping, rain, birds chirping...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: 'music',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'number',
+        default: 8,
+        description: 'Длительность аудио',
+      },
+      {
+        name: 'num_steps',
+        label: 'Шаги генерации',
+        type: 'slider',
+        default: 25,
+        min: 10,
+        max: 50,
+      },
+      {
+        name: 'cfg_strength',
+        label: 'CFG Strength',
+        type: 'slider',
+        default: 4.5,
+        min: 1,
+        max: 10,
+        step: 0.5,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        default: -1,
+        description: '-1 = случайный',
+      },
+    ],
+  },
+
+  // 4. Video Merge
+  {
+    id: 'video-merge',
+    name: 'video-merge',
+    displayName: 'Video Merge',
+    replicateModel: 'lucataco/video-merge',
+    action: 'video_edit',
+    description: 'Объединить несколько видео',
+    settings: [
+      {
+        name: 'video_files',
+        label: 'Видео файлы',
+        type: 'file_array',
+        required: true,
+        description: 'Видео для объединения (по порядку)',
+        maxFiles: 10,
+      },
+      {
+        name: 'keep_audio',
+        label: 'Сохранить аудио',
+        type: 'checkbox',
+        default: true,
+      },
+      {
+        name: 'width',
+        label: 'Ширина',
+        type: 'number',
+        default: 0,
+        description: '0 = авто',
+      },
+      {
+        name: 'height',
+        label: 'Высота',
+        type: 'number',
+        default: 0,
+        description: '0 = авто',
+      },
+      {
+        name: 'fps',
+        label: 'FPS',
+        type: 'number',
+        default: 0,
+        description: '0 = авто',
+      },
+    ],
+  },
+
+  // 5. Autocaption
+  {
+    id: 'autocaption',
+    name: 'autocaption',
+    displayName: 'Autocaption',
+    replicateModel: 'fictions-ai/autocaption',
+    action: 'video_edit',
+    description: 'Добавить субтитры к видео',
+    settings: [
+      {
+        name: 'video_file',
+        label: 'Видео',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'font',
+        label: 'Шрифт',
+        type: 'select',
+        default: 'Poppins/Poppins-ExtraBold.ttf',
+        options: [
+          { value: 'Poppins/Poppins-ExtraBold.ttf', label: 'Poppins ExtraBold' },
+          { value: 'Poppins/Poppins-Bold.ttf', label: 'Poppins Bold' },
+          { value: 'Arial.ttf', label: 'Arial' },
+        ],
+      },
+      {
+        name: 'color',
+        label: 'Цвет текста',
+        type: 'text',
+        default: 'white',
+        description: 'white, yellow, #FF0000',
+      },
+      {
+        name: 'highlight_color',
+        label: 'Цвет выделения',
+        type: 'text',
+        default: 'yellow',
+      },
+      {
+        name: 'stroke_color',
+        label: 'Цвет обводки',
+        type: 'text',
+        default: 'black',
+      },
+      {
+        name: 'stroke_width',
+        label: 'Толщина обводки',
+        type: 'slider',
+        default: 2.6,
+        min: 0,
+        max: 5,
+        step: 0.1,
+      },
+      {
+        name: 'fontsize',
+        label: 'Размер шрифта',
+        type: 'number',
+        default: 7,
+        description: '% от высоты видео',
+      },
+      {
+        name: 'opacity',
+        label: 'Прозрачность',
+        type: 'slider',
+        default: 0,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: '0 = непрозрачный',
+      },
+    ],
+  },
+
+  // 6. Runway Gen4 Aleph
+  {
+    id: 'gen4-aleph',
+    name: 'gen4-aleph',
+    displayName: 'Runway Gen4 Aleph',
+    replicateModel: 'runwayml/gen4-aleph',
+    action: 'video_edit',
+    description: 'Runway - продвинутое редактирование',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Первый кадр',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+];
+
+/**
+ * УЛУЧШИТЬ ВИДЕО - 1 модель
+ */
+export const VIDEO_UPSCALE_MODELS: Model[] = [
+  // 1. Topaz Video Upscale
+  {
+    id: 'topaz-video-upscale',
+    name: 'video-upscale',
+    displayName: 'Topaz Video Upscale',
+    replicateModel: 'topazlabs/video-upscale',
+    action: 'video_upscale',
+    description: 'Topaz Labs - профессиональный апскейл до 4K',
+    settings: [
+      {
+        name: 'video',
+        label: 'Видео',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'target_resolution',
+        label: 'Целевое разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p (Full HD)' },
+          { value: '4k', label: '4K (Ultra HD)' },
+        ],
+      },
+      {
+        name: 'target_fps',
+        label: 'Целевой FPS',
+        type: 'slider',
+        default: 30,
+        min: 15,
+        max: 60,
+        description: 'Интерполяция кадров',
+      },
+    ],
+  },
+];
+
+/**
  * Все модели
  */
 export const ALL_MODELS: Model[] = [
@@ -2089,6 +3242,10 @@ export const ALL_MODELS: Model[] = [
   ...UPSCALE_MODELS,
   ...EDIT_MODELS,
   ...REMOVE_BG_MODELS,
+  ...VIDEO_CREATE_MODELS,
+  ...VIDEO_I2V_MODELS,
+  ...VIDEO_EDIT_MODELS,
+  ...VIDEO_UPSCALE_MODELS,
 ];
 
 /**
@@ -2104,6 +3261,14 @@ export function getModelsByAction(action: ActionType): Model[] {
       return EDIT_MODELS;
     case 'remove_bg':
       return REMOVE_BG_MODELS;
+    case 'video_create':
+      return VIDEO_CREATE_MODELS;
+    case 'video_i2v':
+      return VIDEO_I2V_MODELS;
+    case 'video_edit':
+      return VIDEO_EDIT_MODELS;
+    case 'video_upscale':
+      return VIDEO_UPSCALE_MODELS;
     default:
       return [];
   }
@@ -2125,6 +3290,10 @@ export function getActionLabel(action: ActionType): string {
     edit: 'Редактировать',
     upscale: 'Улучшить качество',
     remove_bg: 'Удалить фон',
+    video_create: 'Создать видео',
+    video_i2v: 'Картинка → Видео',
+    video_edit: 'Редактировать видео',
+    video_upscale: 'Улучшить видео',
   };
   return labels[action];
 }
