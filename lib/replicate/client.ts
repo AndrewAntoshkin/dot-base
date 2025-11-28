@@ -24,59 +24,163 @@ export interface ReplicatePrediction {
 
 /**
  * Replicate Client с автоматическим выбором токена из пула
+ * Включает retry логику и валидацию
  */
 export class ReplicateClient {
   private tokenPool: ReplicateTokenPool;
+  private maxRetries: number = 3;
+  private retryDelay: number = 2000; // 2 секунды
 
   constructor() {
     this.tokenPool = ReplicateTokenPool.getInstance();
   }
 
   /**
-   * Запустить модель на Replicate
+   * Валидация и очистка input параметров
+   */
+  private validateAndCleanInput(input: Record<string, any>): Record<string, any> {
+    const cleaned = { ...input };
+    
+    // Fallback для aspect_ratio: если match_input_image но нет изображения
+    if (cleaned.aspect_ratio === 'match_input_image') {
+      const hasImage = cleaned.image || cleaned.input_image || cleaned.image_input || 
+                       cleaned.start_image || cleaned.first_frame_image;
+      if (!hasImage) {
+        console.log('aspect_ratio fallback: match_input_image → 1:1 (no input image)');
+        cleaned.aspect_ratio = '1:1';
+      }
+    }
+    
+    // Валидация URL полей
+    const urlFields = ['image', 'input_image', 'image_input', 'video', 'mask', 'start_image', 'first_frame_image'];
+    for (const field of urlFields) {
+      if (cleaned[field] && typeof cleaned[field] === 'string') {
+        try {
+          // Проверяем что это валидный URL
+          new URL(cleaned[field]);
+        } catch {
+          // Если не валидный URL и не base64 - удаляем
+          if (!cleaned[field].startsWith('data:')) {
+            console.warn(`Invalid URL in field ${field}, removing`);
+            delete cleaned[field];
+          }
+        }
+      }
+    }
+    
+    // Удаляем undefined и null значения
+    Object.keys(cleaned).forEach(key => {
+      if (cleaned[key] === undefined || cleaned[key] === null || cleaned[key] === '') {
+        delete cleaned[key];
+      }
+    });
+    
+    return cleaned;
+  }
+
+  /**
+   * Проверка, является ли ошибка временной (можно retry)
+   */
+  private isRetryableError(error: any): boolean {
+    const message = error.message?.toLowerCase() || '';
+    const retryablePatterns = [
+      'timeout',
+      'rate limit',
+      'too many requests',
+      '429',
+      '503',
+      '502',
+      'temporarily unavailable',
+      'overloaded',
+      'try again',
+    ];
+    return retryablePatterns.some(pattern => message.includes(pattern));
+  }
+
+  /**
+   * Запустить модель на Replicate с retry логикой
    */
   async run(options: ReplicateRunOptions): Promise<{
     prediction: ReplicatePrediction;
     tokenId: number;
   }> {
-    const tokenData = await this.tokenPool.getNextToken();
+    // Валидация и очистка input
+    const cleanedInput = this.validateAndCleanInput(options.input);
+    
+    let lastError: any = null;
+    let lastTokenId: number | null = null;
 
-    if (!tokenData) {
-      throw new Error('No available Replicate tokens');
-    }
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      const tokenData = await this.tokenPool.getNextToken();
 
-    const replicate = new Replicate({ auth: tokenData.token });
-
-    try {
-      const prediction = await replicate.predictions.create({
-        model: options.model,
-        version: options.version,
-        input: options.input,
-        webhook: options.webhook,
-        webhook_events_filter: options.webhook_events_filter,
-      });
-
-      return {
-        prediction: prediction as ReplicatePrediction,
-        tokenId: tokenData.id,
-      };
-    } catch (error: any) {
-      // Сообщить об ошибке токена
-      await this.tokenPool.reportTokenError(
-        tokenData.id,
-        error.message || 'Unknown error'
-      );
-
-      // Если ошибка авторизации - деактивировать токен
-      if (
-        error.message?.includes('authentication') ||
-        error.message?.includes('401')
-      ) {
-        await this.tokenPool.deactivateToken(tokenData.id);
+      if (!tokenData) {
+        throw new Error('No available Replicate tokens');
       }
 
-      throw error;
+      lastTokenId = tokenData.id;
+      const replicate = new Replicate({ auth: tokenData.token });
+
+      try {
+        console.log(`Replicate attempt ${attempt}/${this.maxRetries}:`, {
+          model: options.model,
+          inputKeys: Object.keys(cleanedInput),
+        });
+
+        const prediction = await replicate.predictions.create({
+          model: options.model,
+          version: options.version,
+          input: cleanedInput,
+          webhook: options.webhook,
+          webhook_events_filter: options.webhook_events_filter,
+        });
+
+        return {
+          prediction: prediction as ReplicatePrediction,
+          tokenId: tokenData.id,
+        };
+      } catch (error: any) {
+        lastError = error;
+        console.error(`Replicate attempt ${attempt} failed:`, error.message);
+
+        // Сообщить об ошибке токена
+        await this.tokenPool.reportTokenError(
+          tokenData.id,
+          error.message || 'Unknown error'
+        );
+
+        // Если ошибка авторизации - деактивировать токен
+        if (
+          error.message?.includes('authentication') ||
+          error.message?.includes('401') ||
+          error.message?.includes('Invalid token')
+        ) {
+          await this.tokenPool.deactivateToken(tokenData.id);
+        }
+
+        // Если ошибка НЕ временная - не retry
+        if (!this.isRetryableError(error) && attempt < this.maxRetries) {
+          // Проверяем специфичные ошибки которые не стоит повторять
+          const noRetryPatterns = ['invalid', 'not found', 'does not exist', 'permission'];
+          const shouldNotRetry = noRetryPatterns.some(p => 
+            error.message?.toLowerCase().includes(p)
+          );
+          if (shouldNotRetry) {
+            console.log('Non-retryable error, stopping attempts');
+            break;
+          }
+        }
+
+        // Ждем перед следующей попыткой
+        if (attempt < this.maxRetries) {
+          const delay = this.retryDelay * attempt; // Exponential backoff
+          console.log(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
+
+    // Все попытки исчерпаны
+    throw lastError || new Error('Failed to create prediction after multiple retries');
   }
 
   /**

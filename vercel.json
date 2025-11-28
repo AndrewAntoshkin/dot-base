@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app/api/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/generations/create/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/webhook/replicate/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
+

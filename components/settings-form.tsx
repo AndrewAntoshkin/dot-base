@@ -14,6 +14,110 @@ import {
 } from '@/components/ui/select';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 
+// Максимальный размер файла для загрузки (3MB чтобы с запасом влезть в лимит Vercel)
+const MAX_UPLOAD_SIZE = 3 * 1024 * 1024;
+// Качество сжатия JPEG
+const COMPRESSION_QUALITY = 0.85;
+// Максимальное разрешение (по большей стороне)
+const MAX_DIMENSION = 2048;
+
+/**
+ * Сжимает изображение до допустимого размера
+ * @returns base64 строка сжатого изображения
+ */
+async function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      
+      // Масштабируем если превышает максимальное разрешение
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        } else {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas context not available'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Пробуем JPEG сначала (лучше сжимает)
+      let result = canvas.toDataURL('image/jpeg', COMPRESSION_QUALITY);
+      
+      // Если всё ещё слишком большой, уменьшаем качество
+      let quality = COMPRESSION_QUALITY;
+      while (result.length > MAX_UPLOAD_SIZE * 1.33 && quality > 0.3) {
+        quality -= 0.1;
+        result = canvas.toDataURL('image/jpeg', quality);
+      }
+      
+      // Если после сжатия всё ещё большой, уменьшаем размер
+      if (result.length > MAX_UPLOAD_SIZE * 1.33) {
+        const scale = 0.7;
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        result = canvas.toDataURL('image/jpeg', 0.8);
+      }
+      
+      resolve(result);
+    };
+    
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Обрабатывает файл - сжимает если нужно
+ */
+async function processFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const dataUrl = reader.result as string;
+      
+      // Для видео не сжимаем
+      if (file.type.startsWith('video/')) {
+        resolve(dataUrl);
+        return;
+      }
+      
+      // Для изображений проверяем размер и сжимаем если нужно
+      try {
+        const base64Size = dataUrl.length * 0.75; // Примерный размер в байтах
+        if (base64Size > MAX_UPLOAD_SIZE) {
+          console.log(`Compressing image: ${(base64Size / 1024 / 1024).toFixed(2)}MB → target <${(MAX_UPLOAD_SIZE / 1024 / 1024).toFixed(1)}MB`);
+          const compressed = await compressImage(dataUrl);
+          console.log(`Compressed to: ${(compressed.length * 0.75 / 1024 / 1024).toFixed(2)}MB`);
+          resolve(compressed);
+        } else {
+          resolve(dataUrl);
+        }
+      } catch (err) {
+        // Если сжатие не удалось, возвращаем оригинал
+        console.warn('Compression failed, using original:', err);
+        resolve(dataUrl);
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 // Компонент загрузки одного файла - ВЫНЕСЕН НАРУЖУ
 function FileUploader({
   settingName,
@@ -35,15 +139,17 @@ function FileUploader({
   const isVideoField = settingName.toLowerCase().includes('video') || acceptVideo;
   const acceptType = isVideoField ? 'image/*,video/*' : 'image/*';
 
-  const handleFile = useCallback((file: File) => {
+  const handleFile = useCallback(async (file: File) => {
     const isValidType = file.type.startsWith('image/') || (isVideoField && file.type.startsWith('video/'));
     if (!isValidType) return;
     
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      onChange(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Используем processFile для автоматического сжатия больших изображений
+      const result = await processFile(file);
+      onChange(result);
+    } catch (err) {
+      console.error('Failed to process file:', err);
+    }
   }, [onChange, isVideoField]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -186,21 +292,13 @@ function MultiFileUploader({
     
     if (filesToProcess.length === 0) return;
     
-    // Читаем все файлы параллельно с Promise.all
-    const readFilePromises = filesToProcess.map((file) => {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          resolve(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-      });
-    });
+    // Обрабатываем все файлы параллельно с автоматическим сжатием
+    const processPromises = filesToProcess.map((file) => processFile(file));
     
     // Ждём все файлы и обновляем состояние один раз
-    const results = await Promise.all(readFilePromises);
+    const results = await Promise.all(processPromises);
     onChange([...valueRef.current, ...results]);
-  }, [maxFiles, onChange]);
+  }, [maxFiles, onChange, isVideoField]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -386,7 +484,18 @@ export function SettingsForm({
             body: JSON.stringify({ files: [fieldValue] }),
           });
           
-          const uploadResult = await uploadResponse.json();
+          // Безопасный парсинг JSON - сервер может вернуть HTML при ошибке
+          let uploadResult;
+          const responseText = await uploadResponse.text();
+          try {
+            uploadResult = JSON.parse(responseText);
+          } catch {
+            console.error('Server returned non-JSON response:', responseText.substring(0, 200));
+            if (responseText.toLowerCase().includes('entity too large') || uploadResponse.status === 413) {
+              throw new Error('Файл слишком большой. Максимальный размер: 4MB');
+            }
+            throw new Error('Ошибка сервера при загрузке файла');
+          }
           
           if (!uploadResponse.ok) {
             console.error('Upload failed:', uploadResult);
@@ -412,7 +521,18 @@ export function SettingsForm({
               body: JSON.stringify({ files: base64Files }),
             });
             
-            const uploadResult = await uploadResponse.json();
+            // Безопасный парсинг JSON - сервер может вернуть HTML при ошибке
+            let uploadResult;
+            const responseText = await uploadResponse.text();
+            try {
+              uploadResult = JSON.parse(responseText);
+            } catch {
+              console.error('Server returned non-JSON response:', responseText.substring(0, 200));
+              if (responseText.toLowerCase().includes('entity too large') || uploadResponse.status === 413) {
+                throw new Error('Файлы слишком большие. Попробуйте меньше файлов или уменьшите размер');
+              }
+              throw new Error('Ошибка сервера при загрузке файлов');
+            }
             
             if (!uploadResponse.ok) {
               console.error('Upload failed:', uploadResult);
