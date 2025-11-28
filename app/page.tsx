@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
-import { SettingsForm, SettingsFormRef } from '@/components/settings-form';
-import { OutputPanel } from '@/components/output-panel';
 import { Header } from '@/components/header';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType, getModelById } from '@/lib/models-config';
 import { useGenerations } from '@/contexts/generations-context';
+import type { SettingsFormRef } from '@/components/settings-form';
+
+// Lazy load тяжёлых компонентов - грузятся только когда нужны
+const SettingsForm = lazy(() => import('@/components/settings-form').then(m => ({ default: m.SettingsForm })));
+const OutputPanel = lazy(() => import('@/components/output-panel').then(m => ({ default: m.OutputPanel })));
 
 // Проверка, является ли action видео действием
 const isVideoAction = (action: string): boolean => {

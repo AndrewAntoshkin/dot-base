@@ -1,23 +1,13 @@
 import type { Metadata } from 'next';
-import { Inter, IBM_Plex_Mono, Gloock } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { GenerationsProvider } from '@/contexts/generations-context';
 
+// Только Inter - убраны IBM Plex Mono и Gloock для ускорения загрузки
 const inter = Inter({ 
   subsets: ['latin', 'cyrillic'],
   variable: '--font-inter',
-});
-
-const ibmPlexMono = IBM_Plex_Mono({ 
-  subsets: ['latin', 'cyrillic'],
-  weight: ['400', '500', '600'],
-  variable: '--font-ibm-plex-mono',
-});
-
-const gloock = Gloock({ 
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-gloock',
+  display: 'swap', // Показывать текст сразу, не ждать загрузки шрифта
 });
 
 export const metadata: Metadata = {
@@ -32,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body className={`${inter.variable} ${ibmPlexMono.variable} ${gloock.variable} font-inter`}>
+      <body className={`${inter.variable} font-inter`}>
         <GenerationsProvider>
           {children}
         </GenerationsProvider>

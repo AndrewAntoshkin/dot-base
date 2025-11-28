@@ -25,9 +25,16 @@ interface GenerationsContextType {
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
 // Smart polling intervals
-const POLLING_INTERVAL_ACTIVE = 5000; // 5 сек когда есть активные генерации
-const POLLING_INTERVAL_IDLE = 30000;  // 30 сек когда всё готово
+const POLLING_INTERVAL_ACTIVE = 5000; // 5 сек когда есть активные генерации (desktop)
+const POLLING_INTERVAL_IDLE = 30000;  // 30 сек когда всё готово (desktop)
 const POLLING_INTERVAL_BACKGROUND = 60000; // 60 сек когда вкладка не активна
+const POLLING_INTERVAL_MOBILE = 60000; // 60 сек на мобилке - экономим батарею
+
+// Определение мобильного устройства
+const isMobileDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 1024 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+};
 
 export function GenerationsProvider({ children }: { children: ReactNode }) {
   const [generations, setGenerations] = useState<Generation[]>([]);
@@ -108,8 +115,13 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
       }
 
       let interval: number;
+      const isMobile = isMobileDevice();
+      
       if (!isPageVisible) {
         interval = POLLING_INTERVAL_BACKGROUND;
+      } else if (isMobile) {
+        // На мобилке всегда редкий polling для экономии батареи
+        interval = hasActiveGenerations ? 15000 : POLLING_INTERVAL_MOBILE; // 15 сек если активно, иначе 60
       } else if (hasActiveGenerations) {
         interval = POLLING_INTERVAL_ACTIVE;
       } else {
