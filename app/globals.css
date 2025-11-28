@@ -136,3 +136,42 @@
   opacity: 0;
 }
 
+/* Mobile-specific styles */
+@media (max-width: 1023px) {
+  /* Prevent body scroll when mobile menu is open */
+  body.menu-open {
+    overflow: hidden;
+  }
+  
+  /* Safe area insets for mobile devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  
+  /* Touch-friendly tap targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Responsive text utilities */
+.text-responsive-xs {
+  font-size: 10px;
+  line-height: 14px;
+}
+
+@media (min-width: 1024px) {
+  .text-responsive-xs {
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+
+/* Mobile input focus styles - prevent zoom on iOS */
+@media (max-width: 1023px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+

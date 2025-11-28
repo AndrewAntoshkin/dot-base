@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils';
 interface OutputPanelProps {
   generationId: string | null;
   onRegenerate?: (prompt: string, settings: Record<string, any>, modelId: string) => void;
+  isMobile?: boolean;
 }
 
 interface Generation {
@@ -31,7 +32,7 @@ function isVideoUrl(url: string): boolean {
   return videoExtensions.some(ext => lowercaseUrl.includes(ext));
 }
 
-export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
+export function OutputPanel({ generationId, onRegenerate, isMobile = false }: OutputPanelProps) {
   const [generation, setGeneration] = useState<Generation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [imageAspectRatio, setImageAspectRatio] = useState<'landscape' | 'portrait' | 'square'>('square');
@@ -125,7 +126,8 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
     }
   };
 
-  if (!generationId && !generation) {
+  // Desktop empty state
+  if (!generationId && !generation && !isMobile) {
     return (
       <div className="flex items-center justify-center min-h-[660px] px-20">
         <div className="flex gap-12 w-full">
@@ -190,14 +192,29 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
     );
   }
 
+  // Mobile empty state  
+  if (!generationId && !generation && isMobile) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center justify-center text-center px-8">
+          <div className="bg-[#131313] rounded-2xl p-6 w-full">
+            <p className="font-inter text-[14px] text-[#656565]">
+              Выберите модель и настройте параметры во вкладке Input для начала генерации
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!generation) return null;
 
   // Processing state - loader and text centered
   if (generation.status === 'processing' || generation.status === 'pending') {
     return (
-      <div className="flex items-center justify-center min-h-[660px]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-white" />
+      <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
+        <div className={`flex flex-col items-center gap-4 ${isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full' : ''}`}>
+          <Loader2 className="h-8 w-8 lg:h-12 lg:w-12 animate-spin text-white" />
           <div className="text-center">
             <p className="font-inter font-medium text-base text-white mb-1">
               Генерация...
@@ -226,8 +243,8 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
     }
     
     return (
-      <div className="flex items-center justify-center min-h-[660px]">
-        <div className="text-center max-w-md px-4">
+      <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
+        <div className={`text-center max-w-md px-4 ${isMobile ? 'bg-[#131313] rounded-2xl p-6 mx-4' : ''}`}>
           <p className="font-inter font-medium text-base text-red-500 mb-2">
             Ошибка генерации
           </p>
@@ -248,7 +265,128 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
   const currentMediaUrl = generation.output_urls?.[selectedImageIndex] || generation.output_urls?.[0];
   const isVideo = currentMediaUrl ? isVideoUrl(currentMediaUrl) : false;
 
-  // Completed state - result with image/video in gray area (660px height)
+  // Mobile completed state
+  if (isMobile) {
+    return (
+      <div className="flex flex-col w-full gap-6">
+        {/* Image/Video container */}
+        {currentMediaUrl && (
+          <div className="relative w-full bg-[#131313] rounded-[12px] overflow-hidden">
+            {isVideo ? (
+              <video
+                src={currentMediaUrl}
+                controls
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-auto"
+              />
+            ) : (
+              <Image
+                src={currentMediaUrl}
+                alt="Generated image"
+                width={800}
+                height={800}
+                className="w-full h-auto"
+                onLoad={handleImageLoad}
+                priority
+              />
+            )}
+          </div>
+        )}
+
+        {/* Thumbnails row - if multiple images */}
+        {generation.output_urls && generation.output_urls.length > 1 && (
+          <div className="flex gap-2 items-center">
+            {generation.output_urls.map((url, index) => {
+              const isThumbVideo = isVideoUrl(url);
+              return (
+                <button
+                  key={index}
+                  onClick={() => setSelectedImageIndex(index)}
+                  className={`
+                    relative w-10 h-10 rounded-lg overflow-hidden shrink-0 transition-all
+                    ${selectedImageIndex === index 
+                      ? 'ring-2 ring-white' 
+                      : 'opacity-50 hover:opacity-100'
+                    }
+                  `}
+                >
+                  {isThumbVideo ? (
+                    <div className="w-full h-full bg-[#1f1f1f] flex items-center justify-center">
+                      <span className="text-xs">🎬</span>
+                    </div>
+                  ) : (
+                    <Image
+                      src={url}
+                      alt={`Output ${index + 1}`}
+                      fill
+                      className="object-cover"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleRegenerate}
+            className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+            title="Переделать"
+          >
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <button
+            onClick={handleDownload}
+            className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+            title="Скачать"
+          >
+            <Download className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Info block */}
+        <div className="flex flex-col gap-3">
+          {/* Date */}
+          <p className="font-inter font-medium text-sm text-[#656565]">
+            Сгенерировано за {formatDate(generation.created_at)}
+          </p>
+
+          {/* Prompt block with border */}
+          {generation.prompt && (
+            <div className="border border-[#2f2f2f] rounded-[16px] p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <p className="font-inter font-medium text-[14px] text-[#656565]">
+                  Prompt
+                </p>
+                <button
+                  onClick={handleCopyPrompt}
+                  className="p-1 hover:opacity-70 transition-opacity flex items-center gap-1"
+                  title="Копировать промпт"
+                  disabled={copied}
+                >
+                  {copied ? (
+                    <span className="font-inter text-xs text-green-500">Скопировано</span>
+                  ) : (
+                    <Copy className="h-4 w-4 text-[#707070]" />
+                  )}
+                </button>
+              </div>
+              <p className="font-inter text-[15px] text-white leading-[22px]">
+                {generation.prompt}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop completed state - result with image/video in gray area (660px height)
   return (
     <div className="flex flex-col w-full">
       {/* Gray area 660px - media container */}
@@ -373,4 +511,3 @@ export function OutputPanel({ generationId, onRegenerate }: OutputPanelProps) {
     </div>
   );
 }
-

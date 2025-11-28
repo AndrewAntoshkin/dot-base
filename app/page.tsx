@@ -7,6 +7,8 @@ import { ModelSelector } from '@/components/model-selector';
 import { SettingsForm } from '@/components/settings-form';
 import { OutputPanel } from '@/components/output-panel';
 import { Header } from '@/components/header';
+import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
+import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType, getModelById } from '@/lib/models-config';
 import { useGenerations } from '@/contexts/generations-context';
 
@@ -25,6 +27,7 @@ function HomeContent() {
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
   const { addGeneration } = useGenerations();
 
   // Load generation from URL parameter
@@ -55,6 +58,8 @@ function HomeContent() {
           
           // Show result in output panel
           setCurrentGenerationId(generation.id);
+          // Switch to output tab on mobile
+          setMobileActiveTab('output');
         }
       } catch (error) {
         console.error('Error loading generation:', error);
@@ -66,6 +71,8 @@ function HomeContent() {
 
   const handleGenerationCreated = (generationId: string, generation: any) => {
     setCurrentGenerationId(generationId);
+    // Switch to output tab on mobile when generation starts
+    setMobileActiveTab('output');
     // Add to global context for header indicator
     if (generation) {
       addGeneration({
@@ -135,11 +142,15 @@ function HomeContent() {
     }
   };
 
+  // Check if we should show start screen (no model selected and no generation)
+  const showStartScreen = !selectedModelId && !currentGenerationId;
+
   return (
     <div className="min-h-screen flex flex-col bg-[#050505]">
       <Header />
 
-      <main className="flex-1 flex gap-6">
+      {/* Desktop Layout */}
+      <main className="hidden lg:flex flex-1 gap-6">
         {/* LEFT PANEL - INPUT (480px fixed) */}
         <div className="w-[480px] flex flex-col pl-20 pr-0 relative">
           {/* Top content area */}
@@ -246,6 +257,111 @@ function HomeContent() {
           </div>
         </div>
       </main>
+
+      {/* Mobile Layout */}
+      <main className="flex lg:hidden flex-1 flex-col p-4 pb-0">
+        {/* Show Start Screen on mobile when no model selected and no generation */}
+        {showStartScreen ? (
+          <MobileStartScreen mode="image" />
+        ) : (
+          <>
+            {/* Tab Switcher */}
+            <div className="mb-4">
+              <MobileTabSwitcher 
+                activeTab={mobileActiveTab}
+                onTabChange={setMobileActiveTab}
+                label="IMAGE GENERATION"
+              />
+            </div>
+
+            {/* Content based on active tab */}
+            {mobileActiveTab === 'input' ? (
+              /* INPUT TAB */
+              <div className="flex-1 flex flex-col gap-6 pb-[120px]">
+                {/* Action Selector */}
+                <div className="animate-fade-in-up">
+                  <ActionSelector
+                    value={selectedAction}
+                    onChange={(action) => {
+                      setSelectedAction(action);
+                      setSelectedModelId('');
+                    }}
+                  />
+                </div>
+
+                {/* Model Selector */}
+                <div className="animate-fade-in-up animate-delay-100">
+                  <ModelSelector
+                    action={selectedAction}
+                    value={selectedModelId}
+                    onChange={setSelectedModelId}
+                  />
+                </div>
+
+                {/* Settings Form */}
+                {selectedModelId && (
+                  <div className="animate-fade-in-up animate-delay-200">
+                    <SettingsForm
+                      modelId={selectedModelId}
+                      onGenerationCreated={handleGenerationCreated}
+                      onFormDataChange={setFormData}
+                      onSubmitStart={() => setIsGenerating(true)}
+                      onError={() => setIsGenerating(false)}
+                      initialData={formData}
+                    />
+                  </div>
+                )}
+
+                {/* Sticky buttons - Mobile */}
+                {selectedModelId && (
+                  <div className="fixed bottom-0 left-0 right-0 bg-[#050505] pt-4 pb-8 px-4 border-t border-[#1f1f1f] z-10">
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({});
+                          if (typeof window !== 'undefined' && (window as any).__settingsFormReset) {
+                            (window as any).__settingsFormReset();
+                          }
+                        }}
+                        disabled={isGenerating}
+                        className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                      >
+                        Сбросить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (typeof window !== 'undefined' && (window as any).__settingsFormSubmit) {
+                            setIsGenerating(true);
+                            await (window as any).__settingsFormSubmit();
+                            setIsGenerating(false);
+                          }
+                        }}
+                        disabled={isGenerating}
+                        className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50"
+                      >
+                        {isGenerating ? 'Генерация...' : 'Создать'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* OUTPUT TAB */
+              <div className="flex-1 flex flex-col pb-10">
+                <div className="animate-fade-in-up">
+                  <OutputPanel 
+                    generationId={currentGenerationId} 
+                    onRegenerate={handleRegenerate}
+                    isMobile={true}
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }
@@ -261,4 +377,3 @@ export default function Home() {
     </Suspense>
   );
 }
-

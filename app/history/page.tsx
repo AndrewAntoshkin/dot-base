@@ -35,8 +35,8 @@ function VideoPlaceholder() {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
       <div className="flex flex-col items-center gap-2">
-        <Play className="h-10 w-10 text-[#656565]" />
-        <span className="font-inter text-sm text-[#656565]">Видео</span>
+        <Play className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
+        <span className="font-inter text-xs lg:text-sm text-[#656565]">Видео</span>
       </div>
     </div>
   );
@@ -119,13 +119,13 @@ export default function HistoryPage() {
     <div className="min-h-screen flex flex-col bg-[#050505]">
       <Header />
 
-      <main className="flex-1 px-20 py-8">
+      <main className="flex-1 px-4 lg:px-20 py-6 lg:py-8">
         {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="font-inter font-medium text-2xl text-white mb-2">
+        <div className="mb-6 lg:mb-8">
+          <h1 className="font-inter font-medium text-xl lg:text-2xl text-white mb-1 lg:mb-2">
             История генераций
           </h1>
-          <p className="font-inter text-sm text-[#959595]">
+          <p className="font-inter text-xs lg:text-sm text-[#959595]">
             Все ваши созданные изображения и видео
           </p>
         </div>
@@ -150,8 +150,8 @@ export default function HistoryPage() {
           </div>
         ) : (
           <>
-            {/* Grid - 4 columns */}
-            <div className="grid grid-cols-4 gap-4">
+            {/* Grid - 2 columns on mobile, 4 on desktop */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
               {generations.map((generation) => (
                 <div
                   key={generation.id}
@@ -162,9 +162,9 @@ export default function HistoryPage() {
                     router.push(`${basePath}?generationId=${generation.id}`);
                   }}
                 >
-                  <div className="bg-[#101010] rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
+                  <div className="bg-[#101010] rounded-xl lg:rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
                     {/* Image/Video with badge - square 1:1 */}
-                    <div className="relative aspect-square bg-[#151515] rounded-xl overflow-hidden">
+                    <div className="relative aspect-square bg-[#151515] rounded-lg lg:rounded-xl overflow-hidden">
                       {generation.output_urls?.[0] ? (
                         isVideoUrl(generation.output_urls[0]) ? (
                           <VideoPlaceholder />
@@ -178,7 +178,7 @@ export default function HistoryPage() {
                         )
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="font-inter text-sm text-[#656565]">
+                          <span className="font-inter text-xs lg:text-sm text-[#656565]">
                             {generation.status === 'processing'
                               ? 'Генерация...'
                               : 'Нет изображения'}
@@ -187,39 +187,39 @@ export default function HistoryPage() {
                       )}
                       
                       {/* Model badge - top right */}
-                      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5">
-                        <span className="font-inter text-xs text-white">
+                      <div className="absolute top-2 right-2 lg:top-3 lg:right-3 bg-black/60 backdrop-blur-sm rounded-md lg:rounded-lg px-1.5 py-1 lg:px-2.5 lg:py-1.5">
+                        <span className="font-inter text-[10px] lg:text-xs text-white">
                           {generation.model_name}
                         </span>
                       </div>
                     </div>
 
                     {/* Card content */}
-                    <div className="p-4">
+                    <div className="p-3 lg:p-4">
                       {/* Prompt - multiline with ellipsis */}
-                      <p className="font-inter text-sm text-[#959595] leading-relaxed line-clamp-3 mb-3">
+                      <p className="font-inter text-xs lg:text-sm text-[#959595] leading-relaxed line-clamp-2 lg:line-clamp-3 mb-2 lg:mb-3">
                         {generation.prompt || 'Без промпта'}
                       </p>
 
                       {/* Date and action buttons */}
                       <div className="flex items-center justify-between">
-                        <span className="font-inter text-xs text-[#656565]">
+                        <span className="font-inter text-[10px] lg:text-xs text-[#656565]">
                           {formatDate(generation.created_at)}
                         </span>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={(e) => handleDelete(e, generation.id)}
-                            className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] hover:border-red-500/50 transition-colors"
+                            className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] hover:border-red-500/50 transition-colors"
                             title="Удалить"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3 lg:h-4 lg:w-4" />
                           </button>
                           <button
                             onClick={(e) => handleDownload(e, generation.output_urls?.[0] || '', generation.id)}
-                            className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+                            className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
                             title="Скачать"
                           >
-                            <Download className="h-4 w-4" />
+                            <Download className="h-3 w-3 lg:h-4 lg:w-4" />
                           </button>
                         </div>
                       </div>
@@ -231,21 +231,21 @@ export default function HistoryPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-4 mt-8">
+              <div className="flex items-center justify-center gap-3 lg:gap-4 mt-6 lg:mt-8">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
                 >
                   Назад
                 </button>
-                <span className="font-inter text-sm text-[#959595]">
-                  Страница {page} из {totalPages}
+                <span className="font-inter text-xs lg:text-sm text-[#959595]">
+                  {page} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
                 >
                   Вперед
                 </button>
@@ -257,4 +257,3 @@ export default function HistoryPage() {
     </div>
   );
 }
-
