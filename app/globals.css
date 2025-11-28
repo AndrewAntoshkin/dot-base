@@ -89,7 +89,7 @@
   background: hsl(var(--muted));
 }
 
-/* Page transition animations */
+/* Page transition animations - desktop only */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -112,28 +112,49 @@
   }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.4s ease-out forwards;
+/* Desktop: animations enabled */
+@media (min-width: 1024px) {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out forwards;
+  }
+
+  .animate-fade-in-up-slow {
+    animation: fadeInUpSlow 0.5s ease-out forwards;
+  }
+
+  /* Staggered animation delays - desktop only */
+  .animate-delay-100 {
+    animation-delay: 0.1s;
+    opacity: 0;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 0.2s;
+    opacity: 0;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 0.3s;
+    opacity: 0;
+  }
 }
 
-.animate-fade-in-up-slow {
-  animation: fadeInUpSlow 0.5s ease-out forwards;
-}
-
-/* Staggered animation delays */
-.animate-delay-100 {
-  animation-delay: 0.1s;
-  opacity: 0;
-}
-
-.animate-delay-200 {
-  animation-delay: 0.2s;
-  opacity: 0;
-}
-
-.animate-delay-300 {
-  animation-delay: 0.3s;
-  opacity: 0;
+/* Mobile: instant render, no animations for performance */
+@media (max-width: 1023px) {
+  .animate-fade-in-up,
+  .animate-fade-in-up-slow,
+  .animate-delay-100,
+  .animate-delay-200,
+  .animate-delay-300 {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  
+  /* Reduce motion for better performance */
+  * {
+    animation-duration: 0.1s !important;
+    transition-duration: 0.1s !important;
+  }
 }
 
 /* Mobile-specific styles */

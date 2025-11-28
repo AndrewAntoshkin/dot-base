@@ -174,6 +174,8 @@ export default function HistoryPage() {
                             alt={generation.prompt || 'Generated image'}
                             fill
                             className="object-cover"
+                            loading="lazy"
+                            sizes="(max-width: 1024px) 50vw, 25vw"
                           />
                         )
                       ) : (

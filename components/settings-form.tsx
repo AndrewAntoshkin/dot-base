@@ -416,6 +416,12 @@ function MultiFileUploader({
   );
 }
 
+// Exposed methods via ref
+export interface SettingsFormRef {
+  submit: () => Promise<void>;
+  reset: () => void;
+}
+
 interface SettingsFormProps {
   modelId: string;
   onGenerationCreated: (generationId: string, generation: any) => void;
@@ -423,6 +429,7 @@ interface SettingsFormProps {
   onSubmitStart?: () => void;
   onError?: (error: string) => void;
   initialData?: Record<string, any>;
+  formRef?: React.MutableRefObject<SettingsFormRef | null>;
 }
 
 export function SettingsForm({
@@ -432,6 +439,7 @@ export function SettingsForm({
   onSubmitStart,
   onError,
   initialData,
+  formRef,
 }: SettingsFormProps) {
   const model = getModelById(modelId);
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -584,12 +592,20 @@ export function SettingsForm({
     setFormData({});
   };
 
-  // Expose methods to parent via ref or global
+  // Expose methods to parent via ref (clean approach)
   React.useEffect(() => {
-    (window as any).__settingsFormSubmit = handleSubmit;
-    (window as any).__settingsFormReset = handleReset;
-    (window as any).__settingsFormLoading = isLoading;
-  }, [handleSubmit, isLoading]);
+    if (formRef) {
+      formRef.current = {
+        submit: handleSubmit,
+        reset: handleReset,
+      };
+    }
+    return () => {
+      if (formRef) {
+        formRef.current = null;
+      }
+    };
+  }, [handleSubmit, formRef]);
 
   const updateFormData = useCallback((name: string, value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }));

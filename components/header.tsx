@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Loader2, LogOut } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
@@ -19,19 +19,22 @@ export function Header() {
   const { unviewedCount, hasActiveGenerations } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const supabase = createBrowserClient(
+  // Мемоизируем Supabase клиент - создаём только один раз
+  const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  ), []);
 
   useEffect(() => {
+    let isMounted = true;
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      if (user && isMounted) {
         setUserEmail(user.email || null);
       }
     };
     getUser();
+    return () => { isMounted = false; };
   }, [supabase]);
 
   const handleLogout = async () => {

@@ -48,29 +48,36 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
 
     setIsLoading(true);
     setSelectedImageIndex(0); // Сбрасываем выбор при смене генерации
+    let isMounted = true;
+    let pollTimeoutId: NodeJS.Timeout | null = null;
 
     const fetchGeneration = async () => {
       try {
         const response = await fetch(`/api/generations/${generationId}`, {
           credentials: 'include',
         });
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const data = await response.json();
           setGeneration(data);
 
-          // Poll for updates if still processing
-          if (data.status === 'processing' || data.status === 'pending') {
-            setTimeout(fetchGeneration, 2000);
+          // Poll for updates if still processing (но реже - 4 сек)
+          if ((data.status === 'processing' || data.status === 'pending') && isMounted) {
+            pollTimeoutId = setTimeout(fetchGeneration, 4000);
           }
         }
       } catch (error) {
         console.error('Error fetching generation:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchGeneration();
+
+    return () => {
+      isMounted = false;
+      if (pollTimeoutId) clearTimeout(pollTimeoutId);
+    };
   }, [generationId]);
 
   const handleDownload = async () => {

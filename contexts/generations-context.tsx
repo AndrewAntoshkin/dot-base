@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 
 interface Generation {
   id: string;
@@ -17,71 +17,116 @@ interface GenerationsContextType {
   unviewedGenerations: Generation[];
   hasActiveGenerations: boolean;
   addGeneration: (generation: Generation) => void;
+  updateGeneration: (id: string, updates: Partial<Generation>) => void;
   markAsViewed: (id: string) => Promise<void>;
   refreshGenerations: () => Promise<void>;
 }
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
+// Smart polling intervals
+const POLLING_INTERVAL_ACTIVE = 5000; // 5 сек когда есть активные генерации
+const POLLING_INTERVAL_IDLE = 30000;  // 30 сек когда всё готово
+const POLLING_INTERVAL_BACKGROUND = 60000; // 60 сек когда вкладка не активна
+
 export function GenerationsProvider({ children }: { children: ReactNode }) {
   const [generations, setGenerations] = useState<Generation[]>([]);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastFetchRef = useRef<number>(0);
 
-  const refreshGenerations = async () => {
+  // Track page visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  const refreshGenerations = useCallback(async () => {
+    // Throttle: не чаще чем раз в 2 секунды
+    const now = Date.now();
+    if (now - lastFetchRef.current < 2000) return;
+    lastFetchRef.current = now;
+
     try {
-      const response = await fetch('/api/generations/list?limit=50', {
+      // Грузим только последние 20 для скорости
+      const response = await fetch('/api/generations/list?limit=20', {
         credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
-        // API возвращает { generations: [...] }, а не просто массив
         setGenerations(data.generations || []);
       }
     } catch (error) {
       console.error('Error fetching generations:', error);
     }
-  };
+  }, []);
 
-  const addGeneration = (generation: Generation) => {
-    setGenerations((prev) => [generation, ...prev]);
-  };
+  const addGeneration = useCallback((generation: Generation) => {
+    setGenerations((prev) => [generation, ...prev.slice(0, 19)]); // Держим макс 20
+  }, []);
 
-  const markAsViewed = async (id: string) => {
+  const updateGeneration = useCallback((id: string, updates: Partial<Generation>) => {
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, ...updates } : g))
+    );
+  }, []);
+
+  const markAsViewed = useCallback(async (id: string) => {
+    // Optimistic update
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, viewed: true } : g))
+    );
+
     try {
-      // Optimistic update
-      setGenerations((prev) =>
-        prev.map((g) => (g.id === id ? { ...g, viewed: true } : g))
-      );
-
-      // Call API
       await fetch(`/api/generations/${id}/view`, { 
         method: 'POST',
         credentials: 'include',
       });
     } catch (error) {
       console.error('Error marking as viewed:', error);
-      // Refresh on error
-      refreshGenerations();
     }
-  };
-
-  // Poll for updates every 3 seconds
-  useEffect(() => {
-    refreshGenerations();
-    const interval = setInterval(refreshGenerations, 3000);
-    return () => clearInterval(interval);
   }, []);
 
-  // Фильтруем непросмотренные генерации
-  const unviewedGenerations = Array.isArray(generations)
-    ? generations.filter((g) => !g.viewed)
-    : [];
-
+  // Вычисляем derived state
+  const unviewedGenerations = generations.filter((g) => !g.viewed);
   const unviewedCount = unviewedGenerations.length;
-
-  // Проверяем есть ли активные генерации (pending/processing) среди непросмотренных
   const hasActiveGenerations = unviewedGenerations.some(
     (g) => g.status === 'pending' || g.status === 'processing'
   );
+
+  // Smart polling: адаптивный интервал
+  useEffect(() => {
+    // Initial fetch
+    refreshGenerations();
+
+    const setupPolling = () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+
+      let interval: number;
+      if (!isPageVisible) {
+        interval = POLLING_INTERVAL_BACKGROUND;
+      } else if (hasActiveGenerations) {
+        interval = POLLING_INTERVAL_ACTIVE;
+      } else {
+        interval = POLLING_INTERVAL_IDLE;
+      }
+
+      pollingIntervalRef.current = setInterval(refreshGenerations, interval);
+    };
+
+    setupPolling();
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [isPageVisible, hasActiveGenerations, refreshGenerations]);
 
   return (
     <GenerationsContext.Provider
@@ -91,6 +136,7 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
         unviewedGenerations,
         hasActiveGenerations,
         addGeneration,
+        updateGeneration,
         markAsViewed,
         refreshGenerations,
       }}

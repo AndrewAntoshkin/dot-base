@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
-import { SettingsForm } from '@/components/settings-form';
+import { SettingsForm, SettingsFormRef } from '@/components/settings-form';
 import { OutputPanel } from '@/components/output-panel';
 import { Header } from '@/components/header';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
@@ -30,6 +30,9 @@ function VideoContent() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
   const { addGeneration } = useGenerations();
+  
+  // Form ref для управления формой без глобальных переменных
+  const formRef = useRef<SettingsFormRef | null>(null);
 
   // Load generation from URL parameter
   useEffect(() => {
@@ -196,6 +199,7 @@ function VideoContent() {
                     onSubmitStart={() => setIsGenerating(true)}
                     onError={() => setIsGenerating(false)}
                     initialData={formData}
+                    formRef={formRef}
                   />
                 </div>
               )}
@@ -210,9 +214,7 @@ function VideoContent() {
                   type="button"
                   onClick={() => {
                     setFormData({});
-                    if (typeof window !== 'undefined' && (window as any).__settingsFormReset) {
-                      (window as any).__settingsFormReset();
-                    }
+                    formRef.current?.reset();
                   }}
                   disabled={isGenerating}
                   className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
@@ -222,9 +224,9 @@ function VideoContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (typeof window !== 'undefined' && (window as any).__settingsFormSubmit) {
+                    if (formRef.current) {
                       setIsGenerating(true);
-                      await (window as any).__settingsFormSubmit();
+                      await formRef.current.submit();
                       setIsGenerating(false);
                     }
                   }}
@@ -311,6 +313,7 @@ function VideoContent() {
                       onSubmitStart={() => setIsGenerating(true)}
                       onError={() => setIsGenerating(false)}
                       initialData={formData}
+                      formRef={formRef}
                     />
                   </div>
                 )}
@@ -323,9 +326,7 @@ function VideoContent() {
                         type="button"
                         onClick={() => {
                           setFormData({});
-                          if (typeof window !== 'undefined' && (window as any).__settingsFormReset) {
-                            (window as any).__settingsFormReset();
-                          }
+                          formRef.current?.reset();
                         }}
                         disabled={isGenerating}
                         className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
@@ -335,9 +336,9 @@ function VideoContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (typeof window !== 'undefined' && (window as any).__settingsFormSubmit) {
+                          if (formRef.current) {
                             setIsGenerating(true);
-                            await (window as any).__settingsFormSubmit();
+                            await formRef.current.submit();
                             setIsGenerating(false);
                           }
                         }}
