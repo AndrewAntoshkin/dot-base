@@ -592,15 +592,21 @@ export function SettingsForm({
     setFormData({});
   };
 
-  // Expose methods to parent via ref (clean approach)
+  // Expose methods to parent via window (works on mobile tab switches)
   React.useEffect(() => {
+    (window as any).__settingsFormSubmit = handleSubmit;
+    (window as any).__settingsFormReset = handleReset;
+    
+    // Also set on ref if provided
     if (formRef) {
       formRef.current = {
         submit: handleSubmit,
         reset: handleReset,
       };
     }
+    
     return () => {
+      // Don't clear window globals - they're needed for mobile
       if (formRef) {
         formRef.current = null;
       }

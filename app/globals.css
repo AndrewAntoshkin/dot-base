@@ -139,21 +139,20 @@
   }
 }
 
-/* Mobile: instant render, no animations for performance */
+/* Mobile: faster animations, not disabled (Radix UI needs them) */
 @media (max-width: 1023px) {
+  /* Only disable our custom page animations, not library animations */
   .animate-fade-in-up,
-  .animate-fade-in-up-slow,
+  .animate-fade-in-up-slow {
+    animation: none;
+    opacity: 1;
+  }
+  
   .animate-delay-100,
   .animate-delay-200,
   .animate-delay-300 {
-    animation: none !important;
-    opacity: 1 !important;
-  }
-  
-  /* Reduce motion for better performance */
-  * {
-    animation-duration: 0.1s !important;
-    transition-duration: 0.1s !important;
+    animation-delay: 0s;
+    opacity: 1;
   }
 }
 

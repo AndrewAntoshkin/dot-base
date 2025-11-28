@@ -323,7 +323,9 @@ function HomeContent() {
                         type="button"
                         onClick={() => {
                           setFormData({});
-                          formRef.current?.reset();
+                          if (typeof window !== 'undefined' && (window as any).__settingsFormReset) {
+                            (window as any).__settingsFormReset();
+                          }
                         }}
                         disabled={isGenerating}
                         className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
@@ -333,9 +335,9 @@ function HomeContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (formRef.current) {
+                          if (typeof window !== 'undefined' && (window as any).__settingsFormSubmit) {
                             setIsGenerating(true);
-                            await formRef.current.submit();
+                            await (window as any).__settingsFormSubmit();
                             setIsGenerating(false);
                           }
                         }}
