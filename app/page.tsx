@@ -1,19 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
+import { SettingsForm, SettingsFormRef } from '@/components/settings-form';
+import { OutputPanel } from '@/components/output-panel';
 import { Header } from '@/components/header';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType, getModelById } from '@/lib/models-config';
 import { useGenerations } from '@/contexts/generations-context';
-import type { SettingsFormRef } from '@/components/settings-form';
-
-// Lazy load тяжёлых компонентов - грузятся только когда нужны
-const SettingsForm = lazy(() => import('@/components/settings-form').then(m => ({ default: m.SettingsForm })));
-const OutputPanel = lazy(() => import('@/components/output-panel').then(m => ({ default: m.OutputPanel })));
 
 // Проверка, является ли action видео действием
 const isVideoAction = (action: string): boolean => {
@@ -24,6 +21,7 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const generationIdParam = searchParams.get('generationId');
+  const startParam = searchParams.get('start');
   
   const [selectedAction, setSelectedAction] = useState<ActionType>('create');
   const [selectedModelId, setSelectedModelId] = useState<string>('');
@@ -31,10 +29,20 @@ function HomeContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
+  const [mobileShowForm, setMobileShowForm] = useState(false);
   const { addGeneration } = useGenerations();
   
   // Form ref для управления формой без глобальных переменных
   const formRef = useRef<SettingsFormRef | null>(null);
+
+  // Check URL param to show form
+  useEffect(() => {
+    if (startParam === '1') {
+      setMobileShowForm(true);
+      // Clear URL param
+      router.replace('/', { scroll: false });
+    }
+  }, [startParam, router]);
 
   // Load generation from URL parameter
   useEffect(() => {
@@ -148,8 +156,8 @@ function HomeContent() {
     }
   };
 
-  // Check if we should show start screen (no model selected and no generation)
-  const showStartScreen = !selectedModelId && !currentGenerationId;
+  // Check if we should show start screen (no model selected and no generation, and not explicitly showing form)
+  const showStartScreen = !selectedModelId && !currentGenerationId && !mobileShowForm;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#050505]">
@@ -267,7 +275,7 @@ function HomeContent() {
       <main className="flex lg:hidden flex-1 flex-col p-4 pb-0">
         {/* Show Start Screen on mobile when no model selected and no generation */}
         {showStartScreen ? (
-          <MobileStartScreen mode="image" />
+          <MobileStartScreen mode="image" onStartGeneration={() => setMobileShowForm(true)} />
         ) : (
           <>
             {/* Tab Switcher */}
@@ -326,9 +334,7 @@ function HomeContent() {
                         type="button"
                         onClick={() => {
                           setFormData({});
-                          if (typeof window !== 'undefined' && (window as any).__settingsFormReset) {
-                            (window as any).__settingsFormReset();
-                          }
+                          formRef.current?.reset();
                         }}
                         disabled={isGenerating}
                         className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
@@ -338,9 +344,9 @@ function HomeContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (typeof window !== 'undefined' && (window as any).__settingsFormSubmit) {
+                          if (formRef.current) {
                             setIsGenerating(true);
-                            await (window as any).__settingsFormSubmit();
+                            await formRef.current.submit();
                             setIsGenerating(false);
                           }
                         }}

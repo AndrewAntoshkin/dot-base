@@ -21,6 +21,7 @@ function VideoContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const generationIdParam = searchParams.get('generationId');
+  const startParam = searchParams.get('start');
   
   // Видео режим - начинаем с video_create
   const [selectedAction, setSelectedAction] = useState<ActionType>('video_create');
@@ -29,10 +30,20 @@ function VideoContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
+  const [mobileShowForm, setMobileShowForm] = useState(false);
   const { addGeneration } = useGenerations();
   
   // Form ref для управления формой без глобальных переменных
   const formRef = useRef<SettingsFormRef | null>(null);
+
+  // Check URL param to show form
+  useEffect(() => {
+    if (startParam === '1') {
+      setMobileShowForm(true);
+      // Clear URL param
+      router.replace('/video', { scroll: false });
+    }
+  }, [startParam, router]);
 
   // Load generation from URL parameter
   useEffect(() => {
@@ -146,8 +157,8 @@ function VideoContent() {
     }
   };
 
-  // Check if we should show start screen (no model selected and no generation)
-  const showStartScreen = !selectedModelId && !currentGenerationId;
+  // Check if we should show start screen (no model selected and no generation, and not explicitly showing form)
+  const showStartScreen = !selectedModelId && !currentGenerationId && !mobileShowForm;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#050505]">
@@ -266,7 +277,7 @@ function VideoContent() {
       <main className="flex lg:hidden flex-1 flex-col p-4 pb-0">
         {/* Show Start Screen on mobile when no model selected and no generation */}
         {showStartScreen ? (
-          <MobileStartScreen mode="video" />
+          <MobileStartScreen mode="video" onStartGeneration={() => setMobileShowForm(true)} />
         ) : (
           <>
             {/* Tab Switcher */}
@@ -326,9 +337,7 @@ function VideoContent() {
                         type="button"
                         onClick={() => {
                           setFormData({});
-                          if (typeof window !== 'undefined' && (window as any).__settingsFormReset) {
-                            (window as any).__settingsFormReset();
-                          }
+                          formRef.current?.reset();
                         }}
                         disabled={isGenerating}
                         className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
@@ -338,9 +347,9 @@ function VideoContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (typeof window !== 'undefined' && (window as any).__settingsFormSubmit) {
+                          if (formRef.current) {
                             setIsGenerating(true);
-                            await (window as any).__settingsFormSubmit();
+                            await formRef.current.submit();
                             setIsGenerating(false);
                           }
                         }}

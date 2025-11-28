@@ -1,21 +1,46 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface MobileStartScreenProps {
   mode: 'image' | 'video';
+  onStartGeneration?: () => void;
 }
 
-export function MobileStartScreen({ mode }: MobileStartScreenProps) {
+export function MobileStartScreen({ mode, onStartGeneration }: MobileStartScreenProps) {
+  const router = useRouter();
+
+  const handleImageClick = () => {
+    if (mode === 'image' && onStartGeneration) {
+      // Уже на странице image - просто показываем форму
+      onStartGeneration();
+    } else {
+      // Переходим на страницу image с параметром начала генерации
+      router.push('/?start=1');
+    }
+  };
+
+  const handleVideoClick = () => {
+    if (mode === 'video' && onStartGeneration) {
+      // Уже на странице video - просто показываем форму
+      onStartGeneration();
+    } else {
+      // Переходим на страницу video с параметром начала генерации
+      router.push('/video?start=1');
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 pb-8">
       {/* Mode Cards */}
       <div className="flex gap-2">
         {/* IMAGE Card */}
-        <Link
-          href="/"
-          className={`flex-1 bg-[#131313] rounded-[20px] p-5 ${mode === 'image' ? 'ring-1 ring-white/20' : ''}`}
+        <button
+          onClick={handleImageClick}
+          className={`flex-1 bg-[#131313] rounded-[20px] p-5 text-left transition-all active:scale-[0.98] ${
+            mode === 'image' ? 'ring-1 ring-white/20' : ''
+          }`}
         >
           <div className="flex flex-col gap-2">
             <p className="font-inter font-black italic text-[24px] leading-[24px] text-white">
@@ -30,12 +55,14 @@ export function MobileStartScreen({ mode }: MobileStartScreenProps) {
               +16 моделей
             </p>
           </div>
-        </Link>
+        </button>
 
         {/* VIDEO Card */}
-        <Link
-          href="/video"
-          className={`flex-1 bg-[#131313] rounded-[20px] p-5 ${mode === 'video' ? 'ring-1 ring-white/20' : ''}`}
+        <button
+          onClick={handleVideoClick}
+          className={`flex-1 bg-[#131313] rounded-[20px] p-5 text-left transition-all active:scale-[0.98] ${
+            mode === 'video' ? 'ring-1 ring-white/20'  : ''
+          }`}
         >
           <div className="flex flex-col gap-2">
             <p className="font-inter font-black italic text-[24px] leading-[24px] text-white">
@@ -50,7 +77,7 @@ export function MobileStartScreen({ mode }: MobileStartScreenProps) {
               +14 моделей
             </p>
           </div>
-        </Link>
+        </button>
       </div>
 
       {/* How to Start Section */}
@@ -127,4 +154,3 @@ export function MobileStartScreen({ mode }: MobileStartScreenProps) {
     </div>
   );
 }
-
