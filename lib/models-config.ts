@@ -2377,10 +2377,67 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     ],
   },
 
-  // Kling v2.1 УДАЛЁН из T2V - модель требует start_image (только I2V)
-  // Используйте kling-v2.1-i2v для анимации изображений
+  // 4. Kling v2.1 Master (T2V + I2V)
+  {
+    id: 'kling-v2.1-master-t2v',
+    name: 'kling-v2.1-master',
+    displayName: 'Kling v2.1 Master',
+    replicateModel: 'kwaivgi/kling-v2.1-master',
+    action: 'video_create',
+    description: 'Kuaishou - премиум качество 1080p с отличной динамикой',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
 
-  // 4. Wan 2.5 T2V
+  // 6. Wan 2.5 T2V
   {
     id: 'wan-2.5-t2v',
     name: 'wan-2.5-t2v',
@@ -2432,7 +2489,7 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 5. Kling v2.0
+  // 7. Kling v2.0
   {
     id: 'kling-v2.0-t2v',
     name: 'kling-v2.0',
@@ -2791,7 +2848,63 @@ export const VIDEO_I2V_MODELS: Model[] = [
     ],
   },
 
-  // 6. Kling v2.1 I2V
+  // 6. Kling v2.1 Master I2V
+  {
+    id: 'kling-v2.1-master-i2v',
+    name: 'kling-v2.1-master',
+    displayName: 'Kling v2.1 Master',
+    replicateModel: 'kwaivgi/kling-v2.1-master',
+    action: 'video_i2v',
+    description: 'Kuaishou - премиум анимация 1080p',
+    settings: [
+      {
+        name: 'start_image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Первый кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 7. Kling v2.1 I2V
   {
     id: 'kling-v2.1-i2v',
     name: 'kling-v2.1',
@@ -2847,7 +2960,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     ],
   },
 
-  // 7. Kling v2.0 I2V
+  // 8. Kling v2.0 I2V
   {
     id: 'kling-v2.0-i2v',
     name: 'kling-v2.0',
@@ -2898,7 +3011,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     ],
   },
 
-  // 8. Video-01 Director
+  // 9. Video-01 Director
   {
     id: 'video-01-director',
     name: 'video-01-director',
@@ -2930,7 +3043,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     ],
   },
 
-  // 9. Runway Gen4 Turbo
+  // 10. Runway Gen4 Turbo
   {
     id: 'gen4-turbo-i2v',
     name: 'gen4-turbo',
