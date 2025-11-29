@@ -51,6 +51,35 @@ export class ReplicateClient {
       }
     }
     
+    // Конвертация строковых чисел в числа для известных полей
+    const numericFields = [
+      'duration', 'fps', 'seed', 'width', 'height', 'steps', 'num_steps',
+      'num_inference_steps', 'cfg_strength', 'guidance_scale', 'cfg_scale',
+      'scale', 'scale_factor', 'creativity', 'resemblance', 'hdr', 'dynamic',
+      'sharpen', 'tiling_width', 'tiling_height', 'fontsize', 'stroke_width',
+      'target_fps', 'number_of_images', 'max_images', 'output_quality',
+      'compression_quality', 'threshold'
+    ];
+    
+    for (const field of numericFields) {
+      if (cleaned[field] !== undefined && typeof cleaned[field] === 'string') {
+        const parsed = parseFloat(cleaned[field]);
+        if (!isNaN(parsed)) {
+          // Для полей которые должны быть целыми числами
+          const integerFields = ['duration', 'fps', 'seed', 'width', 'height', 'steps', 
+            'num_steps', 'num_inference_steps', 'number_of_images', 'max_images',
+            'tiling_width', 'tiling_height', 'fontsize', 'target_fps', 'output_quality',
+            'compression_quality'];
+          if (integerFields.includes(field)) {
+            cleaned[field] = Math.round(parsed);
+          } else {
+            cleaned[field] = parsed;
+          }
+          console.log(`Converted ${field}: "${input[field]}" → ${cleaned[field]}`);
+        }
+      }
+    }
+    
     // Валидация URL полей
     const urlFields = ['image', 'input_image', 'image_input', 'video', 'mask', 'start_image', 'first_frame_image'];
     for (const field of urlFields) {
@@ -76,6 +105,63 @@ export class ReplicateClient {
     });
     
     return cleaned;
+  }
+  
+  /**
+   * Очистка сообщения об ошибке от технических деталей
+   * Убирает упоминания replicate и другие внутренние данные
+   */
+  private sanitizeErrorMessage(error: any): string {
+    let message = error.message || 'Произошла ошибка при генерации';
+    
+    // Убираем URL-ы с replicate
+    message = message.replace(/https?:\/\/[^\s]*replicate[^\s]*/gi, '');
+    message = message.replace(/api\.replicate\.com[^\s]*/gi, '');
+    message = message.replace(/replicate\.com[^\s]*/gi, '');
+    
+    // Убираем упоминания replicate
+    message = message.replace(/replicate/gi, 'API');
+    message = message.replace(/Request to\s+failed/gi, 'Запрос не выполнен');
+    
+    // Парсим JSON ошибки и извлекаем понятное сообщение
+    const jsonMatch = message.match(/\{.*"detail":\s*"([^"]+)"/);
+    if (jsonMatch && jsonMatch[1]) {
+      message = jsonMatch[1];
+    }
+    
+    // Переводим типичные ошибки на понятный язык
+    const errorMappings: [RegExp, string][] = [
+      [/start_image is required/i, 'Для этой модели требуется входное изображение'],
+      [/first_frame_image is required/i, 'Для этой модели требуется входное изображение'],
+      [/image is required/i, 'Требуется загрузить изображение'],
+      [/prompt is required/i, 'Требуется ввести описание (prompt)'],
+      [/Invalid type.*Expected: integer.*given: string/i, 'Ошибка параметров. Попробуйте ещё раз'],
+      [/Invalid type.*Expected: number.*given: string/i, 'Ошибка параметров. Попробуйте ещё раз'],
+      [/rate limit/i, 'Слишком много запросов. Подождите немного'],
+      [/timeout/i, 'Превышено время ожидания. Попробуйте ещё раз'],
+      [/model.*not found/i, 'Модель временно недоступна'],
+      [/authentication/i, 'Ошибка авторизации. Обратитесь в поддержку'],
+      [/nsfw|safety|blocked|flagged/i, 'Контент заблокирован фильтром безопасности'],
+      [/422 Unprocessable Entity/i, 'Некорректные параметры запроса'],
+      [/Input validation failed/i, 'Ошибка валидации параметров'],
+    ];
+    
+    for (const [pattern, replacement] of errorMappings) {
+      if (pattern.test(message)) {
+        return replacement;
+      }
+    }
+    
+    // Убираем технические детали в скобках и JSON
+    message = message.replace(/\{[^}]+\}/g, '').trim();
+    message = message.replace(/\[[^\]]+\]/g, '').trim();
+    
+    // Если сообщение слишком длинное или техническое - заменяем на общее
+    if (message.length > 200 || /status\s*\d+|response|request|http/i.test(message)) {
+      return 'Ошибка при генерации. Попробуйте изменить параметры или выбрать другую модель';
+    }
+    
+    return message.trim() || 'Произошла ошибка при генерации';
   }
 
   /**
@@ -179,8 +265,12 @@ export class ReplicateClient {
       }
     }
 
-    // Все попытки исчерпаны
-    throw lastError || new Error('Failed to create prediction after multiple retries');
+    // Все попытки исчерпаны - очищаем сообщение об ошибке
+    const sanitizedMessage = this.sanitizeErrorMessage(lastError);
+    const cleanError = new Error(sanitizedMessage);
+    // Сохраняем оригинальную ошибку для логов
+    (cleanError as any).originalError = lastError;
+    throw cleanError;
   }
 
   /**

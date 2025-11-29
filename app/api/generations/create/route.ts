@@ -167,31 +167,27 @@ export async function POST(request: NextRequest) {
         status: 'processing',
       });
     } catch (replicateError: any) {
-      console.error('=== REPLICATE ERROR ===');
+      console.error('=== GENERATION ERROR ===');
       console.error('Error message:', replicateError.message);
       console.error('Error name:', replicateError.name);
       console.error('Error stack:', replicateError.stack);
-      console.error('Full error object:', JSON.stringify(replicateError, null, 2));
-      console.error('Error response:', replicateError.response?.data);
+      console.error('Original error:', (replicateError as any).originalError?.message);
+      
+      // Сообщение об ошибке уже очищено в ReplicateClient
+      const userFacingError = replicateError.message || 'Ошибка при генерации';
       
       // Обновить статус на failed
       await supabase
         .from('generations')
         .update({
           status: 'failed',
-          error_message: replicateError.message,
+          error_message: userFacingError,
         })
         .eq('id', generation.id);
 
       return NextResponse.json(
         { 
-          error: 'Failed to start generation', 
-          details: replicateError.message,
-          fullError: process.env.NODE_ENV === 'development' ? {
-            name: replicateError.name,
-            message: replicateError.message,
-            response: replicateError.response?.data
-          } : undefined
+          error: userFacingError,
         },
         { status: 500 }
       );
