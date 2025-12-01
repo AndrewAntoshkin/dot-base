@@ -12,8 +12,115 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, Upload, Image as ImageIcon } from 'lucide-react';
+import { 
+  X, 
+  Image as ImageIcon,
+  Wand2,           // prompt
+  Ban,             // negative_prompt
+  Hash,            // seed, number
+  Gauge,           // cfg_scale, guidance
+  Clock,           // duration
+  Monitor,         // resolution
+  Settings2,       // mode
+  Maximize2,       // aspect_ratio
+  ImagePlus,       // start_image, first_frame_image
+  Target,          // end_image, last_frame_image
+  Palette,         // style
+  Sparkles,        // quality
+  Copy,            // num_outputs
+  Ruler,           // width, height
+  Layers,          // steps
+  Cpu,             // scheduler
+  Zap,             // prompt_optimizer
+  Lock,            // camera_fixed
+  Film,            // fps
+  SlidersHorizontal, // slider generic
+  List,            // select generic
+  ToggleRight,     // checkbox generic
+  Type,            // text generic
+  Images,          // file_array
+  LucideIcon,
+} from 'lucide-react';
 import { AspectRatioSelector } from './aspect-ratio-selector';
+
+// Маппинг иконок по названию поля
+const FIELD_ICONS: Record<string, LucideIcon> = {
+  // Prompt fields
+  prompt: Wand2,
+  negative_prompt: Ban,
+  
+  // Seed & guidance
+  seed: Hash,
+  cfg_scale: Gauge,
+  guidance_scale: Gauge,
+  guidance: Gauge,
+  
+  // Time & duration
+  duration: Clock,
+  fps: Film,
+  
+  // Resolution & size
+  resolution: Monitor,
+  size: Monitor,
+  width: Ruler,
+  height: Ruler,
+  
+  // Mode & settings
+  mode: Settings2,
+  scheduler: Cpu,
+  
+  // Aspect ratio
+  aspect_ratio: Maximize2,
+  
+  // Images
+  start_image: ImagePlus,
+  first_frame_image: ImagePlus,
+  image: ImagePlus,
+  input_image: ImagePlus,
+  end_image: Target,
+  last_frame_image: Target,
+  
+  // Style & quality
+  style: Palette,
+  quality: Sparkles,
+  
+  // Other
+  num_outputs: Copy,
+  num_images: Copy,
+  steps: Layers,
+  num_inference_steps: Layers,
+  prompt_optimizer: Zap,
+  camera_fixed: Lock,
+};
+
+// Получить иконку для поля по имени или типу
+function getFieldIcon(name: string, type: string): LucideIcon {
+  // Сначала ищем по имени
+  if (FIELD_ICONS[name]) {
+    return FIELD_ICONS[name];
+  }
+  
+  // Потом по типу
+  switch (type) {
+    case 'textarea':
+      return Wand2;
+    case 'file':
+      return ImageIcon;
+    case 'file_array':
+      return Images;
+    case 'select':
+      return List;
+    case 'slider':
+      return SlidersHorizontal;
+    case 'checkbox':
+      return ToggleRight;
+    case 'number':
+      return Hash;
+    case 'text':
+    default:
+      return Type;
+  }
+}
 
 // Максимальный размер файла для загрузки (3MB чтобы с запасом влезть в лимит Vercel)
 const MAX_UPLOAD_SIZE = 3 * 1024 * 1024;
@@ -831,9 +938,11 @@ export function SettingsForm({
         
         // Aspect ratio имеет свой особый рендеринг внутри AspectRatioSelector
         if (isAspectRatio) {
+          const Icon = getFieldIcon(setting.name, setting.type);
           return (
             <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
-              <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+              <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                <Icon className="w-3 h-3" />
                 {setting.label}
                 {setting.required && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -842,10 +951,12 @@ export function SettingsForm({
           );
         }
         
+        const Icon = getFieldIcon(setting.name, setting.type);
         return (
           <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
-            {/* Label - 10px uppercase */}
-            <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+            {/* Label - 10px uppercase with icon */}
+            <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+              <Icon className="w-3 h-3" />
               {setting.label}
               {setting.required && <span className="text-red-500 ml-1">*</span>}
             </label>

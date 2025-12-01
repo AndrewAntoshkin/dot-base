@@ -2,6 +2,7 @@
 
 // Используем лёгкую версию для быстрой загрузки
 import { ActionType, getActionLabel } from '@/lib/models-lite';
+import { Command } from 'lucide-react';
 
 interface ActionSelectorProps {
   value: ActionType;
@@ -22,8 +23,9 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
 
   return (
     <div className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
-      {/* Label - 10px uppercase */}
-      <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+      {/* Label - 10px uppercase with icon */}
+      <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+        <Command className="w-3 h-3" />
         Действие
       </label>
       
