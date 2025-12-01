@@ -2547,8 +2547,115 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     ],
   },
 
-  // REMOVED: Hailuo 2.3 Fast - это только I2V модель, требует first_frame_image
-  // Используйте Hailuo 2.3 (не Fast) для T2V или другие модели
+  // 8. Seedance 1 Pro T2V (с поддержкой T2V и I2V)
+  {
+    id: 'seedance-1-pro-t2v',
+    name: 'seedance-1-pro',
+    displayName: 'Seedance 1 Pro',
+    replicateModel: 'bytedance/seedance-1-pro',
+    action: 'video_create',
+    description: 'ByteDance - премиум качество до 1080p',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '480p', label: '480p' },
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '21:9', label: '21:9' },
+          { value: '9:21', label: '9:21' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'slider',
+        default: 5,
+        min: 2,
+        max: 12,
+      },
+      {
+        name: 'camera_fixed',
+        label: 'Фиксированная камера',
+        type: 'checkbox',
+        default: false,
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 9. Hailuo 02 T2V (с отличной физикой)
+  {
+    id: 'hailuo-02-t2v',
+    name: 'hailuo-02',
+    displayName: 'Hailuo 02',
+    replicateModel: 'minimax/hailuo-02',
+    action: 'video_create',
+    description: 'MiniMax - отличная физика, 768p/1080p',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '512p', label: '512p' },
+          { value: '768p', label: '768p (до 10 сек)' },
+          { value: '1080p', label: '1080p Pro (6 сек)' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '6',
+        options: [
+          { value: '6', label: '6 секунд' },
+          { value: '10', label: '10 секунд (только 768p)' },
+        ],
+      },
+      {
+        name: 'prompt_optimizer',
+        label: 'Оптимизация промпта',
+        type: 'checkbox',
+        default: true,
+      },
+    ],
+  },
 ];
 
 /**

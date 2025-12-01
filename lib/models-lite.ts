@@ -68,12 +68,12 @@ export const REMOVE_BG_MODELS_LITE: ModelLite[] = [
 export const VIDEO_CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'veo-3.1-fast', displayName: 'Veo 3.1 Fast', description: 'Google - быстрая генерация видео с аудио', action: 'video_create' },
   { id: 'kling-v2.5-turbo-pro-t2v', displayName: 'Kling v2.5 Turbo Pro', description: 'Kuaishou - высококачественное видео', action: 'video_create' },
+  { id: 'seedance-1-pro-t2v', displayName: 'Seedance 1 Pro', description: 'ByteDance - премиум качество до 1080p с last frame', action: 'video_create' },
+  { id: 'hailuo-02-t2v', displayName: 'Hailuo 02', description: 'MiniMax - отличная физика, 768p/1080p с last frame', action: 'video_create' },
   { id: 'hailuo-2.3-t2v', displayName: 'Hailuo 2.3', description: 'MiniMax - качественное видео с управлением камерой', action: 'video_create' },
-  { id: 'kling-v2.1-t2v', displayName: 'Kling v2.1', description: 'Kuaishou - стабильное видео 1080p', action: 'video_create' },
+  { id: 'kling-v2.1-master-t2v', displayName: 'Kling v2.1 Master', description: 'Kuaishou - премиум качество 1080p', action: 'video_create' },
   { id: 'wan-2.5-t2v', displayName: 'Wan 2.5 T2V', description: 'Wan - текст в видео высокого качества', action: 'video_create' },
   { id: 'kling-v2.0-t2v', displayName: 'Kling v2.0', description: 'Kuaishou - базовая версия 720p', action: 'video_create' },
-  { id: 'seedance-1-pro-t2v', displayName: 'Seedance 1 Pro', description: 'ByteDance - премиум качество до 1080p', action: 'video_create' },
-  { id: 'hailuo-02-t2v', displayName: 'Hailuo 02', description: 'MiniMax - отличная физика, 768p/1080p', action: 'video_create' },
 ];
 
 export const VIDEO_I2V_MODELS_LITE: ModelLite[] = [
