@@ -256,8 +256,8 @@ export function TextOutputPanel({ generationId, onRegenerate, isMobile = false }
         </div>
 
         {/* Text content */}
-        <div className={`font-mono text-sm text-white leading-relaxed whitespace-pre-wrap overflow-auto ${isMobile ? 'max-h-[400px]' : 'max-h-[500px]'}`}>
-          {outputText || 'Результат пуст'}
+        <div className={`font-inter text-sm text-white leading-relaxed overflow-auto ${isMobile ? 'max-h-[400px]' : 'max-h-[500px]'}`}>
+          {outputText ? outputText.replace(/\n+/g, ' ').trim() : 'Результат пуст'}
         </div>
       </div>
 
