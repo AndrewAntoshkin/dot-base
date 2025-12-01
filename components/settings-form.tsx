@@ -5,13 +5,7 @@ import { getModelById, ModelSetting } from '@/lib/models-config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MobileSelect, SelectOption } from '@/components/ui/mobile-select';
 import { 
   X, 
   Image as ImageIcon,
@@ -782,26 +776,20 @@ export function SettingsForm({
           );
         }
         
+        // Преобразуем опции в формат MobileSelect
+        const selectOptions: SelectOption[] = (setting.options || []).map(opt => ({
+          value: opt.value,
+          label: opt.label,
+        }));
+        
         return (
-          <Select
+          <MobileSelect
             value={value}
             onValueChange={(v) => updateFormData(setting.name, v)}
-          >
-            <SelectTrigger className="bg-[#101010] border-0 h-12 rounded-[8px]">
-              <SelectValue placeholder="Выбрать из списка" />
-            </SelectTrigger>
-            <SelectContent className="bg-[#101010] border-[#2f2f2f]">
-              {setting.options?.map((option) => (
-                <SelectItem 
-                  key={option.value} 
-                  value={option.value}
-                  className="font-inter text-[14px] text-white focus:bg-[#1f1f1f]"
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={selectOptions}
+            placeholder="Выбрать из списка"
+            title={setting.label}
+          />
         );
 
       case 'slider':
