@@ -1,12 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import {
-  getPollingInterval,
-  getNetworkQuality,
-  isPageVisible,
-  NetworkQuality,
-} from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -26,34 +20,26 @@ interface GenerationsContextType {
   updateGeneration: (id: string, updates: Partial<Generation>) => void;
   markAsViewed: (id: string) => Promise<void>;
   refreshGenerations: () => Promise<void>;
-  networkQuality: NetworkQuality;
 }
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
+// Простой интервал - 10 секунд
+const POLLING_INTERVAL = 10000;
+
 export function GenerationsProvider({ children }: { children: ReactNode }) {
   const [generations, setGenerations] = useState<Generation[]>([]);
-  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>(() => getNetworkQuality());
-  
-  // Refs
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef = useRef(true);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const refreshGenerations = useCallback(async () => {
-    // Не делаем запросы, если страница не видима или компонент размонтирован
-    if (!isPageVisible() || !isMountedRef.current) return;
-    
     try {
-      const response = await fetch('/api/generations/list?limit=20', {
-        credentials: 'include',
-      });
-      if (response.ok && isMountedRef.current) {
+      const response = await fetch('/api/generations/list?limit=20');
+      if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
       }
     } catch (error) {
-      // Тихо игнорируем ошибки сети
-      console.error('Error fetching generations:', error);
+      console.error('Fetch error:', error);
     }
   }, []);
 
@@ -68,62 +54,35 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markAsViewed = useCallback(async (id: string) => {
-    // Optimistic update
     setGenerations((prev) =>
       prev.map((g) => (g.id === id ? { ...g, viewed: true } : g))
     );
-
     try {
-      await fetch(`/api/generations/${id}/view`, { 
-        method: 'POST',
-        credentials: 'include',
-      });
+      await fetch(`/api/generations/${id}/view`, { method: 'POST' });
     } catch (error) {
-      console.error('Error marking as viewed:', error);
+      console.error('Mark viewed error:', error);
     }
   }, []);
 
-  // Вычисляем derived state
+  // Derived state
   const unviewedGenerations = generations.filter((g) => !g.viewed);
   const unviewedCount = unviewedGenerations.length;
   const hasActiveGenerations = unviewedGenerations.some(
     (g) => g.status === 'pending' || g.status === 'processing'
   );
 
-  // Простой polling без сложной логики
+  // Простой polling
   useEffect(() => {
-    isMountedRef.current = true;
-    
-    // Первоначальная загрузка
     refreshGenerations();
     
-    // Определяем интервал
-    const interval = getPollingInterval(networkQuality);
+    intervalRef.current = setInterval(refreshGenerations, POLLING_INTERVAL);
     
-    // Запускаем polling
-    pollingIntervalRef.current = setInterval(() => {
-      if (isPageVisible()) {
-        refreshGenerations();
-      }
-    }, interval);
-
-    // Обработчик видимости страницы
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshGenerations();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
-      isMountedRef.current = false;
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
-  }, [networkQuality, refreshGenerations]);
+  }, [refreshGenerations]);
 
   return (
     <GenerationsContext.Provider
@@ -136,7 +95,6 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
         updateGeneration,
         markAsViewed,
         refreshGenerations,
-        networkQuality,
       }}
     >
       {children}

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { formatDate } from '@/lib/utils';
 import { Loader2, Download, Play, Trash2 } from 'lucide-react';
-import { shouldUseImageProxy, getProxiedImageUrl, getImageQuality, getNetworkQuality } from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -19,8 +18,7 @@ interface Generation {
 }
 
 function isVideoUrl(url: string): boolean {
-  const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
-  return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  return ['.mp4', '.webm', '.mov', '.avi', '.mkv'].some(ext => url.toLowerCase().includes(ext));
 }
 
 function isVideoAction(action: string): boolean {
@@ -35,54 +33,24 @@ function isValidMediaUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
 
-function VideoPlaceholder() {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
-      <div className="flex flex-col items-center gap-2">
-        <Play className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
-        <span className="font-inter text-xs lg:text-sm text-[#656565]">Видео</span>
-      </div>
-    </div>
-  );
-}
-
-// Компонент изображения с поддержкой прокси
-function HistoryImage({ src, alt, useProxy }: { src: string; alt: string; useProxy: boolean }) {
-  const proxiedSrc = getProxiedImageUrl(src, useProxy);
-  
-  return (
-    <img
-      src={proxiedSrc}
-      alt={alt}
-      className="absolute inset-0 w-full h-full object-cover"
-      loading="lazy"
-    />
-  );
-}
-
 export default function HistoryPage() {
   const router = useRouter();
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  
-  // Синхронно определяем настройки
-  const useProxy = shouldUseImageProxy();
 
   const fetchGenerations = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/generations/list?page=${page}&limit=20`, {
-        credentials: 'include',
-      });
+      const response = await fetch(`/api/generations/list?page=${page}&limit=20`);
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
         setTotalPages(data.totalPages || 1);
       }
     } catch (error) {
-      console.error('Error fetching generations:', error);
+      console.error('Fetch error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +65,6 @@ export default function HistoryPage() {
     e.stopPropagation();
     
     try {
-      // Скачиваем оригинал, не прокси
       const response = await fetch(url);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -119,11 +86,7 @@ export default function HistoryPage() {
     if (!confirm('Удалить эту генерацию?')) return;
     
     try {
-      const response = await fetch(`/api/generations/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
+      const response = await fetch(`/api/generations/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setGenerations(prev => prev.filter(g => g.id !== id));
       }
@@ -132,13 +95,10 @@ export default function HistoryPage() {
     }
   };
 
-  const handleGenerationClick = (generation: Generation) => {
+  const handleClick = (generation: Generation) => {
     let basePath = '/';
-    if (isVideoAction(generation.action)) {
-      basePath = '/video';
-    } else if (isTextAction(generation.action)) {
-      basePath = '/analyze';
-    }
+    if (isVideoAction(generation.action)) basePath = '/video';
+    else if (isTextAction(generation.action)) basePath = '/analyze';
     router.push(`${basePath}?generationId=${generation.id}`);
   };
 
@@ -168,7 +128,7 @@ export default function HistoryPage() {
               </p>
               <Link
                 href="/"
-                className="inline-block bg-[#f0f0f5] rounded-xl px-4 py-3 font-inter font-medium text-base text-[#141414] hover:bg-white transition-colors"
+                className="inline-block bg-[#f0f0f5] rounded-xl px-4 py-3 font-inter font-medium text-base text-[#141414] hover:bg-white"
               >
                 Создать первую генерацию
               </Link>
@@ -181,26 +141,26 @@ export default function HistoryPage() {
                 <div
                   key={generation.id}
                   className="group cursor-pointer"
-                  onClick={() => handleGenerationClick(generation)}
+                  onClick={() => handleClick(generation)}
                 >
-                  <div className="bg-[#101010] rounded-xl lg:rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
+                  <div className="bg-[#101010] rounded-xl lg:rounded-2xl overflow-hidden hover:bg-[#1a1a1a]">
                     <div className="relative aspect-square bg-[#151515] rounded-lg lg:rounded-xl overflow-hidden">
                       {generation.output_urls?.[0] && isValidMediaUrl(generation.output_urls[0]) ? (
                         isVideoUrl(generation.output_urls[0]) ? (
-                          <VideoPlaceholder />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Play className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
+                          </div>
                         ) : (
-                          <HistoryImage 
-                            src={generation.output_urls[0]} 
-                            alt={generation.prompt || 'Generated image'} 
-                            useProxy={useProxy}
+                          <img
+                            src={generation.output_urls[0]}
+                            alt={generation.prompt || 'Generated'}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading="lazy"
                           />
                         )
                       ) : isTextAction(generation.action) ? (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <span className="text-2xl">📝</span>
-                            <span className="font-inter text-xs lg:text-sm text-[#656565]">Текст</span>
-                          </div>
+                          <span className="text-2xl">📝</span>
                         </div>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -218,7 +178,7 @@ export default function HistoryPage() {
                     </div>
 
                     <div className="p-3 lg:p-4">
-                      <p className="font-inter text-xs lg:text-sm text-[#959595] leading-relaxed line-clamp-2 lg:line-clamp-3 mb-2 lg:mb-3">
+                      <p className="font-inter text-xs lg:text-sm text-[#959595] line-clamp-2 lg:line-clamp-3 mb-2 lg:mb-3">
                         {generation.prompt || 'Без промпта'}
                       </p>
 
@@ -229,14 +189,14 @@ export default function HistoryPage() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={(e) => handleDelete(e, generation.id)}
-                            className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] hover:border-red-500/50 transition-colors"
+                            className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]"
                           >
                             <Trash2 className="h-3 w-3 lg:h-4 lg:w-4" />
                           </button>
                           {generation.output_urls?.[0] && (
                             <button
                               onClick={(e) => handleDownload(e, generation.output_urls![0], generation.id)}
-                              className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+                              className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]"
                             >
                               <Download className="h-3 w-3 lg:h-4 lg:w-4" />
                             </button>
@@ -252,9 +212,9 @@ export default function HistoryPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-3 lg:gap-4 mt-6 lg:mt-8">
                 <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter text-xs lg:text-sm text-white hover:bg-[#1f1f1f] disabled:opacity-50"
                 >
                   Назад
                 </button>
@@ -262,9 +222,9 @@ export default function HistoryPage() {
                   {page} / {totalPages}
                 </span>
                 <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter text-xs lg:text-sm text-white hover:bg-[#1f1f1f] disabled:opacity-50"
                 >
                   Вперед
                 </button>
