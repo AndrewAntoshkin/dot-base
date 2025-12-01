@@ -168,3 +168,100 @@ export function isSlowNetwork(): boolean {
   return getNetworkQuality() === 'slow';
 }
 
+/**
+ * Домены которые могут блокироваться провайдерами
+ */
+const BLOCKED_DOMAINS = [
+  'replicate.delivery',
+  'pbxt.replicate.delivery',
+];
+
+/**
+ * Проверить, нужно ли проксировать URL
+ * Возвращает true если URL может быть заблокирован
+ */
+export function shouldProxyUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return BLOCKED_DOMAINS.some(domain => parsed.hostname.endsWith(domain));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Преобразовать URL изображения через прокси
+ * Используется для обхода блокировок на мобильном интернете
+ */
+export function getProxiedImageUrl(url: string, forceProxy = false): string {
+  if (!url) return url;
+  
+  // Не проксируем data: URLs
+  if (url.startsWith('data:')) return url;
+  
+  // Проксируем если URL потенциально заблокирован или принудительно
+  if (forceProxy || shouldProxyUrl(url)) {
+    return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+  }
+  
+  return url;
+}
+
+/**
+ * Проверить доступность внешнего URL (для диагностики блокировок)
+ * Возвращает true если URL доступен напрямую
+ */
+export async function checkUrlAccessibility(url: string, timeout = 5000): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    const response = await fetch(url, {
+      method: 'HEAD',
+      mode: 'no-cors', // Избегаем CORS ошибок
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Хук для хранения состояния необходимости прокси
+ * Проверяет при первом вызове и кэширует результат
+ */
+let proxyNeeded: boolean | null = null;
+let proxyCheckPromise: Promise<boolean> | null = null;
+
+export async function isProxyNeeded(): Promise<boolean> {
+  // Если уже проверяли - возвращаем кэшированный результат
+  if (proxyNeeded !== null) {
+    return proxyNeeded;
+  }
+  
+  // Если проверка уже идёт - ждём её
+  if (proxyCheckPromise) {
+    return proxyCheckPromise;
+  }
+  
+  // Запускаем проверку
+  proxyCheckPromise = (async () => {
+    // Тестовый URL с replicate.delivery
+    const testUrl = 'https://replicate.delivery/';
+    const accessible = await checkUrlAccessibility(testUrl, 3000);
+    proxyNeeded = !accessible;
+    
+    if (proxyNeeded) {
+      console.log('[Network] Replicate CDN blocked, will use proxy');
+    }
+    
+    return proxyNeeded;
+  })();
+  
+  return proxyCheckPromise;
+}
+

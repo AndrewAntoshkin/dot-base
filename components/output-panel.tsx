@@ -10,6 +10,8 @@ import {
   getImageQuality,
   isPageVisible,
   subscribeToVisibilityChanges,
+  isProxyNeeded,
+  getProxiedImageUrl,
   NetworkQuality,
 } from '@/lib/network-utils';
 
@@ -52,14 +54,22 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
   const [copied, setCopied] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [networkQuality, setNetworkQuality] = useState<NetworkQuality>('fast');
+  const [useProxy, setUseProxy] = useState(false);
   
   // Refs для cleanup
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
-  // Инициализация качества сети
+  // Инициализация качества сети и проверка необходимости прокси
   useEffect(() => {
     setNetworkQuality(getNetworkQuality());
+    
+    // Проверяем нужен ли прокси для обхода блокировок
+    isProxyNeeded().then(needed => {
+      if (isMountedRef.current) {
+        setUseProxy(needed);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -320,8 +330,10 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
   // Получаем URL текущего выбранного результата
   const rawMediaUrl = generation.output_urls?.[selectedImageIndex] || generation.output_urls?.[0];
   // Проверяем что это валидный URL, а не текстовый результат (от analyze моделей)
-  const currentMediaUrl = rawMediaUrl && isValidMediaUrl(rawMediaUrl) ? rawMediaUrl : null;
-  const isVideo = currentMediaUrl ? isVideoUrl(currentMediaUrl) : false;
+  const validMediaUrl = rawMediaUrl && isValidMediaUrl(rawMediaUrl) ? rawMediaUrl : null;
+  // Применяем прокси если нужно для обхода блокировок
+  const currentMediaUrl = validMediaUrl ? getProxiedImageUrl(validMediaUrl, useProxy) : null;
+  const isVideo = validMediaUrl ? isVideoUrl(validMediaUrl) : false;
 
   // Определяем качество изображений на основе сети
   const imageQuality = getImageQuality(networkQuality);
@@ -368,6 +380,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
           <div className="flex gap-2 items-center">
             {generation.output_urls.filter(isValidMediaUrl).map((url, index) => {
               const isThumbVideo = isVideoUrl(url);
+              const thumbUrl = getProxiedImageUrl(url, useProxy);
               return (
                 <button
                   key={index}
@@ -386,7 +399,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
                     </div>
                   ) : (
                     <Image
-                      src={url}
+                      src={thumbUrl}
                       alt={`Output ${index + 1}`}
                       fill
                       className="object-cover"
@@ -493,6 +506,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
         <div className="flex gap-2 items-center mb-4 ml-1 py-1">
           {generation.output_urls.filter(isValidMediaUrl).map((url, index) => {
             const isThumbVideo = isVideoUrl(url);
+            const thumbUrl = getProxiedImageUrl(url, useProxy);
             return (
               <button
                 key={index}
@@ -511,7 +525,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
                   </div>
                 ) : (
                   <Image
-                    src={url}
+                    src={thumbUrl}
                     alt={`Output ${index + 1}`}
                     fill
                     className="object-cover"

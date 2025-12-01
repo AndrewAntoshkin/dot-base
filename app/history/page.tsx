@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { formatDate } from '@/lib/utils';
 import { Loader2, Download, Play, Trash2 } from 'lucide-react';
-import { getNetworkQuality, getImageQuality, NetworkQuality } from '@/lib/network-utils';
+import { getNetworkQuality, getImageQuality, isProxyNeeded, getProxiedImageUrl, NetworkQuality } from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -60,10 +60,14 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [networkQuality, setNetworkQuality] = useState<NetworkQuality>('fast');
+  const [useProxy, setUseProxy] = useState(false);
   
-  // Инициализация качества сети
+  // Инициализация качества сети и проверка необходимости прокси
   useEffect(() => {
     setNetworkQuality(getNetworkQuality());
+    
+    // Проверяем нужен ли прокси для обхода блокировок
+    isProxyNeeded().then(needed => setUseProxy(needed));
   }, []);
   
   // Качество изображений в зависимости от сети
@@ -195,7 +199,7 @@ export default function HistoryPage() {
                           <VideoPlaceholder />
                         ) : (
                           <Image
-                            src={generation.output_urls[0]}
+                            src={getProxiedImageUrl(generation.output_urls[0], useProxy)}
                             alt={generation.prompt || 'Generated image'}
                             fill
                             className="object-cover"

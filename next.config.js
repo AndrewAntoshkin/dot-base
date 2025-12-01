@@ -10,7 +10,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
+      // Разрешаем все поддомены replicate
+      {
+        protocol: 'https',
+        hostname: '**.replicate.delivery',
+      },
     ],
+    // Разрешаем изображения с любых доменов (для прокси)
+    unoptimized: false,
     // Оптимизация для мобильных устройств
     deviceSizes: [320, 420, 640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
