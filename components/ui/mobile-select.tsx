@@ -139,7 +139,7 @@ export function MobileSelect({
                         type="button"
                         onClick={() => setTempValue(option.value)}
                         className={cn(
-                          'w-full h-12 rounded-[16px] px-4 py-2 flex items-center gap-3 transition-colors text-left',
+                          'w-full h-12 rounded-[12px] px-4 py-2 flex items-center gap-3 transition-colors text-left',
                           'bg-[#232323]',
                           isSelected && 'border border-[#d6d6d6]'
                         )}
@@ -196,12 +196,12 @@ export function MobileSelect({
     );
   }
 
-  // Desktop: обычный Radix Select
+  // Desktop: стилизованный Radix Select по дизайну Figma
   return (
     <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
       <SelectPrimitive.Trigger
         className={cn(
-          'flex h-12 w-full items-center justify-between rounded-[8px] bg-[#101010] px-3 py-[10px] font-inter font-normal text-[14px] text-white placeholder:text-[#959595] focus:outline-none transition-colors',
+          'flex h-12 w-full items-center justify-between rounded-[8px] bg-[#101010] px-3 py-[10px] font-inter font-normal text-[14px] text-white placeholder:text-[#959595] focus:outline-none focus:border focus:border-white transition-colors',
           triggerClassName
         )}
       >
@@ -212,36 +212,43 @@ export function MobileSelect({
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
-          className="relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-[#2f2f2f] bg-[#101010] shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
+          className="z-50 overflow-hidden rounded-[16px] bg-[#131313] p-2 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
           position="popper"
-          sideOffset={4}
+          sideOffset={8}
         >
-          <SelectPrimitive.Viewport className="p-1 h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]">
+          <SelectPrimitive.Viewport className="flex flex-col gap-2 w-full min-w-[var(--radix-select-trigger-width)] max-h-[300px]">
             {options.map((option) => (
               <SelectPrimitive.Item
                 key={option.value}
                 value={option.value}
-                className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-[#1f1f1f] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 font-inter text-[14px] text-white"
+                className={cn(
+                  'relative flex w-full cursor-pointer select-none items-center rounded-[12px] h-12 px-4 py-2 outline-none transition-colors',
+                  'bg-[#232323] hover:bg-[#2a2a2a]',
+                  'data-[state=checked]:border data-[state=checked]:border-[#d6d6d6]',
+                  'font-inter text-[14px] text-white'
+                )}
               >
-                <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                {/* Галочка для выбранного элемента */}
+                <span className="shrink-0 mr-3 data-[state=unchecked]:hidden">
                   <SelectPrimitive.ItemIndicator>
                     <CheckIcon />
                   </SelectPrimitive.ItemIndicator>
                 </span>
-                <SelectPrimitive.ItemText>
-                  <span className="flex items-center gap-2">
-                    {option.label}
-                    {option.badge && (
-                      <span className={cn(
-                        'px-2 py-1 rounded-[6px] flex items-center gap-1 font-inter font-bold text-[14px] leading-[18px] text-white',
-                        option.badge.className || 'bg-[#573417]'
-                      )}>
-                        {option.badge.text}
-                        {option.badge.icon}
-                      </span>
-                    )}
-                  </span>
+                
+                <SelectPrimitive.ItemText className="flex-1">
+                  {option.label}
                 </SelectPrimitive.ItemText>
+                
+                {/* Badge */}
+                {option.badge && (
+                  <span className={cn(
+                    'ml-2 px-2 py-1 rounded-[6px] flex items-center gap-1 font-inter font-bold text-[14px] leading-[18px] text-white',
+                    option.badge.className || 'bg-[#573417]'
+                  )}>
+                    {option.badge.text}
+                    {option.badge.icon}
+                  </span>
+                )}
               </SelectPrimitive.Item>
             ))}
           </SelectPrimitive.Viewport>
@@ -250,4 +257,3 @@ export function MobileSelect({
     </SelectPrimitive.Root>
   );
 }
-
