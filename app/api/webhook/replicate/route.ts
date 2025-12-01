@@ -2,6 +2,61 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 
+// Проверяем, является ли action текстовым (analyze)
+function isTextAction(action: string): boolean {
+  return action.startsWith('analyze_');
+}
+
+// Проверяем, является ли вывод URL-ом медиа файла
+function isMediaUrl(value: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+  
+  // Проверяем, начинается ли с http/https
+  if (!value.startsWith('http://') && !value.startsWith('https://') && !value.startsWith('data:')) {
+    return false;
+  }
+  
+  // Проверяем расширения медиа файлов
+  const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov'];
+  const lowerValue = value.toLowerCase();
+  return mediaExtensions.some(ext => lowerValue.includes(ext));
+}
+
+// Извлекаем текст из различных форматов вывода
+function extractTextOutput(output: any): string | null {
+  if (!output) return null;
+  
+  // Если уже строка - возвращаем
+  if (typeof output === 'string') {
+    // Но проверяем что это не URL
+    if (!isMediaUrl(output)) {
+      return output;
+    }
+    return null;
+  }
+  
+  // Если массив - объединяем текстовые элементы
+  if (Array.isArray(output)) {
+    const textParts = output.filter(item => typeof item === 'string' && !isMediaUrl(item));
+    if (textParts.length > 0) {
+      return textParts.join('\n');
+    }
+    return null;
+  }
+  
+  // Если объект - ищем текстовые поля
+  if (typeof output === 'object') {
+    const textFields = ['text', 'caption', 'description', 'prompt', 'output', 'result', 'content', 'answer'];
+    for (const field of textFields) {
+      if (output[field] && typeof output[field] === 'string' && !isMediaUrl(output[field])) {
+        return output[field];
+      }
+    }
+  }
+  
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -39,49 +94,72 @@ export async function POST(request: NextRequest) {
     };
 
     if (status === 'succeeded') {
-      // Обработка вывода от Replicate (может быть строка, массив или объект)
-      let replicateUrls: string[] = [];
+      const isAnalyze = isTextAction(generation.action);
       
-      if (typeof output === 'string') {
-        replicateUrls = [output];
-      } else if (Array.isArray(output)) {
-        replicateUrls = output.filter(url => typeof url === 'string');
-      } else if (output && typeof output === 'object') {
-        // Некоторые модели возвращают объект с URL внутри
-        const possibleUrlFields = ['url', 'video', 'output', 'result'];
-        for (const field of possibleUrlFields) {
-          if (output[field] && typeof output[field] === 'string') {
-            replicateUrls = [output[field]];
-            break;
+      if (isAnalyze) {
+        // Обработка текстового вывода для analyze моделей
+        console.log('Processing text output for analyze action...');
+        
+        const textOutput = extractTextOutput(output);
+        
+        if (textOutput) {
+          console.log('Text output extracted:', textOutput.substring(0, 200));
+          updateData.status = 'completed';
+          updateData.output_text = textOutput;
+          // Также сохраняем в output_urls для совместимости (если нет текста)
+          updateData.output_urls = [textOutput];
+        } else {
+          console.error('No text output found for analyze action:', output);
+          updateData.status = 'failed';
+          updateData.error_message = 'No text output received';
+        }
+      } else {
+        // Обработка медиа вывода (изображения/видео)
+        let replicateUrls: string[] = [];
+        
+        if (typeof output === 'string' && isMediaUrl(output)) {
+          replicateUrls = [output];
+        } else if (Array.isArray(output)) {
+          replicateUrls = output.filter(url => typeof url === 'string' && isMediaUrl(url));
+        } else if (output && typeof output === 'object') {
+          // Некоторые модели возвращают объект с URL внутри
+          const possibleUrlFields = ['url', 'video', 'output', 'result'];
+          for (const field of possibleUrlFields) {
+            if (output[field] && typeof output[field] === 'string' && isMediaUrl(output[field])) {
+              replicateUrls = [output[field]];
+              break;
+            }
           }
         }
+        
+        console.log('Replicate output URLs:', replicateUrls);
+        
+        if (replicateUrls.length === 0) {
+          console.error('No valid URLs found in output:', output);
+          updateData.status = 'failed';
+          updateData.error_message = 'No output URLs received from Replicate';
+        } else {
+          console.log('Saving media to storage...', { 
+            count: replicateUrls.length,
+            firstUrl: replicateUrls[0]?.substring(0, 100)
+          });
+          
+          // Сохранить медиа файлы в Supabase Storage (изображения или видео)
+          const savedUrls = await saveGenerationMedia(replicateUrls, generation.id);
+          
+          console.log('Media saved:', { 
+            savedCount: savedUrls.length,
+            firstSavedUrl: savedUrls[0]?.substring(0, 100)
+          });
+          
+          updateData.status = 'completed';
+          // Используем сохранённые URL если есть, иначе временные от Replicate
+          updateData.output_urls = savedUrls.length > 0 ? savedUrls : replicateUrls;
+        }
       }
-      
-      console.log('Replicate output URLs:', replicateUrls);
-      
-      if (replicateUrls.length === 0) {
-        console.error('No valid URLs found in output:', output);
-        updateData.status = 'failed';
-        updateData.error_message = 'No output URLs received from Replicate';
-      } else {
-        console.log('Saving media to storage...', { 
-          count: replicateUrls.length,
-          firstUrl: replicateUrls[0]?.substring(0, 100)
-        });
-        
-        // Сохранить медиа файлы в Supabase Storage (изображения или видео)
-        const savedUrls = await saveGenerationMedia(replicateUrls, generation.id);
-        
-        console.log('Media saved:', { 
-          savedCount: savedUrls.length,
-          firstSavedUrl: savedUrls[0]?.substring(0, 100)
-        });
-        
-        updateData.status = 'completed';
-        // Используем сохранённые URL если есть, иначе временные от Replicate
-        updateData.output_urls = savedUrls.length > 0 ? savedUrls : replicateUrls;
 
-        // Вычесть кредиты у пользователя (если функция существует)
+      // Вычесть кредиты у пользователя (если функция существует)
+      if (updateData.status === 'completed') {
         try {
           await supabase.rpc('decrement_credits', {
             user_id_param: generation.user_id,

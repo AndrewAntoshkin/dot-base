@@ -66,7 +66,7 @@ export function Header() {
   }, [isMobileMenuOpen]);
 
   // Get current mode based on pathname
-  const currentMode = pathname === '/video' ? 'video' : 'image';
+  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : 'image';
   
   return (
     <>
@@ -115,12 +115,14 @@ export function Header() {
               >
                 Video
               </Link>
-              <span
-                className="px-3 py-2 rounded font-inter font-medium text-base text-[#656565] tracking-[-0.32px] cursor-not-allowed"
-                title="Coming soon"
+              <Link
+                href="/analyze"
+                className={`px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
+                  pathname === '/analyze' ? 'bg-[#1f1f1f] text-white' : 'text-[#656565] hover:text-white'
+                }`}
               >
-                Text
-              </span>
+                Analyze
+              </Link>
             </nav>
           </div>
 
@@ -229,15 +231,16 @@ export function Header() {
               VIDEO
             </Link>
             
-            {/* TEXT SOON */}
-            <div className="px-4 py-3 rounded-[16px] flex items-center gap-1">
-              <span className="font-inter font-medium text-[20px] leading-[24px] text-[#656565]">
-                TEXT
-              </span>
-              <span className="font-inter font-medium text-[12px] leading-[19px] text-[#fbc56e]">
-                SOON
-              </span>
-            </div>
+            {/* ANALYZE */}
+            <Link
+              href="/analyze"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
+                currentMode === 'analyze' ? 'bg-black' : ''
+              }`}
+            >
+              ANALYZE
+            </Link>
           </div>
           
           {/* Divider */}

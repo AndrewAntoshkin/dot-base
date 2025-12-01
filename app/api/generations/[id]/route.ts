@@ -69,45 +69,81 @@ export async function GET(
 
         // Обновить статус если изменился
         if (prediction.status === 'succeeded') {
-          // Обработка вывода от Replicate (может быть строка, массив или объект)
-          let replicateUrls: string[] = [];
           const output = prediction.output;
+          const isAnalyze = generation.action?.startsWith('analyze_');
           
-          if (typeof output === 'string') {
-            replicateUrls = [output];
-          } else if (Array.isArray(output)) {
-            replicateUrls = output.filter(url => typeof url === 'string');
-          } else if (output && typeof output === 'object') {
-            // Некоторые модели возвращают объект с URL внутри
-            const possibleUrlFields = ['url', 'video', 'output', 'result'];
-            for (const field of possibleUrlFields) {
-              if ((output as any)[field] && typeof (output as any)[field] === 'string') {
-                replicateUrls = [(output as any)[field]];
-                break;
+          if (isAnalyze) {
+            // Обработка текстового вывода для analyze моделей
+            let textOutput: string | null = null;
+            
+            if (typeof output === 'string') {
+              textOutput = output;
+            } else if (Array.isArray(output)) {
+              textOutput = output.filter(item => typeof item === 'string').join('\n');
+            } else if (output && typeof output === 'object') {
+              const textFields = ['text', 'caption', 'description', 'prompt', 'output', 'result', 'content', 'answer'];
+              for (const field of textFields) {
+                if ((output as any)[field] && typeof (output as any)[field] === 'string') {
+                  textOutput = (output as any)[field];
+                  break;
+                }
               }
             }
-          }
+            
+            if (textOutput) {
+              await supabase
+                .from('generations')
+                .update({
+                  status: 'completed',
+                  output_text: textOutput,
+                  output_urls: [textOutput], // Для совместимости
+                  replicate_output: prediction,
+                })
+                .eq('id', id);
 
-          // Сохранить медиа в storage
-          let outputUrls = replicateUrls;
-          if (replicateUrls.length > 0) {
-            const savedUrls = await saveGenerationMedia(replicateUrls, generation.id);
-            if (savedUrls.length > 0) {
-              outputUrls = savedUrls;
+              generation.status = 'completed';
+              generation.output_text = textOutput;
+              generation.output_urls = [textOutput];
             }
+          } else {
+            // Обработка медиа вывода
+            let replicateUrls: string[] = [];
+            
+            if (typeof output === 'string') {
+              replicateUrls = [output];
+            } else if (Array.isArray(output)) {
+              replicateUrls = output.filter(url => typeof url === 'string');
+            } else if (output && typeof output === 'object') {
+              const possibleUrlFields = ['url', 'video', 'output', 'result'];
+              for (const field of possibleUrlFields) {
+                if ((output as any)[field] && typeof (output as any)[field] === 'string') {
+                  replicateUrls = [(output as any)[field]];
+                  break;
+                }
+              }
+            }
+
+            // Сохранить медиа в storage
+            let outputUrls = replicateUrls;
+            if (replicateUrls.length > 0) {
+              const savedUrls = await saveGenerationMedia(replicateUrls, generation.id);
+              if (savedUrls.length > 0) {
+                outputUrls = savedUrls;
+              }
+            }
+
+            await supabase
+              .from('generations')
+              .update({
+                status: 'completed',
+                output_urls: outputUrls,
+                replicate_output: prediction,
+              })
+              .eq('id', id);
+
+            generation.status = 'completed';
+            generation.output_urls = outputUrls;
           }
-
-          await supabase
-            .from('generations')
-            .update({
-              status: 'completed',
-              output_urls: outputUrls,
-              replicate_output: prediction,
-            })
-            .eq('id', id);
-
-          generation.status = 'completed';
-          generation.output_urls = outputUrls;
         } else if (prediction.status === 'failed') {
           await supabase
             .from('generations')

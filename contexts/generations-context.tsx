@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import {
+  getPollingInterval,
+  getNetworkQuality,
+  subscribeToNetworkChanges,
+  subscribeToVisibilityChanges,
+  isPageVisible,
+  NetworkQuality,
+} from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -20,17 +28,26 @@ interface GenerationsContextType {
   updateGeneration: (id: string, updates: Partial<Generation>) => void;
   markAsViewed: (id: string) => Promise<void>;
   refreshGenerations: () => Promise<void>;
+  networkQuality: NetworkQuality;
 }
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
-// Простой интервал polling - 5 сек
-const POLLING_INTERVAL = 5000;
-
 export function GenerationsProvider({ children }: { children: ReactNode }) {
   const [generations, setGenerations] = useState<Generation[]>([]);
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>('fast');
+  const [isVisible, setIsVisible] = useState(true);
+  
+  // Храним ref для interval ID
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasActiveRef = useRef(false);
 
   const refreshGenerations = useCallback(async () => {
+    // Не делаем запросы, если страница не видима
+    if (!isPageVisible()) {
+      return;
+    }
+    
     try {
       const response = await fetch('/api/generations/list?limit=20', {
         credentials: 'include',
@@ -76,13 +93,74 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
   const hasActiveGenerations = unviewedGenerations.some(
     (g) => g.status === 'pending' || g.status === 'processing'
   );
+  hasActiveRef.current = hasActiveGenerations;
 
-  // Простой polling каждые 5 секунд
+  // Инициализация качества сети
   useEffect(() => {
-    refreshGenerations();
-    const interval = setInterval(refreshGenerations, POLLING_INTERVAL);
-    return () => clearInterval(interval);
+    setNetworkQuality(getNetworkQuality());
+  }, []);
+
+  // Подписка на изменения качества сети
+  useEffect(() => {
+    const unsubscribe = subscribeToNetworkChanges((quality) => {
+      console.log(`[Network] Quality changed to: ${quality}`);
+      setNetworkQuality(quality);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Подписка на видимость страницы
+  useEffect(() => {
+    const unsubscribe = subscribeToVisibilityChanges((visible) => {
+      setIsVisible(visible);
+      // При возвращении на страницу сразу обновляем
+      if (visible) {
+        refreshGenerations();
+      }
+    });
+    return unsubscribe;
   }, [refreshGenerations]);
+
+  // Умный polling с адаптацией к сети и видимости
+  useEffect(() => {
+    // Очищаем предыдущий интервал
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    // Не запускаем polling если страница не видима
+    if (!isVisible) {
+      return;
+    }
+
+    // Получаем интервал в зависимости от качества сети и наличия активных генераций
+    const baseInterval = getPollingInterval(networkQuality);
+    // Если нет активных генераций - polling ещё реже
+    const interval = hasActiveRef.current ? baseInterval : baseInterval * 2;
+
+    // Первоначальная загрузка
+    refreshGenerations();
+
+    // Запускаем polling
+    pollingIntervalRef.current = setInterval(() => {
+      // Динамически проверяем, есть ли активные генерации
+      const dynamicInterval = hasActiveRef.current ? baseInterval : baseInterval * 2;
+      // Если интервал изменился, перезапускаем
+      if (dynamicInterval !== interval && pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = setInterval(refreshGenerations, dynamicInterval);
+      }
+      refreshGenerations();
+    }, interval);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [networkQuality, isVisible, refreshGenerations]);
 
   return (
     <GenerationsContext.Provider
@@ -95,6 +173,7 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
         updateGeneration,
         markAsViewed,
         refreshGenerations,
+        networkQuality,
       }}
     >
       {children}

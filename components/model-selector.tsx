@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ActionType, Model, getModelsByAction } from '@/lib/models-config';
+import { useEffect, useState, useMemo } from 'react';
+// Используем лёгкую версию для селектора (~140 строк вместо 3800+)
+import { ActionType, ModelLite, getModelsByActionLite } from '@/lib/models-lite';
 import {
   Select,
   SelectContent,
@@ -17,17 +18,18 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
-  const [models, setModels] = useState<Model[]>([]);
+  // Мемоизируем список моделей - пересчитывается только при смене action
+  const models = useMemo(() => getModelsByActionLite(action), [action]);
 
   useEffect(() => {
-    const availableModels = getModelsByAction(action);
-    setModels(availableModels);
-
     // Reset selection if current model is not in the list
-    if (value && !availableModels.find((m) => m.id === value)) {
+    if (value && !models.find((m) => m.id === value)) {
       onChange('');
     }
-  }, [action]);
+  }, [action, models, value, onChange]);
+
+  // Находим текущую модель для описания
+  const currentModel = value ? models.find((m) => m.id === value) : null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -58,9 +60,9 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
         </SelectContent>
       </Select>
 
-      {value && (
+      {currentModel?.description && (
         <p className="font-inter text-[14px] text-[#959595] mt-1">
-          {models.find((m) => m.id === value)?.description}
+          {currentModel.description}
         </p>
       )}
     </div>

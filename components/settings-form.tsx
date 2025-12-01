@@ -137,7 +137,10 @@ function FileUploader({
 
   // Определяем, это видео или изображение по settingName
   const isVideoField = settingName.toLowerCase().includes('video') || acceptVideo;
-  const acceptType = isVideoField ? 'image/*,video/*' : 'image/*';
+  // Явно указываем форматы для лучшей совместимости с macOS
+  const acceptType = isVideoField 
+    ? 'image/png,image/jpeg,image/jpg,image/gif,image/webp,video/mp4,video/quicktime,video/webm' 
+    : 'image/png,image/jpeg,image/jpg,image/gif,image/webp';
 
   const handleFile = useCallback(async (file: File) => {
     const isValidType = file.type.startsWith('image/') || (isVideoField && file.type.startsWith('video/'));
@@ -362,7 +365,9 @@ function MultiFileUploader({
           <input
             ref={inputRef}
             type="file"
-            accept={isVideoField ? 'image/*,video/*' : 'image/*'}
+            accept={isVideoField 
+              ? 'image/png,image/jpeg,image/jpg,image/gif,image/webp,video/mp4,video/quicktime,video/webm' 
+              : 'image/png,image/jpeg,image/jpg,image/gif,image/webp'}
             multiple
             onChange={handleInputChange}
             className="hidden"

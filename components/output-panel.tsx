@@ -1,9 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { Loader2, Download, RotateCcw, Copy } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import {
+  getGenerationPollingInterval,
+  getNetworkQuality,
+  getImageQuality,
+  isPageVisible,
+  subscribeToVisibilityChanges,
+  NetworkQuality,
+} from '@/lib/network-utils';
 
 interface OutputPanelProps {
   generationId: string | null;
@@ -32,14 +40,31 @@ function isVideoUrl(url: string): boolean {
   return videoExtensions.some(ext => lowercaseUrl.includes(ext));
 }
 
+// Проверка, является ли строка валидным URL медиа (а не текстовым результатом)
+function isValidMediaUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
+}
+
 export function OutputPanel({ generationId, onRegenerate, isMobile = false }: OutputPanelProps) {
   const [generation, setGeneration] = useState<Generation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [imageAspectRatio, setImageAspectRatio] = useState<'landscape' | 'portrait' | 'square'>('square');
   const [copied, setCopied] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>('fast');
+  
+  // Refs для cleanup
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Инициализация качества сети
+  useEffect(() => {
+    setNetworkQuality(getNetworkQuality());
+  }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (!generationId) {
       setGeneration(null);
       setSelectedImageIndex(0);
@@ -48,35 +73,59 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
 
     setIsLoading(true);
     setSelectedImageIndex(0); // Сбрасываем выбор при смене генерации
-    let isMounted = true;
-    let pollTimeoutId: NodeJS.Timeout | null = null;
+
+    // Очищаем предыдущий timeout
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
 
     const fetchGeneration = async () => {
+      // Не делаем запросы, если страница не видима
+      if (!isPageVisible()) {
+        // Повторим когда страница станет видимой
+        pollTimeoutRef.current = setTimeout(fetchGeneration, 1000);
+        return;
+      }
+
       try {
         const response = await fetch(`/api/generations/${generationId}`, {
           credentials: 'include',
         });
-        if (response.ok && isMounted) {
+        if (response.ok && isMountedRef.current) {
           const data = await response.json();
           setGeneration(data);
 
-          // Poll for updates if still processing (но реже - 4 сек)
-          if ((data.status === 'processing' || data.status === 'pending') && isMounted) {
-            pollTimeoutId = setTimeout(fetchGeneration, 4000);
+          // Poll for updates if still processing с адаптивным интервалом
+          if ((data.status === 'processing' || data.status === 'pending') && isMountedRef.current) {
+            const currentQuality = getNetworkQuality();
+            const interval = getGenerationPollingInterval(currentQuality);
+            pollTimeoutRef.current = setTimeout(fetchGeneration, interval);
           }
         }
       } catch (error) {
         console.error('Error fetching generation:', error);
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMountedRef.current) setIsLoading(false);
       }
     };
 
     fetchGeneration();
 
+    // Подписка на видимость - при возвращении на страницу обновляем
+    const unsubscribe = subscribeToVisibilityChanges((visible) => {
+      if (visible && generation?.status === 'processing') {
+        fetchGeneration();
+      }
+    });
+
     return () => {
-      isMounted = false;
-      if (pollTimeoutId) clearTimeout(pollTimeoutId);
+      isMountedRef.current = false;
+      unsubscribe();
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
     };
   }, [generationId]);
 
@@ -269,8 +318,17 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
   }
 
   // Получаем URL текущего выбранного результата
-  const currentMediaUrl = generation.output_urls?.[selectedImageIndex] || generation.output_urls?.[0];
+  const rawMediaUrl = generation.output_urls?.[selectedImageIndex] || generation.output_urls?.[0];
+  // Проверяем что это валидный URL, а не текстовый результат (от analyze моделей)
+  const currentMediaUrl = rawMediaUrl && isValidMediaUrl(rawMediaUrl) ? rawMediaUrl : null;
   const isVideo = currentMediaUrl ? isVideoUrl(currentMediaUrl) : false;
+
+  // Определяем качество изображений на основе сети
+  const imageQuality = getImageQuality(networkQuality);
+  
+  // Размеры для мобильных - меньше, чтобы быстрее грузилось
+  const mobileImageSize = networkQuality === 'slow' ? 400 : 600;
+  const desktopImageSize = networkQuality === 'slow' ? 800 : 1200;
 
   // Mobile completed state
   if (isMobile) {
@@ -293,20 +351,22 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               <Image
                 src={currentMediaUrl}
                 alt="Generated image"
-                width={800}
-                height={800}
+                width={mobileImageSize}
+                height={mobileImageSize}
+                quality={imageQuality}
                 className="w-full h-auto"
                 onLoad={handleImageLoad}
                 priority
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
             )}
           </div>
         )}
 
-        {/* Thumbnails row - if multiple images */}
-        {generation.output_urls && generation.output_urls.length > 1 && (
+        {/* Thumbnails row - if multiple valid media URLs */}
+        {generation.output_urls && generation.output_urls.filter(isValidMediaUrl).length > 1 && (
           <div className="flex gap-2 items-center">
-            {generation.output_urls.map((url, index) => {
+            {generation.output_urls.filter(isValidMediaUrl).map((url, index) => {
               const isThumbVideo = isVideoUrl(url);
               return (
                 <button
@@ -412,8 +472,9 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
             <Image
               src={currentMediaUrl}
               alt="Generated image"
-              width={1200}
+              width={desktopImageSize}
               height={660}
+              quality={imageQuality}
               className={
                 imageAspectRatio === 'landscape'
                   ? 'w-full h-auto' // Горизонтальная - по ширине в края
@@ -421,15 +482,16 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               }
               onLoad={handleImageLoad}
               priority
+              sizes="(max-width: 1024px) 100vw, 60vw"
             />
           )}
         </div>
       )}
 
       {/* Thumbnails row - 40x40px with gap 8px - КЛИКАБЕЛЬНЫЕ с белой обводкой */}
-      {generation.output_urls && generation.output_urls.length > 1 && (
+      {generation.output_urls && generation.output_urls.filter(isValidMediaUrl).length > 1 && (
         <div className="flex gap-2 items-center mb-4 ml-1 py-1">
-          {generation.output_urls.map((url, index) => {
+          {generation.output_urls.filter(isValidMediaUrl).map((url, index) => {
             const isThumbVideo = isVideoUrl(url);
             return (
               <button

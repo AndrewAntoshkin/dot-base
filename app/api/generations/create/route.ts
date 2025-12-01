@@ -9,12 +9,13 @@ import { z } from 'zod';
 const createGenerationSchema = z.object({
   action: z.enum([
     'create', 'edit', 'upscale', 'remove_bg',
-    'video_create', 'video_i2v', 'video_edit', 'video_upscale'
+    'video_create', 'video_i2v', 'video_edit', 'video_upscale',
+    'analyze_describe', 'analyze_ocr', 'analyze_prompt'
   ]),
   model_id: z.string(),
-  prompt: z.string().optional(),
-  input_image_url: z.string().optional(),
-  input_video_url: z.string().optional(),
+  prompt: z.string().nullish(), // nullable + optional для analyze моделей без prompt
+  input_image_url: z.string().nullish(),
+  input_video_url: z.string().nullish(),
   settings: z.record(z.any()).optional(),
 });
 

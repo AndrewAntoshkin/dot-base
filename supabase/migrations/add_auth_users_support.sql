@@ -51,3 +51,5 @@ COMMENT ON COLUMN users.email IS 'Email для пользователей с ema
 COMMENT ON COLUMN users.auth_provider IS 'Метод аутентификации: email, telegram, или oauth';
 COMMENT ON TRIGGER on_auth_user_created ON auth.users IS 'Автоматически создает запись в public.users при регистрации через email';
 
+
+

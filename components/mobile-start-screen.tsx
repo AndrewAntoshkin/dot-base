@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 interface MobileStartScreenProps {
-  mode: 'image' | 'video';
+  mode: 'image' | 'video' | 'analyze';
   onStartGeneration?: () => void;
 }
 
@@ -13,21 +13,25 @@ export function MobileStartScreen({ mode, onStartGeneration }: MobileStartScreen
 
   const handleImageClick = () => {
     if (mode === 'image' && onStartGeneration) {
-      // Уже на странице image - просто показываем форму
       onStartGeneration();
     } else {
-      // Переходим на страницу image с параметром начала генерации
       router.push('/?start=1');
     }
   };
 
   const handleVideoClick = () => {
     if (mode === 'video' && onStartGeneration) {
-      // Уже на странице video - просто показываем форму
       onStartGeneration();
     } else {
-      // Переходим на страницу video с параметром начала генерации
       router.push('/video?start=1');
+    }
+  };
+
+  const handleAnalyzeClick = () => {
+    if (mode === 'analyze' && onStartGeneration) {
+      onStartGeneration();
+    } else {
+      router.push('/analyze?start=1');
     }
   };
 
@@ -79,6 +83,31 @@ export function MobileStartScreen({ mode, onStartGeneration }: MobileStartScreen
           </div>
         </button>
       </div>
+
+      {/* ANALYZE Card - Full Width */}
+      <button
+        onClick={handleAnalyzeClick}
+        className={`w-full bg-[#131313] rounded-[20px] p-5 text-left transition-all active:scale-[0.98] ${
+          mode === 'analyze' ? 'ring-1 ring-white/20' : ''
+        }`}
+      >
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col gap-2">
+            <p className="font-inter font-black italic text-[24px] leading-[24px] text-white">
+              ANALYZE
+            </p>
+            <div className="flex flex-col gap-[2px] font-inter font-medium italic text-[14px] leading-[20px] text-[#9c9c9c]">
+              <p>Описание изображений</p>
+              <p>OCR / Извлечение текста</p>
+              <p>Генерация промптов</p>
+            </div>
+            <p className="font-inter text-[12px] leading-[20px] text-[#797979]">
+              10 моделей
+            </p>
+          </div>
+          <div className="text-4xl">🔍</div>
+        </div>
+      </button>
 
       {/* How to Start Section */}
       <div className="flex flex-col gap-4">

@@ -52,3 +52,5 @@ USING (bucket_id = 'generations');
    - Измените на "Give public read access"
 */
 
+
+

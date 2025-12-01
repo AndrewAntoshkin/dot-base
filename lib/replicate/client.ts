@@ -209,16 +209,25 @@ export class ReplicateClient {
       try {
         console.log(`Replicate attempt ${attempt}/${this.maxRetries}:`, {
           model: options.model,
+          version: options.version ? options.version.substring(0, 8) + '...' : undefined,
           inputKeys: Object.keys(cleanedInput),
         });
 
-        const prediction = await replicate.predictions.create({
-          model: options.model,
-          version: options.version,
+        // Если есть version - используем только version (для community моделей)
+        // Если нет version - используем model (для official моделей)
+        const createOptions: any = {
           input: cleanedInput,
           webhook: options.webhook,
           webhook_events_filter: options.webhook_events_filter,
-        });
+        };
+        
+        if (options.version) {
+          createOptions.version = options.version;
+        } else {
+          createOptions.model = options.model;
+        }
+
+        const prediction = await replicate.predictions.create(createOptions);
 
         return {
           prediction: prediction as ReplicatePrediction,

@@ -1,6 +1,7 @@
 'use client';
 
-import { ActionType, getActionLabel } from '@/lib/models-config';
+// Используем лёгкую версию для быстрой загрузки
+import { ActionType, getActionLabel } from '@/lib/models-lite';
 import {
   Select,
   SelectContent,
@@ -12,14 +13,15 @@ import {
 interface ActionSelectorProps {
   value: ActionType;
   onChange: (action: ActionType) => void;
-  mode?: 'image' | 'video';
+  mode?: 'image' | 'video' | 'analyze';
 }
 
 const IMAGE_ACTIONS: ActionType[] = ['create', 'edit', 'upscale', 'remove_bg'];
 const VIDEO_ACTIONS: ActionType[] = ['video_create', 'video_i2v', 'video_edit', 'video_upscale'];
+const ANALYZE_ACTIONS: ActionType[] = ['analyze_describe', 'analyze_ocr', 'analyze_prompt'];
 
 export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelectorProps) {
-  const actions = mode === 'video' ? VIDEO_ACTIONS : IMAGE_ACTIONS;
+  const actions = mode === 'video' ? VIDEO_ACTIONS : mode === 'analyze' ? ANALYZE_ACTIONS : IMAGE_ACTIONS;
 
   return (
     <div className="flex flex-col gap-2">

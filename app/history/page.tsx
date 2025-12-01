@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { formatDate } from '@/lib/utils';
 import { Loader2, Download, Play, Trash2 } from 'lucide-react';
+import { getNetworkQuality, getImageQuality, NetworkQuality } from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -30,6 +31,16 @@ function isVideoAction(action: string): boolean {
   return action.startsWith('video_');
 }
 
+// Проверка, является ли action текстовым (analyze)
+function isTextAction(action: string): boolean {
+  return action.startsWith('analyze_');
+}
+
+// Проверка, является ли строка URL (а не текстовым результатом)
+function isValidMediaUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
+}
+
 // Простой компонент для отображения видео-плейсхолдера
 function VideoPlaceholder() {
   return (
@@ -48,6 +59,15 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>('fast');
+  
+  // Инициализация качества сети
+  useEffect(() => {
+    setNetworkQuality(getNetworkQuality());
+  }, []);
+  
+  // Качество изображений в зависимости от сети
+  const imageQuality = getImageQuality(networkQuality);
 
   useEffect(() => {
     fetchGenerations();
@@ -158,14 +178,19 @@ export default function HistoryPage() {
                   className="group cursor-pointer"
                   onClick={() => {
                     // Направляем на правильную страницу в зависимости от типа генерации
-                    const basePath = isVideoAction(generation.action) ? '/video' : '/';
+                    let basePath = '/';
+                    if (isVideoAction(generation.action)) {
+                      basePath = '/video';
+                    } else if (isTextAction(generation.action)) {
+                      basePath = '/analyze';
+                    }
                     router.push(`${basePath}?generationId=${generation.id}`);
                   }}
                 >
                   <div className="bg-[#101010] rounded-xl lg:rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
                     {/* Image/Video with badge - square 1:1 */}
                     <div className="relative aspect-square bg-[#151515] rounded-lg lg:rounded-xl overflow-hidden">
-                      {generation.output_urls?.[0] ? (
+                      {generation.output_urls?.[0] && isValidMediaUrl(generation.output_urls[0]) ? (
                         isVideoUrl(generation.output_urls[0]) ? (
                           <VideoPlaceholder />
                         ) : (
@@ -175,9 +200,17 @@ export default function HistoryPage() {
                             fill
                             className="object-cover"
                             loading="lazy"
+                            quality={imageQuality}
                             sizes="(max-width: 1024px) 50vw, 25vw"
                           />
                         )
+                      ) : isTextAction(generation.action) ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-2xl">📝</span>
+                            <span className="font-inter text-xs lg:text-sm text-[#656565]">Текст</span>
+                          </div>
+                        </div>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <span className="font-inter text-xs lg:text-sm text-[#656565]">

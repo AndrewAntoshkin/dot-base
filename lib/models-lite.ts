@@ -2,9 +2,14 @@
  * Лёгкая версия конфигурации моделей для быстрой загрузки на клиенте
  * Содержит только данные необходимые для отображения в селекторах
  * Полная конфигурация загружается по требованию через getModelById
+ * 
+ * ~140 строк вместо 3800+ в полной версии - критично для мобильного интернета!
  */
 
-export type ActionType = 'create' | 'edit' | 'upscale' | 'remove_bg' | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale';
+export type ActionType = 
+  | 'create' | 'edit' | 'upscale' | 'remove_bg'  // Image
+  | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale'  // Video
+  | 'analyze_describe' | 'analyze_ocr' | 'analyze_prompt';  // Analyze
 
 export interface ModelLite {
   id: string;
@@ -97,6 +102,24 @@ export const VIDEO_UPSCALE_MODELS_LITE: ModelLite[] = [
   { id: 'topaz-video-upscale', displayName: 'Topaz Video Upscale', description: 'Topaz Labs - профессиональный апскейл до 4K', action: 'video_upscale' },
 ];
 
+// Analyze models
+export const ANALYZE_DESCRIBE_MODELS_LITE: ModelLite[] = [
+  { id: 'moondream2', displayName: 'Moondream 2', description: 'Быстрое описание изображений, VQA', action: 'analyze_describe' },
+  { id: 'llava-13b', displayName: 'LLaVa 13B', description: 'Детальные описания с GPT-4 уровнем', action: 'analyze_describe' },
+  { id: 'blip-2', displayName: 'BLIP-2', description: 'Универсальные ответы на вопросы', action: 'analyze_describe' },
+];
+
+export const ANALYZE_OCR_MODELS_LITE: ModelLite[] = [
+  { id: 'deepseek-ocr', displayName: 'DeepSeek OCR', description: '100+ языков, Markdown вывод', action: 'analyze_ocr' },
+  { id: 'text-extract-ocr', displayName: 'Text Extract OCR', description: 'Простое извлечение текста', action: 'analyze_ocr' },
+];
+
+export const ANALYZE_PROMPT_MODELS_LITE: ModelLite[] = [
+  { id: 'clip-interrogator', displayName: 'CLIP Interrogator', description: 'Генерация промпта для Stable Diffusion', action: 'analyze_prompt' },
+  { id: 'sdxl-clip-interrogator', displayName: 'SDXL CLIP Interrogator', description: 'Оптимизирован для SDXL моделей', action: 'analyze_prompt' },
+  { id: 'img2prompt', displayName: 'Img2Prompt', description: 'Промпт со стилем для SD 1.x', action: 'analyze_prompt' },
+];
+
 /**
  * Получить модели по действию (лёгкая версия)
  */
@@ -118,6 +141,12 @@ export function getModelsByActionLite(action: ActionType): ModelLite[] {
       return VIDEO_EDIT_MODELS_LITE;
     case 'video_upscale':
       return VIDEO_UPSCALE_MODELS_LITE;
+    case 'analyze_describe':
+      return ANALYZE_DESCRIBE_MODELS_LITE;
+    case 'analyze_ocr':
+      return ANALYZE_OCR_MODELS_LITE;
+    case 'analyze_prompt':
+      return ANALYZE_PROMPT_MODELS_LITE;
     default:
       return [];
   }
@@ -136,6 +165,9 @@ export function getActionLabel(action: ActionType): string {
     video_i2v: 'Картинка → Видео',
     video_edit: 'Редактировать видео',
     video_upscale: 'Улучшить видео',
+    analyze_describe: 'Описать изображение',
+    analyze_ocr: 'Извлечь текст (OCR)',
+    analyze_prompt: 'Получить промпт',
   };
   return labels[action];
 }

@@ -4,7 +4,10 @@
  * Обновлено: 2025-11-26
  */
 
-export type ActionType = 'create' | 'edit' | 'upscale' | 'remove_bg' | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale';
+export type ActionType = 
+  | 'create' | 'edit' | 'upscale' | 'remove_bg'  // Image
+  | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale'  // Video
+  | 'analyze_describe' | 'analyze_ocr' | 'analyze_prompt';  // Analyze
 
 export type SettingType = 
   | 'text' 
@@ -3475,6 +3478,254 @@ export const VIDEO_UPSCALE_MODELS: Model[] = [
 ];
 
 /**
+ * АНАЛИЗ ИЗОБРАЖЕНИЙ - Описание (4 модели)
+ */
+export const ANALYZE_DESCRIBE_MODELS: Model[] = [
+  // 1. Moondream 2
+  {
+    id: 'moondream2',
+    name: 'moondream2',
+    displayName: 'Moondream 2',
+    replicateModel: 'lucataco/moondream2',
+    version: '72ccb656353c348c1385df54b237eeb7bfa874bf11486cf0b9473e691b662d31',
+    action: 'analyze_describe',
+    runs: '5.6M runs',
+    description: 'Быстрое описание изображений, VQA',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'prompt',
+        label: 'Вопрос',
+        type: 'textarea',
+        default: 'Describe this image in detail',
+        placeholder: 'What is in this image?',
+        description: 'Задайте вопрос об изображении',
+      },
+    ],
+  },
+
+  // 2. LLaVa 13B
+  {
+    id: 'llava-13b',
+    name: 'llava-13b',
+    displayName: 'LLaVa 13B',
+    replicateModel: 'yorickvp/llava-13b',
+    version: '80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb',
+    action: 'analyze_describe',
+    runs: '32.7M runs',
+    description: 'Детальные описания с GPT-4 уровнем',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'prompt',
+        label: 'Вопрос',
+        type: 'textarea',
+        default: 'What is happening in this image? Describe in detail.',
+        placeholder: 'Describe this image',
+        description: 'Детальный вопрос об изображении',
+      },
+      {
+        name: 'max_tokens',
+        label: 'Макс. токенов',
+        type: 'slider',
+        default: 1024,
+        min: 100,
+        max: 2048,
+        step: 64,
+      },
+      {
+        name: 'temperature',
+        label: 'Температура',
+        type: 'slider',
+        default: 0.2,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Креативность ответа',
+      },
+    ],
+  },
+
+  // 3. BLIP-2
+  {
+    id: 'blip-2',
+    name: 'blip-2',
+    displayName: 'BLIP-2',
+    replicateModel: 'andreasjansson/blip-2',
+    version: 'f677695e5e89f8b236e52ecd1d3f01beb44c34606419bcc19345e046d8f786f9',
+    action: 'analyze_describe',
+    runs: '31.1M runs',
+    description: 'Универсальные ответы на вопросы',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'question',
+        label: 'Вопрос',
+        type: 'textarea',
+        default: 'What is this?',
+        placeholder: 'What do you see?',
+      },
+    ],
+  },
+];
+
+/**
+ * АНАЛИЗ ИЗОБРАЖЕНИЙ - OCR (3 модели)
+ */
+export const ANALYZE_OCR_MODELS: Model[] = [
+  // 1. DeepSeek OCR
+  {
+    id: 'deepseek-ocr',
+    name: 'deepseek-ocr',
+    displayName: 'DeepSeek OCR',
+    replicateModel: 'lucataco/deepseek-ocr',
+    version: 'cb3b474fbfc56b1664c8c7841550bccecbe7b74c30e45ce938ffca1180b4dff5',
+    action: 'analyze_ocr',
+    description: '100+ языков, сохраняет структуру документа → Markdown',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Документ, фото текста, скриншот',
+      },
+    ],
+  },
+
+  // 2. Text Extract OCR
+  {
+    id: 'text-extract-ocr',
+    name: 'text-extract-ocr',
+    displayName: 'Text Extract OCR',
+    replicateModel: 'abiruyt/text-extract-ocr',
+    version: 'a524caeaa23495bc9edc805ab08ab5fe943afd3febed884a4f3747aa32e9cd61',
+    action: 'analyze_ocr',
+    description: 'Простое и быстрое извлечение текста',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+    ],
+  },
+];
+
+/**
+ * АНАЛИЗ ИЗОБРАЖЕНИЙ - Генерация промптов (3 модели)
+ */
+export const ANALYZE_PROMPT_MODELS: Model[] = [
+  // 1. CLIP Interrogator
+  {
+    id: 'clip-interrogator',
+    name: 'clip-interrogator',
+    displayName: 'CLIP Interrogator',
+    replicateModel: 'pharmapsychotic/clip-interrogator',
+    version: '8151e1c9f47e696fa316146a2e35812ccf79cfc9eba05b11c7f450155102af70',
+    action: 'analyze_prompt',
+    runs: '4.7M runs',
+    description: 'Генерация промпта для Stable Diffusion',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'mode',
+        label: 'Режим',
+        type: 'select',
+        default: 'best',
+        options: [
+          { value: 'best', label: 'Best (медленный, точный)' },
+          { value: 'fast', label: 'Fast (быстрый)' },
+          { value: 'classic', label: 'Classic' },
+          { value: 'negative', label: 'Negative (негативный промпт)' },
+        ],
+      },
+      {
+        name: 'clip_model_name',
+        label: 'CLIP модель',
+        type: 'select',
+        default: 'ViT-L-14/openai',
+        options: [
+          { value: 'ViT-L-14/openai', label: 'ViT-L-14 (OpenAI)' },
+          { value: 'ViT-H-14/laion2b_s32b_b79k', label: 'ViT-H-14 (LAION)' },
+        ],
+      },
+    ],
+  },
+
+  // 2. SDXL CLIP Interrogator
+  {
+    id: 'sdxl-clip-interrogator',
+    name: 'sdxl-clip-interrogator',
+    displayName: 'SDXL CLIP Interrogator',
+    replicateModel: 'lucataco/sdxl-clip-interrogator',
+    version: 'b8dd624ad312d215250b362af0ecff05d7ad4f8270f9beb034c483d70682e7b3',
+    action: 'analyze_prompt',
+    runs: '848.7K runs',
+    description: 'Оптимизирован для SDXL моделей',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'mode',
+        label: 'Режим',
+        type: 'select',
+        default: 'best',
+        options: [
+          { value: 'best', label: 'Best (точный)' },
+          { value: 'fast', label: 'Fast (быстрый)' },
+        ],
+      },
+    ],
+  },
+
+  // 3. Img2Prompt
+  {
+    id: 'img2prompt',
+    name: 'img2prompt',
+    displayName: 'Img2Prompt',
+    replicateModel: 'methexis-inc/img2prompt',
+    version: '50adaf2d3ad20a6f911a8a9e3ccf777b263b8596fbd2c8fc26e8888f8a0edbb5',
+    action: 'analyze_prompt',
+    runs: '2.7M runs',
+    description: 'Промпт со стилем для SD 1.x',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+    ],
+  },
+];
+
+/**
  * Все модели
  */
 export const ALL_MODELS: Model[] = [
@@ -3486,6 +3737,9 @@ export const ALL_MODELS: Model[] = [
   ...VIDEO_I2V_MODELS,
   ...VIDEO_EDIT_MODELS,
   ...VIDEO_UPSCALE_MODELS,
+  ...ANALYZE_DESCRIBE_MODELS,
+  ...ANALYZE_OCR_MODELS,
+  ...ANALYZE_PROMPT_MODELS,
 ];
 
 /**
@@ -3509,6 +3763,12 @@ export function getModelsByAction(action: ActionType): Model[] {
       return VIDEO_EDIT_MODELS;
     case 'video_upscale':
       return VIDEO_UPSCALE_MODELS;
+    case 'analyze_describe':
+      return ANALYZE_DESCRIBE_MODELS;
+    case 'analyze_ocr':
+      return ANALYZE_OCR_MODELS;
+    case 'analyze_prompt':
+      return ANALYZE_PROMPT_MODELS;
     default:
       return [];
   }
@@ -3534,6 +3794,9 @@ export function getActionLabel(action: ActionType): string {
     video_i2v: 'Картинка → Видео',
     video_edit: 'Редактировать видео',
     video_upscale: 'Улучшить видео',
+    analyze_describe: 'Описать изображение',
+    analyze_ocr: 'Извлечь текст (OCR)',
+    analyze_prompt: 'Получить промпт',
   };
   return labels[action];
 }

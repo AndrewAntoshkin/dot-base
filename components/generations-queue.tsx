@@ -14,6 +14,11 @@ const isVideoAction = (action: string): boolean => {
   return action?.startsWith('video_');
 };
 
+// Проверка, является ли action текстовым (analyze)
+const isTextAction = (action: string): boolean => {
+  return action?.startsWith('analyze_');
+};
+
 export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
   const router = useRouter();
   const { unviewedGenerations, markAsViewed } = useGenerations();
@@ -22,7 +27,12 @@ export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
     // Mark as viewed before navigating
     await markAsViewed(id);
     // Navigate to correct page based on action type
-    const basePath = isVideoAction(action) ? '/video' : '/';
+    let basePath = '/';
+    if (isVideoAction(action)) {
+      basePath = '/video';
+    } else if (isTextAction(action)) {
+      basePath = '/analyze';
+    }
     router.push(`${basePath}?generationId=${id}`);
     onClose();
   };
