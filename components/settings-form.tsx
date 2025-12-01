@@ -441,6 +441,8 @@ export function SettingsForm({
   const [error, setError] = useState<string | null>(null);
   // Состояние для выбранных индексов изображений в file_array полях
   const [selectedIndices, setSelectedIndices] = useState<Record<string, number>>({});
+  // Ref для хранения handleSubmit функции (чтобы использовать в useEffect до определения функции)
+  const handleSubmitRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   // Sync initialData to formData when it changes
   React.useEffect(() => {
@@ -449,14 +451,51 @@ export function SettingsForm({
     }
   }, [initialData, modelId]);
 
-  if (!model) return null;
-
   // Expose form data to parent
   React.useEffect(() => {
-    if (onFormDataChange) {
+    if (onFormDataChange && model) {
       onFormDataChange(formData);
     }
-  }, [formData, onFormDataChange]);
+  }, [formData, onFormDataChange, model]);
+
+  // Expose methods to parent via window and ref
+  React.useEffect(() => {
+    if (!model) return;
+    
+    const handleSubmitForWindow = async () => {
+      await handleSubmitRef.current();
+    };
+    
+    const handleResetForWindow = () => {
+      setFormData({});
+    };
+    
+    (window as any).__settingsFormSubmit = handleSubmitForWindow;
+    (window as any).__settingsFormReset = handleResetForWindow;
+    
+    // Set on ref if provided
+    if (formRef) {
+      formRef.current = {
+        submit: handleSubmitForWindow,
+        reset: handleResetForWindow,
+      };
+    }
+    
+    return () => {
+      // Don't clear window globals - they're needed for mobile
+      if (formRef) {
+        formRef.current = null;
+      }
+    };
+  }, [model, formRef]);
+
+  // updateFormData должен быть до раннего return (это хук)
+  const updateFormData = useCallback((name: string, value: any) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
+
+  // Early return ПОСЛЕ всех хуков
+  if (!model) return null;
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -586,30 +625,8 @@ export function SettingsForm({
     setFormData({});
   };
 
-  // Expose methods to parent via window (works on mobile tab switches)
-  React.useEffect(() => {
-    (window as any).__settingsFormSubmit = handleSubmit;
-    (window as any).__settingsFormReset = handleReset;
-    
-    // Also set on ref if provided
-    if (formRef) {
-      formRef.current = {
-        submit: handleSubmit,
-        reset: handleReset,
-      };
-    }
-    
-    return () => {
-      // Don't clear window globals - they're needed for mobile
-      if (formRef) {
-        formRef.current = null;
-      }
-    };
-  }, [handleSubmit, formRef]);
-
-  const updateFormData = useCallback((name: string, value: any) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  }, []);
+  // Обновляем ref для handleSubmit (используется в useEffect выше)
+  handleSubmitRef.current = handleSubmit;
 
   const renderSetting = (setting: ModelSetting) => {
     const value = formData[setting.name] ?? setting.default ?? '';

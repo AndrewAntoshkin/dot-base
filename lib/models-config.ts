@@ -2789,6 +2789,65 @@ export const VIDEO_I2V_MODELS: Model[] = [
     ],
   },
 
+  // 4.5. Hailuo 02 I2V (с поддержкой последнего кадра)
+  {
+    id: 'hailuo-02-i2v',
+    name: 'hailuo-02',
+    displayName: 'Hailuo 02',
+    replicateModel: 'minimax/hailuo-02',
+    action: 'video_i2v',
+    runs: '241.4K runs',
+    description: 'MiniMax - с поддержкой первого и последнего кадра',
+    settings: [
+      {
+        name: 'first_frame_image',
+        label: 'Первый кадр',
+        type: 'file',
+        description: 'Первый кадр видео (определяет соотношение сторон)',
+      },
+      {
+        name: 'last_frame_image',
+        label: 'Последний кадр',
+        type: 'file',
+        description: 'Последний кадр видео',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'select',
+        default: '6',
+        options: [
+          { value: '6', label: '6 секунд' },
+          { value: '10', label: '10 секунд (только 768p)' },
+        ],
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '512p', label: '512p' },
+          { value: '768p', label: '768p (до 10 сек)' },
+          { value: '1080p', label: '1080p Pro (6 сек)' },
+        ],
+      },
+      {
+        name: 'prompt_optimizer',
+        label: 'Оптимизация промпта',
+        type: 'checkbox',
+        default: true,
+      },
+    ],
+  },
+
   // 5. Seedance 1 Pro
   {
     id: 'seedance-1-pro',
@@ -2796,13 +2855,19 @@ export const VIDEO_I2V_MODELS: Model[] = [
     displayName: 'Seedance 1 Pro',
     replicateModel: 'bytedance/seedance-1-pro',
     action: 'video_i2v',
-    description: 'ByteDance - премиум качество',
+    description: 'ByteDance - премиум качество с поддержкой последнего кадра',
     settings: [
       {
         name: 'image',
-        label: 'Изображение',
+        label: 'Первый кадр',
         type: 'file',
-        description: 'Опционально для I2V',
+        description: 'Первый кадр видео (опционально для T2V)',
+      },
+      {
+        name: 'last_frame_image',
+        label: 'Последний кадр',
+        type: 'file',
+        description: 'Последний кадр видео (работает только с первым кадром)',
       },
       {
         name: 'prompt',
@@ -2833,6 +2898,8 @@ export const VIDEO_I2V_MODELS: Model[] = [
           { value: '1:1', label: '1:1' },
           { value: '4:3', label: '4:3' },
           { value: '3:4', label: '3:4' },
+          { value: '21:9', label: '21:9' },
+          { value: '9:21', label: '9:21' },
         ],
       },
       {
@@ -2842,6 +2909,12 @@ export const VIDEO_I2V_MODELS: Model[] = [
         default: 5,
         min: 2,
         max: 12,
+      },
+      {
+        name: 'camera_fixed',
+        label: 'Фиксированная камера',
+        type: 'checkbox',
+        default: false,
       },
       {
         name: 'seed',
@@ -2914,14 +2987,20 @@ export const VIDEO_I2V_MODELS: Model[] = [
     displayName: 'Kling v2.1',
     replicateModel: 'kwaivgi/kling-v2.1',
     action: 'video_i2v',
-    description: 'Kuaishou - стабильная анимация 1080p',
+    description: 'Kuaishou - стабильная анимация 720p/1080p с поддержкой последнего кадра',
     settings: [
       {
         name: 'start_image',
-        label: 'Изображение',
+        label: 'Первый кадр',
         type: 'file',
         required: true,
         description: 'Первый кадр видео',
+      },
+      {
+        name: 'end_image',
+        label: 'Последний кадр',
+        type: 'file',
+        description: 'Последний кадр видео (требуется режим Pro)',
       },
       {
         name: 'prompt',
@@ -2937,6 +3016,17 @@ export const VIDEO_I2V_MODELS: Model[] = [
         placeholder: 'Что исключить...',
       },
       {
+        name: 'mode',
+        label: 'Режим',
+        type: 'select',
+        default: 'standard',
+        options: [
+          { value: 'standard', label: 'Standard (720p)' },
+          { value: 'pro', label: 'Pro (1080p, поддержка last frame)' },
+        ],
+        description: 'Pro режим нужен для использования последнего кадра',
+      },
+      {
         name: 'duration',
         label: 'Длительность (сек)',
         type: 'select',
@@ -2945,15 +3035,6 @@ export const VIDEO_I2V_MODELS: Model[] = [
           { value: '5', label: '5 секунд' },
           { value: '10', label: '10 секунд' },
         ],
-      },
-      {
-        name: 'cfg_scale',
-        label: 'CFG Scale',
-        type: 'slider',
-        default: 0.5,
-        min: 0,
-        max: 1,
-        step: 0.1,
       },
       {
         name: 'seed',
