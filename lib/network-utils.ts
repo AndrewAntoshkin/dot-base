@@ -1,5 +1,7 @@
 /**
  * Network utilities для оптимизации загрузки на медленных сетях
+ * 
+ * КРИТИЧНО: Все функции СИНХРОННЫЕ - не блокируют рендер!
  */
 
 // Типы для Network Information API
@@ -37,16 +39,13 @@ export function getNetworkQuality(): NetworkQuality {
   const connection = getNetworkInfo();
   
   if (!connection) {
-    // Если API недоступен, считаем сеть средней
     return 'medium';
   }
   
-  // Режим экономии данных - всегда slow
   if (connection.saveData) {
     return 'slow';
   }
   
-  // По типу соединения
   switch (connection.effectiveType) {
     case 'slow-2g':
     case '2g':
@@ -60,105 +59,78 @@ export function getNetworkQuality(): NetworkQuality {
 }
 
 /**
- * Получить оптимальный интервал polling в зависимости от качества сети
- * На медленных сетях polling реже, чтобы не забивать канал
+ * Проверить, мобильное ли устройство
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isSmallScreen = window.innerWidth < 1024;
+  
+  const userAgent = navigator.userAgent.toLowerCase();
+  const mobileKeywords = ['mobile', 'android', 'iphone', 'ipad', 'ipod', 'blackberry', 'windows phone'];
+  const isMobileUA = mobileKeywords.some(keyword => userAgent.includes(keyword));
+  
+  return isMobileUA || (isTouchDevice && isSmallScreen);
+}
+
+/**
+ * Получить интервал polling в зависимости от качества сети
  */
 export function getPollingInterval(quality?: NetworkQuality): number {
   const networkQuality = quality ?? getNetworkQuality();
   
   switch (networkQuality) {
     case 'slow':
-      return 30000; // 30 сек на плохой сети
+      return 30000; // 30 сек
     case 'medium':
-      return 15000; // 15 сек на 3G
+      return 15000; // 15 сек
     case 'fast':
     default:
-      return 5000; // 5 сек на быстрой сети
+      return 5000; // 5 сек
   }
 }
 
 /**
- * Получить оптимальный интервал polling для статуса генерации
- * (отдельно, так как тут важнее реактивность)
+ * Получить интервал polling для статуса генерации
  */
 export function getGenerationPollingInterval(quality?: NetworkQuality): number {
   const networkQuality = quality ?? getNetworkQuality();
   
   switch (networkQuality) {
     case 'slow':
-      return 15000; // 15 сек на плохой сети
+      return 15000;
     case 'medium':
-      return 8000;  // 8 сек на 3G
+      return 8000;
     case 'fast':
     default:
-      return 4000;  // 4 сек на быстрой сети
+      return 4000;
   }
 }
 
 /**
- * Получить качество изображений для Next.js Image в зависимости от сети
- * Меньше качество = меньше трафик
+ * Получить качество изображений для Next.js Image
  */
 export function getImageQuality(quality?: NetworkQuality): number {
   const networkQuality = quality ?? getNetworkQuality();
   
   switch (networkQuality) {
     case 'slow':
-      return 50; // Низкое качество на плохой сети
+      return 50;
     case 'medium':
-      return 70; // Среднее качество
+      return 70;
     case 'fast':
     default:
-      return 85; // Высокое качество
+      return 85;
   }
 }
 
 /**
- * Подписаться на изменения качества сети
- */
-export function subscribeToNetworkChanges(callback: (quality: NetworkQuality) => void): () => void {
-  const connection = getNetworkInfo();
-  
-  if (!connection) {
-    return () => {}; // Noop если API недоступен
-  }
-  
-  const handler = () => {
-    callback(getNetworkQuality());
-  };
-  
-  connection.addEventListener('change', handler);
-  
-  return () => {
-    connection.removeEventListener('change', handler);
-  };
-}
-
-/**
- * Проверить, видима ли страница (для остановки polling в фоне)
+ * Проверить, видима ли страница
  */
 export function isPageVisible(): boolean {
   if (typeof document === 'undefined') return true;
   return document.visibilityState === 'visible';
-}
-
-/**
- * Подписаться на изменения видимости страницы
- */
-export function subscribeToVisibilityChanges(callback: (isVisible: boolean) => void): () => void {
-  if (typeof document === 'undefined') {
-    return () => {};
-  }
-  
-  const handler = () => {
-    callback(isPageVisible());
-  };
-  
-  document.addEventListener('visibilitychange', handler);
-  
-  return () => {
-    document.removeEventListener('visibilitychange', handler);
-  };
 }
 
 /**
@@ -169,99 +141,58 @@ export function isSlowNetwork(): boolean {
 }
 
 /**
- * Домены которые могут блокироваться провайдерами
+ * Должны ли мы использовать прокси для изображений?
+ * 
+ * СИНХРОННАЯ функция!
+ * 
+ * Логика: На мобильных устройствах с мобильным интернетом (не WiFi)
+ * replicate.delivery может быть заблокирован провайдером.
  */
-const BLOCKED_DOMAINS = [
-  'replicate.delivery',
-  'pbxt.replicate.delivery',
-];
-
-/**
- * Проверить, нужно ли проксировать URL
- * Возвращает true если URL может быть заблокирован
- */
-export function shouldProxyUrl(url: string): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return BLOCKED_DOMAINS.some(domain => parsed.hostname.endsWith(domain));
-  } catch {
-    return false;
+export function shouldUseImageProxy(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  const connection = getNetworkInfo();
+  
+  // Если мобильное устройство + есть признаки мобильной сети
+  if (isMobileDevice()) {
+    if (connection) {
+      // На 3G и ниже - всегда прокси
+      if (connection.effectiveType !== '4g') {
+        return true;
+      }
+      // Режим экономии данных
+      if (connection.saveData) {
+        return true;
+      }
+      // Высокий RTT (>100ms) - признак мобильной сети
+      if (connection.rtt > 100) {
+        return true;
+      }
+    }
+    // Если нет connection API на мобильном - безопаснее использовать прокси
+    return !connection;
   }
+  
+  return false;
 }
 
 /**
- * Преобразовать URL изображения через прокси
- * Используется для обхода блокировок на мобильном интернете
+ * Преобразовать URL изображения через прокси если нужно
  */
-export function getProxiedImageUrl(url: string, forceProxy = false): string {
+export function getProxiedImageUrl(url: string, forceProxy?: boolean): string {
   if (!url) return url;
   
-  // Не проксируем data: URLs
-  if (url.startsWith('data:')) return url;
+  // Не проксируем data: URLs и уже проксированные
+  if (url.startsWith('data:') || url.startsWith('/api/proxy/')) {
+    return url;
+  }
   
-  // Проксируем если URL потенциально заблокирован или принудительно
-  if (forceProxy || shouldProxyUrl(url)) {
+  const shouldProxy = forceProxy ?? shouldUseImageProxy();
+  
+  // Проксируем только replicate URLs
+  if (shouldProxy && (url.includes('replicate.delivery') || url.includes('pbxt.replicate'))) {
     return `/api/proxy/image?url=${encodeURIComponent(url)}`;
   }
   
   return url;
 }
-
-/**
- * Проверить доступность внешнего URL (для диагностики блокировок)
- * Возвращает true если URL доступен напрямую
- */
-export async function checkUrlAccessibility(url: string, timeout = 5000): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
-    const response = await fetch(url, {
-      method: 'HEAD',
-      mode: 'no-cors', // Избегаем CORS ошибок
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Хук для хранения состояния необходимости прокси
- * Проверяет при первом вызове и кэширует результат
- */
-let proxyNeeded: boolean | null = null;
-let proxyCheckPromise: Promise<boolean> | null = null;
-
-export async function isProxyNeeded(): Promise<boolean> {
-  // Если уже проверяли - возвращаем кэшированный результат
-  if (proxyNeeded !== null) {
-    return proxyNeeded;
-  }
-  
-  // Если проверка уже идёт - ждём её
-  if (proxyCheckPromise) {
-    return proxyCheckPromise;
-  }
-  
-  // Запускаем проверку
-  proxyCheckPromise = (async () => {
-    // Тестовый URL с replicate.delivery
-    const testUrl = 'https://replicate.delivery/';
-    const accessible = await checkUrlAccessibility(testUrl, 3000);
-    proxyNeeded = !accessible;
-    
-    if (proxyNeeded) {
-      console.log('[Network] Replicate CDN blocked, will use proxy');
-    }
-    
-    return proxyNeeded;
-  })();
-  
-  return proxyCheckPromise;
-}
-

@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { formatDate } from '@/lib/utils';
 import { Loader2, Download, Play, Trash2 } from 'lucide-react';
-import { getNetworkQuality, getImageQuality, isProxyNeeded, getProxiedImageUrl, NetworkQuality } from '@/lib/network-utils';
+import { shouldUseImageProxy, getProxiedImageUrl, getImageQuality, getNetworkQuality } from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -19,29 +18,23 @@ interface Generation {
   created_at: string;
 }
 
-// Функция определения типа медиа по URL
 function isVideoUrl(url: string): boolean {
   const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
-  const lowercaseUrl = url.toLowerCase();
-  return videoExtensions.some(ext => lowercaseUrl.includes(ext));
+  return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 }
 
-// Проверка, является ли action видео действием
 function isVideoAction(action: string): boolean {
   return action.startsWith('video_');
 }
 
-// Проверка, является ли action текстовым (analyze)
 function isTextAction(action: string): boolean {
   return action.startsWith('analyze_');
 }
 
-// Проверка, является ли строка URL (а не текстовым результатом)
 function isValidMediaUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
 
-// Простой компонент для отображения видео-плейсхолдера
 function VideoPlaceholder() {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-[#151515]">
@@ -53,63 +46,66 @@ function VideoPlaceholder() {
   );
 }
 
+// Компонент изображения с поддержкой прокси
+function HistoryImage({ src, alt, useProxy }: { src: string; alt: string; useProxy: boolean }) {
+  const proxiedSrc = getProxiedImageUrl(src, useProxy);
+  
+  return (
+    <img
+      src={proxiedSrc}
+      alt={alt}
+      className="absolute inset-0 w-full h-full object-cover"
+      loading="lazy"
+    />
+  );
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [networkQuality, setNetworkQuality] = useState<NetworkQuality>('fast');
-  const [useProxy, setUseProxy] = useState(false);
   
-  // Инициализация качества сети и проверка необходимости прокси
-  useEffect(() => {
-    setNetworkQuality(getNetworkQuality());
-    
-    // Проверяем нужен ли прокси для обхода блокировок
-    isProxyNeeded().then(needed => setUseProxy(needed));
-  }, []);
-  
-  // Качество изображений в зависимости от сети
-  const imageQuality = getImageQuality(networkQuality);
+  // Синхронно определяем настройки
+  const useProxy = shouldUseImageProxy();
 
-  useEffect(() => {
-    fetchGenerations();
-  }, [page]);
-
-  const fetchGenerations = async () => {
+  const fetchGenerations = useCallback(async () => {
+    setIsLoading(true);
     try {
       const response = await fetch(`/api/generations/list?page=${page}&limit=20`, {
         credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
-        setGenerations(data.generations);
-        setTotalPages(data.totalPages);
+        setGenerations(data.generations || []);
+        setTotalPages(data.totalPages || 1);
       }
     } catch (error) {
       console.error('Error fetching generations:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page]);
+
+  useEffect(() => {
+    fetchGenerations();
+  }, [fetchGenerations]);
 
   const handleDownload = async (e: React.MouseEvent, url: string, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     
     try {
+      // Скачиваем оригинал, не прокси
       const response = await fetch(url);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = blobUrl;
-      // Определяем расширение по типу файла
-      const extension = isVideoUrl(url) ? 'mp4' : 'png';
-      link.download = `generation-${id}.${extension}`;
+      link.download = `generation-${id}.${isVideoUrl(url) ? 'mp4' : 'png'}`;
       link.click();
-
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Download error:', error);
@@ -129,14 +125,21 @@ export default function HistoryPage() {
       });
 
       if (response.ok) {
-        // Удаляем из локального состояния
         setGenerations(prev => prev.filter(g => g.id !== id));
-      } else {
-        console.error('Delete failed');
       }
     } catch (error) {
       console.error('Delete error:', error);
     }
+  };
+
+  const handleGenerationClick = (generation: Generation) => {
+    let basePath = '/';
+    if (isVideoAction(generation.action)) {
+      basePath = '/video';
+    } else if (isTextAction(generation.action)) {
+      basePath = '/analyze';
+    }
+    router.push(`${basePath}?generationId=${generation.id}`);
   };
 
   return (
@@ -144,7 +147,6 @@ export default function HistoryPage() {
       <Header />
 
       <main className="flex-1 px-4 lg:px-20 py-6 lg:py-8">
-        {/* Page Header */}
         <div className="mb-6 lg:mb-8">
           <h1 className="font-inter font-medium text-xl lg:text-2xl text-white mb-1 lg:mb-2">
             История генераций
@@ -174,38 +176,23 @@ export default function HistoryPage() {
           </div>
         ) : (
           <>
-            {/* Grid - 2 columns on mobile, 4 on desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
               {generations.map((generation) => (
                 <div
                   key={generation.id}
                   className="group cursor-pointer"
-                  onClick={() => {
-                    // Направляем на правильную страницу в зависимости от типа генерации
-                    let basePath = '/';
-                    if (isVideoAction(generation.action)) {
-                      basePath = '/video';
-                    } else if (isTextAction(generation.action)) {
-                      basePath = '/analyze';
-                    }
-                    router.push(`${basePath}?generationId=${generation.id}`);
-                  }}
+                  onClick={() => handleGenerationClick(generation)}
                 >
                   <div className="bg-[#101010] rounded-xl lg:rounded-2xl overflow-hidden hover:bg-[#1a1a1a] transition-colors">
-                    {/* Image/Video with badge - square 1:1 */}
                     <div className="relative aspect-square bg-[#151515] rounded-lg lg:rounded-xl overflow-hidden">
                       {generation.output_urls?.[0] && isValidMediaUrl(generation.output_urls[0]) ? (
                         isVideoUrl(generation.output_urls[0]) ? (
                           <VideoPlaceholder />
                         ) : (
-                          <Image
-                            src={getProxiedImageUrl(generation.output_urls[0], useProxy)}
-                            alt={generation.prompt || 'Generated image'}
-                            fill
-                            className="object-cover"
-                            loading="lazy"
-                            quality={imageQuality}
-                            sizes="(max-width: 1024px) 50vw, 25vw"
+                          <HistoryImage 
+                            src={generation.output_urls[0]} 
+                            alt={generation.prompt || 'Generated image'} 
+                            useProxy={useProxy}
                           />
                         )
                       ) : isTextAction(generation.action) ? (
@@ -218,14 +205,11 @@ export default function HistoryPage() {
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <span className="font-inter text-xs lg:text-sm text-[#656565]">
-                            {generation.status === 'processing'
-                              ? 'Генерация...'
-                              : 'Нет изображения'}
+                            {generation.status === 'processing' ? 'Генерация...' : 'Нет изображения'}
                           </span>
                         </div>
                       )}
                       
-                      {/* Model badge - top right */}
                       <div className="absolute top-2 right-2 lg:top-3 lg:right-3 bg-black/60 backdrop-blur-sm rounded-md lg:rounded-lg px-1.5 py-1 lg:px-2.5 lg:py-1.5">
                         <span className="font-inter text-[10px] lg:text-xs text-white">
                           {generation.model_name}
@@ -233,14 +217,11 @@ export default function HistoryPage() {
                       </div>
                     </div>
 
-                    {/* Card content */}
                     <div className="p-3 lg:p-4">
-                      {/* Prompt - multiline with ellipsis */}
                       <p className="font-inter text-xs lg:text-sm text-[#959595] leading-relaxed line-clamp-2 lg:line-clamp-3 mb-2 lg:mb-3">
                         {generation.prompt || 'Без промпта'}
                       </p>
 
-                      {/* Date and action buttons */}
                       <div className="flex items-center justify-between">
                         <span className="font-inter text-[10px] lg:text-xs text-[#656565]">
                           {formatDate(generation.created_at)}
@@ -249,17 +230,17 @@ export default function HistoryPage() {
                           <button
                             onClick={(e) => handleDelete(e, generation.id)}
                             className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] hover:border-red-500/50 transition-colors"
-                            title="Удалить"
                           >
                             <Trash2 className="h-3 w-3 lg:h-4 lg:w-4" />
                           </button>
-                          <button
-                            onClick={(e) => handleDownload(e, generation.output_urls?.[0] || '', generation.id)}
-                            className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
-                            title="Скачать"
-                          >
-                            <Download className="h-3 w-3 lg:h-4 lg:w-4" />
-                          </button>
+                          {generation.output_urls?.[0] && (
+                            <button
+                              onClick={(e) => handleDownload(e, generation.output_urls![0], generation.id)}
+                              className="p-1.5 lg:p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+                            >
+                              <Download className="h-3 w-3 lg:h-4 lg:w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -268,13 +249,12 @@ export default function HistoryPage() {
               ))}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-3 lg:gap-4 mt-6 lg:mt-8">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
                 >
                   Назад
                 </button>
@@ -284,7 +264,7 @@ export default function HistoryPage() {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  className="h-9 lg:h-10 px-3 lg:px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-xs lg:text-sm text-white hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
                 >
                   Вперед
                 </button>
