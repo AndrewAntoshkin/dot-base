@@ -2,13 +2,6 @@
 
 // Используем лёгкую версию для быстрой загрузки
 import { ActionType, getActionLabel } from '@/lib/models-lite';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface ActionSelectorProps {
   value: ActionType;
@@ -23,28 +16,65 @@ const ANALYZE_ACTIONS: ActionType[] = ['analyze_describe', 'analyze_ocr', 'analy
 export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelectorProps) {
   const actions = mode === 'video' ? VIDEO_ACTIONS : mode === 'analyze' ? ANALYZE_ACTIONS : IMAGE_ACTIONS;
 
+  // Разбиваем на 2 ряда по 2 кнопки
+  const row1 = actions.slice(0, 2);
+  const row2 = actions.slice(2, 4);
+
   return (
-    <div className="flex flex-col gap-2">
-      <label className="font-inter font-medium text-[14px] leading-[20px] text-white tracking-[-0.084px]">
+    <div className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+      {/* Label - 10px uppercase */}
+      <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
         Действие
       </label>
-      <Select value={value} onValueChange={(v) => onChange(v as ActionType)}>
-        <SelectTrigger>
-          <SelectValue placeholder="Выбрать из списка" />
-        </SelectTrigger>
-        <SelectContent className="bg-[#101010] border-[#2f2f2f]">
-          {actions.map((action) => (
-            <SelectItem 
-              key={action} 
-              value={action}
-              className="font-inter text-[14px] text-white focus:bg-[#1f1f1f]"
+      
+      {/* Action buttons grid */}
+      <div className="flex flex-col gap-2">
+        {/* Row 1 */}
+        <div className="flex gap-2">
+          {row1.map((action) => (
+            <button
+              key={action}
+              type="button"
+              onClick={() => onChange(action)}
+              className={`
+                flex-1 h-[56px] px-6 py-2 rounded-[16px] 
+                font-inter text-[13px] leading-[18px] text-center text-white
+                transition-all
+                ${value === action 
+                  ? 'bg-[#101010] border border-white' 
+                  : 'bg-[#101010] border border-transparent hover:border-[#404040]'
+                }
+              `}
             >
               {getActionLabel(action)}
-            </SelectItem>
+            </button>
           ))}
-        </SelectContent>
-      </Select>
+        </div>
+        
+        {/* Row 2 */}
+        {row2.length > 0 && (
+          <div className="flex gap-2">
+            {row2.map((action) => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => onChange(action)}
+                className={`
+                  flex-1 h-[56px] px-6 py-2 rounded-[16px] 
+                  font-inter text-[13px] leading-[18px] text-center text-white
+                  transition-all
+                  ${value === action 
+                    ? 'bg-[#101010] border border-white' 
+                    : 'bg-[#101010] border border-transparent hover:border-[#404040]'
+                  }
+                `}
+              >
+                {getActionLabel(action)}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-

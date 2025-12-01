@@ -65,7 +65,7 @@ export default function LoginPage() {
   // Показываем сообщение об отправке письма
   if (emailSent) {
     return (
-      <div className="min-h-screen bg-[#050505] flex">
+      <div className="min-h-screen bg-[#101010] flex">
         {/* Left side - Success message */}
         <div className="flex-1 flex items-center justify-center relative">
           <div className="w-[364px] flex flex-col gap-7 items-center">
@@ -123,7 +123,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] flex">
+    <div className="min-h-screen bg-[#101010] flex">
       {/* Left side - Form */}
       <div className="flex-1 flex items-center justify-center relative">
         <div className="w-[364px] flex flex-col gap-7 items-center">

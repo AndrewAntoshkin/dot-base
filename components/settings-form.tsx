@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
+import { AspectRatioSelector } from './aspect-ratio-selector';
 
 // Максимальный размер файла для загрузки (3MB чтобы с запасом влезть в лимит Vercel)
 const MAX_UPLOAD_SIZE = 3 * 1024 * 1024;
@@ -216,43 +217,35 @@ function FileUploader({
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
-        {description && (
-          <p className="font-inter text-[14px] text-[#959595] mt-2">{description}</p>
-        )}
       </div>
     );
   }
 
   return (
-    <div>
-      <div
-        onClick={handleClick}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`
-          h-12 flex items-center pl-3 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
-          ${isDragging 
-            ? 'border-white bg-white/5' 
-            : 'border-[#656565] hover:border-white bg-[#101010]'
-          }
-        `}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept={acceptType}
-          onChange={handleInputChange}
-          className="hidden"
-        />
-        <ImageIcon className="w-5 h-5 text-[#959595]" />
-        <span className="font-inter text-[14px] text-[#959595]">
-          {isVideoField ? 'Выберите файл' : 'Выберите на устройстве'}
-        </span>
-      </div>
-      {description && (
-        <p className="font-inter text-[14px] text-[#959595] mt-2">{description}</p>
-      )}
+    <div
+      onClick={handleClick}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      className={`
+        h-12 flex items-center pl-3 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
+        ${isDragging 
+          ? 'border-white bg-white/5' 
+          : 'border-[#656565] hover:border-white bg-[#101010]'
+        }
+      `}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={acceptType}
+        onChange={handleInputChange}
+        className="hidden"
+      />
+      <ImageIcon className="w-5 h-5 text-[#959595]" />
+      <span className="font-inter text-[14px] text-[#959595]">
+        {isVideoField ? 'Выберите файл' : 'Выберите на устройстве'}
+      </span>
     </div>
   );
 }
@@ -379,13 +372,9 @@ function MultiFileUploader({
         </div>
       )}
 
-      {description && (
-        <p className="font-inter text-[14px] text-[#959595] mt-2">{description}</p>
-      )}
-
       {/* Превью загруженных изображений - под областью загрузки, 4 в ряд */}
       {value.length > 0 && (
-        <div className="grid grid-cols-4 gap-2 mt-3 ml-1">
+        <div className="grid grid-cols-4 gap-2 mt-3">
           {value.map((img, index) => (
             <div 
               key={index} 
@@ -393,7 +382,7 @@ function MultiFileUploader({
               className={`
                 relative rounded-[8px] overflow-hidden bg-[#0a0a0a] cursor-pointer transition-all
                 ${selectedIndex === index 
-                  ? 'ring-2 ring-white ring-offset-2 ring-offset-[#050505]' 
+                  ? 'ring-2 ring-white ring-offset-2 ring-offset-neutral-900' 
                   : 'hover:ring-1 hover:ring-white/50'
                 }
               `}
@@ -628,72 +617,67 @@ export function SettingsForm({
     switch (setting.type) {
       case 'textarea':
         return (
-          <div className="relative">
-            <Textarea
-              value={value}
-              onChange={(e) => updateFormData(setting.name, e.target.value)}
-              placeholder={setting.placeholder || 'Напишите запрос'}
-              required={setting.required}
-              rows={4}
-            />
-            {setting.description && (
-              <p className="font-inter text-[14px] text-[#959595] mt-2">
-                {setting.description}
-              </p>
-            )}
-          </div>
+          <Textarea
+            value={value}
+            onChange={(e) => updateFormData(setting.name, e.target.value)}
+            placeholder={setting.placeholder || 'Напишите запрос'}
+            required={setting.required}
+            rows={4}
+            className="bg-[#101010] border-0 rounded-[8px] min-h-[80px]"
+          />
         );
 
       case 'text':
       case 'number':
         return (
-          <div>
-            <Input
-              type={setting.type}
-              value={value}
-              onChange={(e) => updateFormData(setting.name, e.target.value)}
-              placeholder={setting.placeholder}
-              required={setting.required}
-              min={setting.min}
-              max={setting.max}
-              step={setting.step}
-            />
-            {setting.description && (
-              <p className="font-inter text-[14px] text-[#959595] mt-2">
-                {setting.description}
-              </p>
-            )}
-          </div>
+          <Input
+            type={setting.type}
+            value={value}
+            onChange={(e) => updateFormData(setting.name, e.target.value)}
+            placeholder={setting.placeholder}
+            required={setting.required}
+            min={setting.min}
+            max={setting.max}
+            step={setting.step}
+            className="bg-[#101010] border-0 h-12 rounded-[8px]"
+          />
         );
 
       case 'select':
+        // Используем интерактивный селектор для aspect_ratio
+        if (setting.name === 'aspect_ratio' && setting.options) {
+          const defaultOption = setting.options.find(opt => opt.value === setting.default);
+          return (
+            <AspectRatioSelector
+              value={value || setting.default || '1:1'}
+              options={setting.options}
+              onChange={(v) => updateFormData(setting.name, v)}
+              description={setting.description}
+              defaultLabel={defaultOption?.label}
+            />
+          );
+        }
+        
         return (
-          <div>
-            <Select
-              value={value}
-              onValueChange={(v) => updateFormData(setting.name, v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Выбрать из списка" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#101010] border-[#2f2f2f]">
-                {setting.options?.map((option) => (
-                  <SelectItem 
-                    key={option.value} 
-                    value={option.value}
-                    className="font-inter text-[14px] text-white focus:bg-[#1f1f1f]"
-                  >
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {setting.description && (
-              <p className="font-inter text-[14px] text-[#959595] mt-2">
-                {setting.description}
-              </p>
-            )}
-          </div>
+          <Select
+            value={value}
+            onValueChange={(v) => updateFormData(setting.name, v)}
+          >
+            <SelectTrigger className="bg-[#101010] border-0 h-12 rounded-[8px]">
+              <SelectValue placeholder="Выбрать из списка" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#101010] border-[#2f2f2f]">
+              {setting.options?.map((option) => (
+                <SelectItem 
+                  key={option.value} 
+                  value={option.value}
+                  className="font-inter text-[14px] text-white focus:bg-[#1f1f1f]"
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         );
 
       case 'slider':
@@ -703,72 +687,58 @@ export function SettingsForm({
         const percentage = ((currentValue - min) / (max - min)) * 100;
         
         return (
-          <div>
-            <div className="flex flex-col gap-1">
-              {/* Кастомный слайдер по дизайну Figma */}
-              <div className="relative h-4 w-full">
-                {/* Трек (фон) */}
-                <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[2px] bg-[#3a3a3a] rounded-full" />
-                {/* Заполненная часть */}
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 left-0 h-[2px] bg-white rounded-full"
-                  style={{ width: `${percentage}%` }}
-                />
-                {/* Ползунок */}
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border-2 border-[#050505] shadow-sm cursor-pointer"
-                  style={{ left: `calc(${percentage}% - 6px)` }}
-                />
-                {/* Скрытый input для взаимодействия */}
-                <input
-                  type="range"
-                  value={currentValue}
-                  onChange={(e) => updateFormData(setting.name, parseFloat(e.target.value))}
-                  min={min}
-                  max={max}
-                  step={setting.step || 1}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-              </div>
-              {/* Подписи: min - value - max */}
-              <div className="flex justify-between items-center h-4">
-                <span className="font-inter text-[12px] leading-[14px] text-[#878787] w-8">
-                  {min}
-                </span>
-                <span className="font-inter text-[12px] leading-[14px] font-bold text-white text-center w-8">
-                  {currentValue}
-                </span>
-                <span className="font-inter text-[12px] leading-[14px] text-[#878787] text-right w-8">
-                  {max}
-                </span>
-              </div>
+          <div className="flex flex-col gap-1">
+            {/* Кастомный слайдер по дизайну Figma */}
+            <div className="relative h-4 w-full">
+              {/* Трек (фон) */}
+              <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[2px] bg-[#3a3a3a] rounded-full" />
+              {/* Заполненная часть */}
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 left-0 h-[2px] bg-white rounded-full"
+                style={{ width: `${percentage}%` }}
+              />
+              {/* Ползунок */}
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border-2 border-neutral-900 shadow-sm cursor-pointer"
+                style={{ left: `calc(${percentage}% - 6px)` }}
+              />
+              {/* Скрытый input для взаимодействия */}
+              <input
+                type="range"
+                value={currentValue}
+                onChange={(e) => updateFormData(setting.name, parseFloat(e.target.value))}
+                min={min}
+                max={max}
+                step={setting.step || 1}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
             </div>
-            {setting.description && (
-              <p className="font-inter text-[14px] text-[#959595] mt-2">
-                {setting.description}
-              </p>
-            )}
+            {/* Подписи: min - value - max */}
+            <div className="flex justify-between items-center h-4">
+              <span className="font-inter text-[12px] leading-[14px] text-[#878787] w-8">
+                {min}
+              </span>
+              <span className="font-inter text-[12px] leading-[14px] font-bold text-white text-center w-8">
+                {currentValue}
+              </span>
+              <span className="font-inter text-[12px] leading-[14px] text-[#878787] text-right w-8">
+                {max}
+              </span>
+            </div>
           </div>
         );
 
       case 'checkbox':
         return (
-          <div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!value}
-                onChange={(e) => updateFormData(setting.name, e.target.checked)}
-                className="w-4 h-4 rounded accent-white"
-              />
-              <span className="font-inter font-medium text-[14px] text-white">{setting.label}</span>
-            </label>
-            {setting.description && (
-              <p className="font-inter text-[14px] text-[#959595] mt-2">
-                {setting.description}
-              </p>
-            )}
-          </div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!value}
+              onChange={(e) => updateFormData(setting.name, e.target.checked)}
+              className="w-4 h-4 rounded accent-white"
+            />
+            <span className="font-inter text-[14px] text-white">{setting.label}</span>
+          </label>
         );
 
       case 'file':
@@ -778,7 +748,6 @@ export function SettingsForm({
             settingName={setting.name}
             value={formData[setting.name]}
             onChange={(val) => updateFormData(setting.name, val)}
-            description={setting.description}
           />
         );
 
@@ -800,7 +769,6 @@ export function SettingsForm({
               }
             }}
             maxFiles={setting.maxFiles || 10}
-            description={setting.description}
             selectedIndex={selectedIndices[setting.name] ?? 0}
             onSelectIndex={(index) => setSelectedIndices(prev => ({
               ...prev,
@@ -814,20 +782,78 @@ export function SettingsForm({
     }
   };
 
+  // Получаем описание и дефолтное значение для настройки
+  const getSettingMeta = (setting: ModelSetting) => {
+    const defaultOption = setting.options?.find(opt => opt.value === setting.default);
+    return {
+      description: setting.description,
+      defaultLabel: defaultOption?.label || (setting.default !== undefined ? String(setting.default) : undefined),
+    };
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Only fields, no buttons */}
-      {model.settings.map((setting) => (
-        <div key={setting.name} className="flex flex-col gap-2 shrink-0">
-          {setting.type !== 'checkbox' && (
-            <label className="font-inter font-medium text-[14px] leading-[20px] text-white tracking-[-0.084px]">
+    <div className="flex flex-col gap-3">
+      {/* Settings wrapped in cards */}
+      {model.settings.map((setting) => {
+        const meta = getSettingMeta(setting);
+        const isAspectRatio = setting.name === 'aspect_ratio';
+        
+        // Checkbox рендерится без карточки (или внутри простой карточки)
+        if (setting.type === 'checkbox') {
+          return (
+            <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+              {renderSetting(setting)}
+              {meta.description && (
+                <p className="font-inter text-[14px] leading-[20px] text-[#959595]">
+                  {meta.description}
+                </p>
+              )}
+            </div>
+          );
+        }
+        
+        // Aspect ratio имеет свой особый рендеринг внутри AspectRatioSelector
+        if (isAspectRatio) {
+          return (
+            <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+              <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                {setting.label}
+                {setting.required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              {renderSetting(setting)}
+            </div>
+          );
+        }
+        
+        return (
+          <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+            {/* Label - 10px uppercase */}
+            <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
               {setting.label}
               {setting.required && <span className="text-red-500 ml-1">*</span>}
             </label>
-          )}
-          {renderSetting(setting)}
-        </div>
-      ))}
+            
+            {/* Field */}
+            {renderSetting(setting)}
+            
+            {/* Description and default value */}
+            {(meta.description || meta.defaultLabel) && (
+              <div className="flex flex-col gap-1.5">
+                {meta.description && (
+                  <p className="font-inter text-[14px] leading-[20px] text-[#959595]">
+                    {meta.description}
+                  </p>
+                )}
+                {meta.defaultLabel && (
+                  <p className="font-inter font-medium text-[12px] leading-[16px] text-[#e0e0e0]">
+                    По умолчанию {meta.defaultLabel}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Error message if any */}
       {error && (

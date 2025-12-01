@@ -120,21 +120,55 @@ export function TextOutputPanel({ generationId, onRegenerate, isMobile = false }
     onRegenerate(generation.prompt || '', generation.settings || {}, generation.model_id);
   };
 
-  // Empty state
+  // Empty state - такой же как на Image/Video страницах
   if (!generationId && !generation) {
-    return (
-      <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[400px]'}`}>
-        <div className={`flex flex-col items-center gap-4 ${isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full mx-4' : ''}`}>
-          <div className="w-16 h-16 rounded-2xl bg-[#1f1f1f] flex items-center justify-center">
-            <span className="text-3xl">🔍</span>
+    // Mobile version
+    if (isMobile) {
+      return (
+        <div className="flex-1 min-h-[400px] flex items-center justify-center">
+          <div className="bg-[#131313] rounded-2xl p-8 w-full mx-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#1f1f1f] flex items-center justify-center">
+                <span className="text-3xl">🔍</span>
+              </div>
+              <div className="text-center">
+                <p className="font-inter font-medium text-base text-white mb-2">
+                  Анализ изображений
+                </p>
+                <p className="font-inter text-sm text-[#959595] max-w-[300px]">
+                  Загрузите изображение и выберите тип анализа
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="font-inter font-medium text-base text-white mb-2">
-              Анализ изображений
-            </p>
-            <p className="font-inter text-sm text-[#959595] max-w-[300px]">
-              Загрузите изображение и выберите тип анализа: описание, OCR или генерация промпта
-            </p>
+        </div>
+      );
+    }
+    
+    // Desktop version - 3 шага как на Image/Video
+    return (
+      <div className="flex items-center justify-center min-h-[660px] px-20">
+        <div className="flex gap-12 w-full">
+          <div className="flex-1 flex flex-col py-2">
+            <img src="/numbers/1.png" alt="1" width={36} height={64} className="mb-0" />
+            <div className="flex flex-col gap-2 py-6">
+              <h3 className="font-inter font-semibold text-xl text-white">Выбор модели</h3>
+              <p className="font-inter text-sm text-[#9c9c9c]">Выберите действие и модель</p>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col py-2">
+            <img src="/numbers/2.png" alt="2" width={55} height={64} className="mb-0" />
+            <div className="flex flex-col gap-2 py-6">
+              <h3 className="font-inter font-semibold text-xl text-white">Промпт</h3>
+              <p className="font-inter text-sm text-[#9c9c9c]">Опишите что хотите создать</p>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col py-2">
+            <img src="/numbers/3.png" alt="3" width={53} height={64} className="mb-0" />
+            <div className="flex flex-col gap-2 py-6">
+              <h3 className="font-inter font-semibold text-xl text-white">Настройки</h3>
+              <p className="font-inter text-sm text-[#9c9c9c]">Настройте параметры</p>
+            </div>
           </div>
         </div>
       </div>

@@ -330,7 +330,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               key={index}
               onClick={() => setSelectedImageIndex(index)}
               className={`relative w-10 h-10 rounded-lg overflow-hidden shrink-0 transition-all ${
-                selectedImageIndex === index ? 'ring-2 ring-white ring-offset-2 ring-offset-[#050505]' : 'opacity-70 hover:opacity-100'
+                selectedImageIndex === index ? 'ring-2 ring-white ring-offset-2 ring-offset-[#101010]' : 'opacity-70 hover:opacity-100'
               }`}
             >
               {isVideoUrl(url) ? (

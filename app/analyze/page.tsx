@@ -136,7 +136,7 @@ function AnalyzeContent() {
   const showStartScreen = !selectedModelId && !currentGenerationId && !mobileShowForm;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#050505]">
+    <div className="min-h-screen flex flex-col bg-[#101010]">
       <Header />
 
       {/* Desktop Layout */}
@@ -193,7 +193,7 @@ function AnalyzeContent() {
 
           {/* Sticky buttons */}
           {selectedModelId && (
-            <div className="sticky bottom-0 bg-[#050505] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
+            <div className="sticky bottom-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -299,7 +299,7 @@ function AnalyzeContent() {
 
                 {/* Sticky buttons - Mobile */}
                 {selectedModelId && (
-                  <div className="fixed bottom-0 left-0 right-0 bg-[#050505] pt-4 pb-8 px-4 border-t border-[#1f1f1f] z-10">
+                  <div className="fixed bottom-0 left-0 right-0 bg-[#101010] pt-4 pb-8 px-4 border-t border-[#1f1f1f] z-10">
                     <div className="flex gap-3">
                       <button
                         type="button"
@@ -351,7 +351,7 @@ function AnalyzeContent() {
 export default function AnalyzePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+      <div className="min-h-screen flex items-center justify-center bg-[#101010]">
         <div className="text-white">Загрузка...</div>
       </div>
     }>

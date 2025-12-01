@@ -5,7 +5,7 @@
 @layer base {
   :root {
     /* Figma design colors */
-    --background: 0 0% 2%; /* #050505 */
+    --background: 0 0% 6%; /* #101010 */
     --foreground: 0 0% 100%; /* #FFFFFF */
 
     --card: 0 0% 6.3%; /* #101010 */

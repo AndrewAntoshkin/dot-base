@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 // Используем лёгкую версию для селектора (~140 строк вместо 3800+)
-import { ActionType, ModelLite, getModelsByActionLite } from '@/lib/models-lite';
+import { ActionType, getModelsByActionLite } from '@/lib/models-lite';
 import {
   Select,
   SelectContent,
@@ -32,12 +32,15 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
   const currentModel = value ? models.find((m) => m.id === value) : null;
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="font-inter font-medium text-[14px] leading-[20px] text-white tracking-[-0.084px]">
+    <div className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+      {/* Label - 10px uppercase */}
+      <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
         Модель
       </label>
+      
+      {/* Select field with dark inner background */}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
+        <SelectTrigger className="bg-[#101010] border-0 h-12 rounded-[8px] pl-3 pr-2">
           <SelectValue placeholder="Выбрать из списка" />
         </SelectTrigger>
         <SelectContent className="bg-[#101010] border-[#2f2f2f]">
@@ -60,12 +63,12 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
         </SelectContent>
       </Select>
 
+      {/* Model description outside card or inside - keep inside for consistency */}
       {currentModel?.description && (
-        <p className="font-inter text-[14px] text-[#959595] mt-1">
+        <p className="font-inter text-[14px] leading-[20px] text-[#959595]">
           {currentModel.description}
         </p>
       )}
     </div>
   );
 }
-

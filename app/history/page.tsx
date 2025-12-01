@@ -103,7 +103,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#050505]">
+    <div className="min-h-screen flex flex-col bg-[#101010]">
       <Header />
 
       <main className="flex-1 px-4 lg:px-20 py-6 lg:py-8">
