@@ -95,6 +95,27 @@ export async function POST(request: NextRequest) {
     if (validatedData.input_video_url) {
       replicateInput.video = validatedData.input_video_url;
     }
+    
+    // Для remove_bg моделей убедимся что изображение присутствует
+    if (validatedData.action === 'remove_bg') {
+      // Изображение может быть в settings.image или input_image_url
+      if (!replicateInput.image) {
+        const settingsImage = validatedData.settings?.image;
+        if (settingsImage) {
+          replicateInput.image = settingsImage;
+        }
+      }
+      
+      if (!replicateInput.image) {
+        console.error('Remove BG: No image provided');
+        return NextResponse.json(
+          { error: 'Требуется загрузить изображение' },
+          { status: 400 }
+        );
+      }
+      
+      console.log('Remove BG: Image URL =', replicateInput.image?.substring(0, 100) + '...');
+    }
 
     // Создать запись в БД
     const { data: generation, error: insertError } = await supabase
@@ -125,11 +146,17 @@ export async function POST(request: NextRequest) {
 
     // Запустить генерацию на Replicate
     try {
-      console.log('Starting generation:', {
-        model: model.replicateModel,
-        action: validatedData.action,
-        inputKeys: Object.keys(replicateInput),
-      });
+      // Логируем полный input для отладки (кроме самих изображений)
+      const logInput = { ...replicateInput };
+      if (logInput.image && typeof logInput.image === 'string' && logInput.image.length > 100) {
+        logInput.image = logInput.image.substring(0, 100) + '...';
+      }
+      
+      console.log('=== STARTING REPLICATE GENERATION ===');
+      console.log('Model:', model.replicateModel);
+      console.log('Version:', model.version || 'not specified');
+      console.log('Action:', validatedData.action);
+      console.log('Input:', JSON.stringify(logInput, null, 2));
 
       const replicateClient = getReplicateClient();
       
@@ -169,10 +196,15 @@ export async function POST(request: NextRequest) {
       });
     } catch (replicateError: any) {
       console.error('=== GENERATION ERROR ===');
+      console.error('Model:', model.replicateModel);
       console.error('Error message:', replicateError.message);
       console.error('Error name:', replicateError.name);
       console.error('Error stack:', replicateError.stack);
-      console.error('Original error:', (replicateError as any).originalError?.message);
+      const originalError = (replicateError as any).originalError;
+      if (originalError) {
+        console.error('Original error message:', originalError.message);
+        console.error('Original error response:', originalError.response?.data || originalError.response);
+      }
       
       // Сообщение об ошибке уже очищено в ReplicateClient
       const userFacingError = replicateError.message || 'Ошибка при генерации';

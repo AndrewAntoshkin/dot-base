@@ -235,7 +235,22 @@ export class ReplicateClient {
         };
       } catch (error: any) {
         lastError = error;
-        console.error(`Replicate attempt ${attempt} failed:`, error.message);
+        console.error(`=== Replicate attempt ${attempt} FAILED ===`);
+        console.error('Error message:', error.message);
+        console.error('Error status:', error.status || error.statusCode);
+        console.error('Error response:', error.response?.data || error.response?.body);
+        
+        // Если это ошибка Replicate API - извлекаем детали
+        if (error.response) {
+          try {
+            const responseBody = typeof error.response.body === 'string' 
+              ? JSON.parse(error.response.body) 
+              : error.response.body;
+            console.error('Replicate API error details:', JSON.stringify(responseBody, null, 2));
+          } catch (e) {
+            console.error('Raw response body:', error.response.body);
+          }
+        }
 
         // Сообщить об ошибке токена
         await this.tokenPool.reportTokenError(
