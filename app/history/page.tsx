@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { formatDate } from '@/lib/utils';
-import { Loader2, Download, Play, Trash2 } from 'lucide-react';
+import { Loader2, Download, Play, Trash2, Type } from 'lucide-react';
 
 interface Generation {
   id: string;
@@ -160,7 +160,7 @@ export default function HistoryPage() {
                         )
                       ) : isTextAction(generation.action) ? (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-2xl">📝</span>
+                          <Type className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
                         </div>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
