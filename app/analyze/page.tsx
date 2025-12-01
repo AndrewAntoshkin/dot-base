@@ -133,7 +133,8 @@ function AnalyzeContent() {
     }
   };
 
-  const showStartScreen = !selectedModelId && !currentGenerationId && !mobileShowForm;
+  // Убираем стартовый экран - сразу показываем форму как на десктопе
+  const showStartScreen = false;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#101010]">

@@ -157,8 +157,8 @@ function VideoContent() {
     }
   };
 
-  // Check if we should show start screen (no model selected and no generation, and not explicitly showing form)
-  const showStartScreen = !selectedModelId && !currentGenerationId && !mobileShowForm;
+  // Убираем стартовый экран - сразу показываем форму как на десктопе
+  const showStartScreen = false;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#101010]">
