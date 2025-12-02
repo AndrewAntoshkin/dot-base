@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
-import { SettingsForm, SettingsFormRef } from '@/components/settings-form';
 import { OutputPanel } from '@/components/output-panel';
 import { Header } from '@/components/header';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
-import { ActionType, getModelById } from '@/lib/models-config';
+import { ActionType } from '@/lib/models-lite';
 import { useGenerations } from '@/contexts/generations-context';
+import type { SettingsFormRef } from '@/components/settings-form';
+
+// Ленивая загрузка тяжёлого компонента
+const SettingsForm = lazy(() => import('@/components/settings-form').then(m => ({ default: m.SettingsForm })));
 
 // Проверка, является ли action видео действием
 const isVideoAction = (action: string): boolean => {
@@ -110,7 +113,8 @@ function VideoContent() {
     setIsGenerating(true);
     
     try {
-      // Get the model info
+      // Dynamic import для избежания загрузки тяжёлого models-config на старте
+      const { getModelById } = await import('@/lib/models-config');
       const model = getModelById(modelId);
       if (!model) {
         console.error('Model not found:', modelId);
@@ -203,15 +207,17 @@ function VideoContent() {
               {/* Settings Form - только поля, без кнопок */}
               {selectedModelId && (
                 <div className="animate-fade-in-up animate-delay-300">
-                  <SettingsForm
-                    modelId={selectedModelId}
-                    onGenerationCreated={handleGenerationCreated}
-                    onFormDataChange={setFormData}
-                    onSubmitStart={() => setIsGenerating(true)}
-                    onError={() => setIsGenerating(false)}
-                    initialData={formData}
-                    formRef={formRef}
-                  />
+                  <Suspense fallback={<div className="p-4 text-center text-[#959595]">Загрузка настроек...</div>}>
+                    <SettingsForm
+                      modelId={selectedModelId}
+                      onGenerationCreated={handleGenerationCreated}
+                      onFormDataChange={setFormData}
+                      onSubmitStart={() => setIsGenerating(true)}
+                      onError={() => setIsGenerating(false)}
+                      initialData={formData}
+                      formRef={formRef}
+                    />
+                  </Suspense>
                 </div>
               )}
             </div>
@@ -317,15 +323,17 @@ function VideoContent() {
                 {/* Settings Form */}
                 {selectedModelId && (
                   <div className="animate-fade-in-up animate-delay-200">
-                    <SettingsForm
-                      modelId={selectedModelId}
-                      onGenerationCreated={handleGenerationCreated}
-                      onFormDataChange={setFormData}
-                      onSubmitStart={() => setIsGenerating(true)}
-                      onError={() => setIsGenerating(false)}
-                      initialData={formData}
-                      formRef={formRef}
-                    />
+                    <Suspense fallback={<div className="p-4 text-center text-[#959595]">Загрузка настроек...</div>}>
+                      <SettingsForm
+                        modelId={selectedModelId}
+                        onGenerationCreated={handleGenerationCreated}
+                        onFormDataChange={setFormData}
+                        onSubmitStart={() => setIsGenerating(true)}
+                        onError={() => setIsGenerating(false)}
+                        initialData={formData}
+                        formRef={formRef}
+                      />
+                    </Suspense>
                   </div>
                 )}
 
