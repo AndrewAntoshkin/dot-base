@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
-import { Loader2, Download, RotateCcw, Copy } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Copy, WifiOff } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { fetchWithTimeout, isOnline, isSlowConnection } from '@/lib/network-utils';
 
 interface OutputPanelProps {
   generationId: string | null;
@@ -34,8 +35,9 @@ function isValidMediaUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
 
-// Простой интервал polling
-const POLLING_INTERVAL = 5000;
+// Интервалы polling с адаптацией под качество сети
+const POLLING_INTERVAL = 5000; // 5 секунд обычно
+const POLLING_INTERVAL_SLOW = 10000; // 10 секунд для медленного соединения
 
 export function OutputPanel({ generationId, onRegenerate, isMobile = false }: OutputPanelProps) {
   const [generation, setGeneration] = useState<Generation | null>(null);
@@ -43,9 +45,11 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
   const [imageAspectRatio, setImageAspectRatio] = useState<'landscape' | 'portrait' | 'square'>('square');
   const [copied, setCopied] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const consecutiveErrorsRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -59,29 +63,69 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       setGeneration(null);
       setSelectedImageIndex(0);
       setIsLoading(false);
+      setNetworkError(null);
       return;
     }
 
     setIsLoading(true);
     setSelectedImageIndex(0);
+    setNetworkError(null);
+    consecutiveErrorsRef.current = 0;
 
     const fetchGeneration = async () => {
+      // Пропускаем если офлайн
+      if (!isOnline()) {
+        setNetworkError('Нет подключения к интернету');
+        // Продолжаем polling на случай восстановления
+        if (isMountedRef.current) {
+          pollTimeoutRef.current = setTimeout(fetchGeneration, POLLING_INTERVAL_SLOW);
+        }
+        return;
+      }
+      
       try {
-        const response = await fetch(`/api/generations/${generationId}`);
+        const response = await fetchWithTimeout(`/api/generations/${generationId}`, {
+          timeout: isSlowConnection() ? 20000 : 10000,
+          retries: 1,
+          credentials: 'include',
+        });
         
         if (!response.ok || !isMountedRef.current) return;
         
         const data = await response.json();
         setGeneration(data);
         setIsLoading(false);
+        setNetworkError(null);
+        consecutiveErrorsRef.current = 0;
 
         // Polling если обрабатывается
         if ((data.status === 'processing' || data.status === 'pending') && isMountedRef.current) {
-          pollTimeoutRef.current = setTimeout(fetchGeneration, POLLING_INTERVAL);
+          const interval = isSlowConnection() ? POLLING_INTERVAL_SLOW : POLLING_INTERVAL;
+          pollTimeoutRef.current = setTimeout(fetchGeneration, interval);
         }
-      } catch (error) {
-        console.error('Error:', error);
-        if (isMountedRef.current) setIsLoading(false);
+      } catch (error: any) {
+        console.error('[OutputPanel] Fetch error:', error);
+        consecutiveErrorsRef.current++;
+        
+        if (isMountedRef.current) {
+          setIsLoading(false);
+          
+          // Показываем ошибку после нескольких попыток
+          if (consecutiveErrorsRef.current >= 3) {
+            if (error.code === 'TIMEOUT') {
+              setNetworkError('Медленное соединение');
+            } else if (error.code === 'OFFLINE') {
+              setNetworkError('Нет подключения');
+            } else {
+              setNetworkError('Ошибка загрузки');
+            }
+          }
+          
+          // Продолжаем polling для processing генераций
+          if (generation?.status === 'processing' || generation?.status === 'pending') {
+            pollTimeoutRef.current = setTimeout(fetchGeneration, POLLING_INTERVAL_SLOW);
+          }
+        }
       }
     };
 
@@ -211,6 +255,13 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               <p className="font-inter font-medium text-base text-white mb-1">Генерация...</p>
               <p className="font-inter text-sm text-[#959595]">{generation.model_name}</p>
             </div>
+            {/* Индикатор сетевых проблем */}
+            {networkError && (
+              <div className="flex items-center gap-2 text-yellow-500 text-sm">
+                <WifiOff className="h-4 w-4" />
+                <span>{networkError}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { fetchWithTimeout, isOnline, subscribeToNetworkChanges, getNetworkDiagnostics } from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -16,6 +17,8 @@ interface GenerationsContextType {
   unviewedCount: number;
   unviewedGenerations: Generation[];
   hasActiveGenerations: boolean;
+  isOffline: boolean;
+  networkError: string | null;
   addGeneration: (generation: Generation) => void;
   updateGeneration: (id: string, updates: Partial<Generation>) => void;
   markAsViewed: (id: string) => Promise<void>;
@@ -24,22 +27,90 @@ interface GenerationsContextType {
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
-// Простой интервал - 10 секунд
-const POLLING_INTERVAL = 10000;
+// Интервалы polling
+const POLLING_INTERVAL = 10000; // 10 секунд обычно
+const POLLING_INTERVAL_SLOW = 20000; // 20 секунд при ошибках
+const MAX_CONSECUTIVE_ERRORS = 3;
 
 export function GenerationsProvider({ children }: { children: ReactNode }) {
   const [generations, setGenerations] = useState<Generation[]>([]);
+  const [isOffline, setIsOffline] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const consecutiveErrorsRef = useRef(0);
+  const currentIntervalRef = useRef(POLLING_INTERVAL);
 
   const refreshGenerations = useCallback(async () => {
+    // Пропускаем если офлайн
+    if (!isOnline()) {
+      setIsOffline(true);
+      console.log('[Generations] Skipping refresh - offline');
+      return;
+    }
+    
+    setIsOffline(false);
+    
     try {
-      const response = await fetch('/api/generations/list?limit=20');
+      const response = await fetchWithTimeout('/api/generations/list?limit=20', {
+        timeout: 15000, // 15 секунд timeout
+        retries: 1,
+        credentials: 'include',
+      });
+      
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
+        setNetworkError(null);
+        
+        // Сбрасываем счётчик ошибок при успехе
+        consecutiveErrorsRef.current = 0;
+        
+        // Возвращаем нормальный интервал
+        if (currentIntervalRef.current !== POLLING_INTERVAL) {
+          currentIntervalRef.current = POLLING_INTERVAL;
+          // Перезапускаем интервал с новым значением
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(refreshGenerations, POLLING_INTERVAL);
+          }
+        }
+      } else if (response.status === 401) {
+        // Не авторизован - не показываем как сетевую ошибку
+        console.log('[Generations] Not authenticated');
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
-      console.error('Fetch error:', error);
+    } catch (error: any) {
+      consecutiveErrorsRef.current++;
+      
+      console.error('[Generations] Refresh error:', {
+        message: error.message,
+        code: error.code,
+        consecutiveErrors: consecutiveErrorsRef.current,
+        diagnostics: getNetworkDiagnostics(),
+      });
+      
+      // Показываем ошибку пользователю после нескольких попыток
+      if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+        if (error.code === 'OFFLINE') {
+          setIsOffline(true);
+          setNetworkError('Нет подключения к интернету');
+        } else if (error.code === 'TIMEOUT') {
+          setNetworkError('Медленное соединение. Данные могут обновляться с задержкой');
+        } else {
+          setNetworkError('Проблемы с соединением');
+        }
+        
+        // Увеличиваем интервал при ошибках
+        if (currentIntervalRef.current !== POLLING_INTERVAL_SLOW) {
+          currentIntervalRef.current = POLLING_INTERVAL_SLOW;
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(refreshGenerations, POLLING_INTERVAL_SLOW);
+          }
+        }
+      }
     }
   }, []);
 
@@ -58,9 +129,14 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
       prev.map((g) => (g.id === id ? { ...g, viewed: true } : g))
     );
     try {
-      await fetch(`/api/generations/${id}/view`, { method: 'POST' });
+      await fetchWithTimeout(`/api/generations/${id}/view`, { 
+        method: 'POST',
+        timeout: 10000,
+        retries: 1,
+        credentials: 'include',
+      });
     } catch (error) {
-      console.error('Mark viewed error:', error);
+      console.error('[Generations] Mark viewed error:', error);
     }
   }, []);
 
@@ -71,7 +147,22 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
     (g) => g.status === 'pending' || g.status === 'processing'
   );
 
-  // Простой polling
+  // Подписка на изменения сети
+  useEffect(() => {
+    const unsubscribe = subscribeToNetworkChanges((online) => {
+      setIsOffline(!online);
+      if (online) {
+        // При восстановлении соединения - сразу обновляем
+        setNetworkError(null);
+        consecutiveErrorsRef.current = 0;
+        refreshGenerations();
+      }
+    });
+    
+    return unsubscribe;
+  }, [refreshGenerations]);
+
+  // Polling
   useEffect(() => {
     refreshGenerations();
     
@@ -91,6 +182,8 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
         unviewedCount,
         unviewedGenerations,
         hasActiveGenerations,
+        isOffline,
+        networkError,
         addGeneration,
         updateGeneration,
         markAsViewed,

@@ -117,31 +117,40 @@ function getFieldIcon(name: string, type: string): LucideIcon {
   }
 }
 
-// Максимальный размер файла для загрузки (3MB чтобы с запасом влезть в лимит Vercel)
-const MAX_UPLOAD_SIZE = 3 * 1024 * 1024;
+import { fetchWithTimeout, isSlowConnection, isOnline, NetworkError } from '@/lib/network-utils';
+
+// Максимальный размер файла для загрузки (уменьшен для мобильного)
+const MAX_UPLOAD_SIZE = 2 * 1024 * 1024; // 2MB для лучшей совместимости с мобильным
 // Качество сжатия JPEG
-const COMPRESSION_QUALITY = 0.85;
+const COMPRESSION_QUALITY = 0.80;
 // Максимальное разрешение (по большей стороне)
 const MAX_DIMENSION = 2048;
 
 /**
  * Сжимает изображение до допустимого размера
+ * Адаптируется под качество соединения
  * @returns base64 строка сжатого изображения
  */
 async function compressImage(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
+    const img = new window.Image();
     img.onload = () => {
       let { width, height } = img;
       
+      // Для медленного соединения используем более агрессивное сжатие
+      const slowConnection = isSlowConnection();
+      const maxDim = slowConnection ? 1536 : MAX_DIMENSION;
+      const targetSize = slowConnection ? MAX_UPLOAD_SIZE * 0.7 : MAX_UPLOAD_SIZE; // 1.4MB для медленного
+      const initialQuality = slowConnection ? 0.7 : COMPRESSION_QUALITY;
+      
       // Масштабируем если превышает максимальное разрешение
-      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      if (width > maxDim || height > maxDim) {
         if (width > height) {
-          height = Math.round((height * MAX_DIMENSION) / width);
-          width = MAX_DIMENSION;
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
         } else {
-          width = Math.round((width * MAX_DIMENSION) / height);
-          height = MAX_DIMENSION;
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
         }
       }
       
@@ -158,24 +167,26 @@ async function compressImage(dataUrl: string): Promise<string> {
       ctx.drawImage(img, 0, 0, width, height);
       
       // Пробуем JPEG сначала (лучше сжимает)
-      let result = canvas.toDataURL('image/jpeg', COMPRESSION_QUALITY);
+      let result = canvas.toDataURL('image/jpeg', initialQuality);
       
       // Если всё ещё слишком большой, уменьшаем качество
-      let quality = COMPRESSION_QUALITY;
-      while (result.length > MAX_UPLOAD_SIZE * 1.33 && quality > 0.3) {
+      let quality = initialQuality;
+      const minQuality = slowConnection ? 0.4 : 0.3;
+      while (result.length > targetSize * 1.33 && quality > minQuality) {
         quality -= 0.1;
         result = canvas.toDataURL('image/jpeg', quality);
       }
       
       // Если после сжатия всё ещё большой, уменьшаем размер
-      if (result.length > MAX_UPLOAD_SIZE * 1.33) {
-        const scale = 0.7;
+      if (result.length > targetSize * 1.33) {
+        const scale = slowConnection ? 0.6 : 0.7;
         canvas.width = Math.round(width * scale);
         canvas.height = Math.round(height * scale);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        result = canvas.toDataURL('image/jpeg', 0.8);
+        result = canvas.toDataURL('image/jpeg', slowConnection ? 0.6 : 0.8);
       }
       
+      console.log(`[Compress] ${slowConnection ? 'SLOW' : 'FAST'} connection: ${(result.length / 1024).toFixed(0)}KB, quality: ${quality.toFixed(1)}`);
       resolve(result);
     };
     
@@ -618,14 +629,38 @@ export function SettingsForm({
         const fieldValue = formData[setting.name];
         
         if (setting.type === 'file' && fieldValue && fieldValue.startsWith('data:')) {
+          // Проверяем соединение перед загрузкой
+          if (!isOnline()) {
+            throw new Error('Нет подключения к интернету. Проверьте соединение');
+          }
+          
           // Загружаем одиночный файл
           console.log(`Uploading file for ${setting.name}...`);
-          const uploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ files: [fieldValue] }),
-          });
+          
+          // Используем fetchWithTimeout для надёжной загрузки
+          const uploadTimeout = isSlowConnection() ? 120000 : 60000; // 2 мин для медленного, 1 мин обычно
+          
+          let uploadResponse;
+          try {
+            uploadResponse = await fetchWithTimeout('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ files: [fieldValue] }),
+              timeout: uploadTimeout,
+              retries: 2,
+              retryDelay: 2000,
+            });
+          } catch (networkErr: any) {
+            console.error('Network error during upload:', networkErr);
+            if (networkErr.code === 'TIMEOUT') {
+              throw new Error('Загрузка прервана из-за медленного соединения. Попробуйте позже или используйте WiFi');
+            }
+            if (networkErr.code === 'OFFLINE') {
+              throw new Error('Потеряно соединение с интернетом');
+            }
+            throw new Error('Ошибка сети при загрузке. Проверьте соединение');
+          }
           
           // Безопасный парсинг JSON - сервер может вернуть HTML при ошибке
           let uploadResult;
@@ -656,13 +691,37 @@ export function SettingsForm({
           const base64Files = fieldValue.filter((f: string) => f && f.startsWith('data:'));
           
           if (base64Files.length > 0) {
+            // Проверяем соединение перед загрузкой
+            if (!isOnline()) {
+              throw new Error('Нет подключения к интернету. Проверьте соединение');
+            }
+            
             console.log(`Uploading ${base64Files.length} files for ${setting.name}...`);
-            const uploadResponse = await fetch('/api/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ files: base64Files }),
-            });
+            
+            // Увеличенный timeout для множественных файлов
+            const uploadTimeout = isSlowConnection() ? 180000 : 90000; // 3 мин для медленного
+            
+            let uploadResponse;
+            try {
+              uploadResponse = await fetchWithTimeout('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ files: base64Files }),
+                timeout: uploadTimeout,
+                retries: 2,
+                retryDelay: 3000,
+              });
+            } catch (networkErr: any) {
+              console.error('Network error during upload:', networkErr);
+              if (networkErr.code === 'TIMEOUT') {
+                throw new Error('Загрузка прервана. Попробуйте загрузить меньше файлов или используйте WiFi');
+              }
+              if (networkErr.code === 'OFFLINE') {
+                throw new Error('Потеряно соединение с интернетом');
+              }
+              throw new Error('Ошибка сети при загрузке. Проверьте соединение');
+            }
             
             // Безопасный парсинг JSON - сервер может вернуть HTML при ошибке
             let uploadResult;
@@ -692,19 +751,39 @@ export function SettingsForm({
         }
       }
       
-      const response = await fetch('/api/generations/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          action: model.action,
-          model_id: model.id,
-          prompt: formData.prompt,
-          input_image_url: processedSettings.image || processedSettings.input_image || processedSettings.start_image || processedSettings.first_frame_image,
-          input_video_url: isVideoAction ? processedSettings.video : undefined,
-          settings: processedSettings,
-        }),
-      });
+      // Проверяем соединение перед созданием генерации
+      if (!isOnline()) {
+        throw new Error('Нет подключения к интернету. Проверьте соединение');
+      }
+      
+      let response;
+      try {
+        response = await fetchWithTimeout('/api/generations/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            action: model.action,
+            model_id: model.id,
+            prompt: formData.prompt,
+            input_image_url: processedSettings.image || processedSettings.input_image || processedSettings.start_image || processedSettings.first_frame_image,
+            input_video_url: isVideoAction ? processedSettings.video : undefined,
+            settings: processedSettings,
+          }),
+          timeout: isSlowConnection() ? 60000 : 30000,
+          retries: 2,
+          retryDelay: 2000,
+        });
+      } catch (networkErr: any) {
+        console.error('Network error creating generation:', networkErr);
+        if (networkErr.code === 'TIMEOUT') {
+          throw new Error('Запрос занял слишком много времени. Проверьте соединение');
+        }
+        if (networkErr.code === 'OFFLINE') {
+          throw new Error('Потеряно соединение с интернетом');
+        }
+        throw new Error('Ошибка сети. Проверьте соединение и попробуйте снова');
+      }
 
       if (!response.ok) {
         const errorData = await response.json();

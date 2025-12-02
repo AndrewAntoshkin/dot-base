@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut, WifiOff } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { createBrowserClient } from '@supabase/ssr';
@@ -16,7 +16,7 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const { unviewedCount, hasActiveGenerations } = useGenerations();
+  const { unviewedCount, hasActiveGenerations, isOffline, networkError } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Мемоизируем Supabase клиент - создаём только один раз
@@ -129,6 +129,16 @@ export function Header() {
           {/* Right side - Status, Галерея (desktop), Avatar */}
           <div className="flex items-center gap-2 lg:gap-6">
             <div className="flex items-center gap-2 lg:gap-1 relative">
+              {/* Network status indicator */}
+              {(isOffline || networkError) && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full">
+                  <WifiOff className="w-3.5 h-3.5 text-yellow-500" />
+                  <span className="hidden sm:inline font-inter text-xs text-yellow-500">
+                    {isOffline ? 'Офлайн' : 'Проблемы с сетью'}
+                  </span>
+                </div>
+              )}
+              
               {/* Generation status indicator - clickable */}
               {unviewedCount > 0 && (
                 <button
