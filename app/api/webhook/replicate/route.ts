@@ -171,7 +171,37 @@ export async function POST(request: NextRequest) {
       }
     } else if (status === 'failed') {
       updateData.status = 'failed';
-      updateData.error_message = error || 'Unknown error';
+      
+      // Детальный разбор ошибки
+      let errorMessage = error || 'Unknown error';
+      
+      // Логируем полный ответ для отладки
+      console.error('=== REPLICATE PREDICTION FAILED ===');
+      console.error('Prediction ID:', predictionId);
+      console.error('Generation ID:', generation.id);
+      console.error('Model:', generation.model_id);
+      console.error('Error field:', error);
+      console.error('Full body:', JSON.stringify(body, null, 2));
+      
+      // Улучшенные сообщения об ошибках
+      if (!error || error === '') {
+        // Replicate часто не даёт причину - проверяем типичные случаи
+        const modelName = (generation.model_id || '').toLowerCase();
+        
+        if (modelName.includes('nano-banana') || modelName.includes('gemini')) {
+          errorMessage = 'Контент заблокирован фильтром безопасности Google. Попробуйте изменить запрос';
+        } else if (body.logs?.includes('NSFW') || body.logs?.includes('safety')) {
+          errorMessage = 'Контент заблокирован фильтром безопасности';
+        } else if (body.logs?.includes('timeout') || body.logs?.includes('exceeded')) {
+          errorMessage = 'Превышено время генерации. Попробуйте снова';
+        } else if (body.logs?.includes('memory') || body.logs?.includes('OOM')) {
+          errorMessage = 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
+        } else {
+          errorMessage = 'Генерация не удалась. Попробуйте изменить параметры или выбрать другую модель';
+        }
+      }
+      
+      updateData.error_message = errorMessage;
     }
 
     await supabase
