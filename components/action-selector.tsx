@@ -1,6 +1,8 @@
 'use client';
 
 // Используем лёгкую версию для быстрой загрузки
+'use client';
+
 import { ActionType, getActionLabel } from '@/lib/models-lite';
 import { Command } from 'lucide-react';
 
@@ -45,8 +47,7 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
                 ${value === action 
                   ? 'bg-[#101010] border border-white' 
                   : 'bg-[#101010] border border-transparent hover:border-[#404040]'
-                }
-              `}
+                }`}
             >
               {getActionLabel(action)}
             </button>
@@ -68,8 +69,7 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
                   ${value === action 
                     ? 'bg-[#101010] border border-white' 
                     : 'bg-[#101010] border border-transparent hover:border-[#404040]'
-                  }
-                `}
+                  }`}
               >
                 {getActionLabel(action)}
               </button>

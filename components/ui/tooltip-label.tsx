@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 
 interface TooltipLabelProps {
@@ -25,13 +25,8 @@ export function TooltipLabel({
   className = '',
 }: TooltipLabelProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
   // Проверяем, есть ли что показывать в тултипе
   const hasTooltip = description || defaultValue;
-
-  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
-  const handleMouseLeave = useCallback(() => setIsHovered(false), []);
 
   // Если нет тултипа, просто рендерим label
   if (!hasTooltip) {
@@ -45,12 +40,7 @@ export function TooltipLabel({
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="relative inline-block"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <div className="relative inline-block" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       <div
         className={`
           inline-flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]

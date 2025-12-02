@@ -117,7 +117,7 @@ function getFieldIcon(name: string, type: string): LucideIcon {
   }
 }
 
-import { fetchWithTimeout, isSlowConnection, isOnline, NetworkError } from '@/lib/network-utils';
+import { fetchWithTimeout, isSlowConnection, isOnline } from '@/lib/network-utils';
 
 // Максимальный размер файла для загрузки (уменьшен для мобильного)
 const MAX_UPLOAD_SIZE = 2 * 1024 * 1024; // 2MB для лучшей совместимости с мобильным
@@ -125,6 +125,65 @@ const MAX_UPLOAD_SIZE = 2 * 1024 * 1024; // 2MB для лучшей совмес
 const COMPRESSION_QUALITY = 0.80;
 // Максимальное разрешение (по большей стороне)
 const MAX_DIMENSION = 2048;
+
+function dataUrlToBlob(dataUrl: string) {
+  const match = dataUrl.match(/^data:(.*?);base64,(.+)$/);
+  if (!match) {
+    throw new Error('Некорректный формат файла. Ожидается data URL');
+  }
+  const mimeType = match[1] || 'application/octet-stream';
+  const base64 = match[2];
+  const binary = atob(base64);
+  const len = binary.length;
+  const buffer = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    buffer[i] = binary.charCodeAt(i);
+  }
+  const blob = new Blob([buffer], { type: mimeType });
+  const extension = mimeType.split('/')[1] || 'bin';
+  return { blob, mimeType, extension };
+}
+
+async function uploadDataUrls(dataUrls: string[]) {
+  const formData = new FormData();
+  dataUrls.forEach((dataUrl, index) => {
+    const { blob, extension } = dataUrlToBlob(dataUrl);
+    const filename = `upload-${Date.now()}-${index}.${extension}`;
+    formData.append('files', blob, filename);
+  });
+
+  const uploadTimeout = isSlowConnection() ? 120000 : 60000;
+  const response = await fetchWithTimeout('/api/upload', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+    timeout: uploadTimeout,
+    retries: 2,
+    retryDelay: 2000,
+  });
+
+  const responseText = await response.text();
+  let result;
+  try {
+    result = JSON.parse(responseText);
+  } catch {
+    console.error('Server returned non-JSON response:', responseText.substring(0, 200));
+    if (response.status === 413 || responseText.toLowerCase().includes('entity too large')) {
+      throw new Error('Файл слишком большой. Попробуйте уменьшить размер или загрузить меньше файлов');
+    }
+    throw new Error('Ошибка сервера при загрузке файла');
+  }
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Не удалось загрузить файл');
+  }
+
+  if (!result.urls || result.urls.length === 0) {
+    throw new Error('Файл не был загружен');
+  }
+
+  return result.urls as string[];
+}
 
 /**
  * Сжимает изображение до допустимого размера
@@ -629,123 +688,35 @@ export function SettingsForm({
         const fieldValue = formData[setting.name];
         
         if (setting.type === 'file' && fieldValue && fieldValue.startsWith('data:')) {
-          // Проверяем соединение перед загрузкой
           if (!isOnline()) {
             throw new Error('Нет подключения к интернету. Проверьте соединение');
           }
-          
-          // Загружаем одиночный файл
-          console.log(`Uploading file for ${setting.name}...`);
-          
-          // Используем fetchWithTimeout для надёжной загрузки
-          const uploadTimeout = isSlowConnection() ? 120000 : 60000; // 2 мин для медленного, 1 мин обычно
-          
-          let uploadResponse;
+
           try {
-            uploadResponse = await fetchWithTimeout('/api/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ files: [fieldValue] }),
-              timeout: uploadTimeout,
-              retries: 2,
-              retryDelay: 2000,
-            });
-          } catch (networkErr: any) {
-            console.error('Network error during upload:', networkErr);
-            if (networkErr.code === 'TIMEOUT') {
-              throw new Error('Загрузка прервана из-за медленного соединения. Попробуйте позже или используйте WiFi');
-            }
-            if (networkErr.code === 'OFFLINE') {
-              throw new Error('Потеряно соединение с интернетом');
-            }
-            throw new Error('Ошибка сети при загрузке. Проверьте соединение');
-          }
-          
-          // Безопасный парсинг JSON - сервер может вернуть HTML при ошибке
-          let uploadResult;
-          const responseText = await uploadResponse.text();
-          try {
-            uploadResult = JSON.parse(responseText);
-          } catch {
-            console.error('Server returned non-JSON response:', responseText.substring(0, 200));
-            if (responseText.toLowerCase().includes('entity too large') || uploadResponse.status === 413) {
-              throw new Error('Файл слишком большой. Максимальный размер: 4MB');
-            }
-            throw new Error('Ошибка сервера при загрузке файла');
-          }
-          
-          if (!uploadResponse.ok) {
-            console.error('Upload failed:', uploadResult);
-            throw new Error(uploadResult.error || 'Не удалось загрузить файл');
-          }
-          
-          if (uploadResult.urls && uploadResult.urls.length > 0) {
-            processedSettings[setting.name] = uploadResult.urls[0];
-            console.log(`File uploaded: ${uploadResult.urls[0]}`);
-          } else {
-            throw new Error('Файл не был загружен');
+            console.log(`Uploading file for ${setting.name}...`);
+            const [url] = await uploadDataUrls([fieldValue]);
+            processedSettings[setting.name] = url;
+            console.log(`File uploaded: ${url}`);
+          } catch (uploadErr: any) {
+            console.error('Upload failed:', uploadErr);
+            throw uploadErr;
           }
         } else if (setting.type === 'file_array' && Array.isArray(fieldValue) && fieldValue.length > 0) {
-          // Фильтруем только base64 строки
           const base64Files = fieldValue.filter((f: string) => f && f.startsWith('data:'));
-          
+
           if (base64Files.length > 0) {
-            // Проверяем соединение перед загрузкой
             if (!isOnline()) {
               throw new Error('Нет подключения к интернету. Проверьте соединение');
             }
-            
-            console.log(`Uploading ${base64Files.length} files for ${setting.name}...`);
-            
-            // Увеличенный timeout для множественных файлов
-            const uploadTimeout = isSlowConnection() ? 180000 : 90000; // 3 мин для медленного
-            
-            let uploadResponse;
+
             try {
-              uploadResponse = await fetchWithTimeout('/api/upload', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ files: base64Files }),
-                timeout: uploadTimeout,
-                retries: 2,
-                retryDelay: 3000,
-              });
-            } catch (networkErr: any) {
-              console.error('Network error during upload:', networkErr);
-              if (networkErr.code === 'TIMEOUT') {
-                throw new Error('Загрузка прервана. Попробуйте загрузить меньше файлов или используйте WiFi');
-              }
-              if (networkErr.code === 'OFFLINE') {
-                throw new Error('Потеряно соединение с интернетом');
-              }
-              throw new Error('Ошибка сети при загрузке. Проверьте соединение');
-            }
-            
-            // Безопасный парсинг JSON - сервер может вернуть HTML при ошибке
-            let uploadResult;
-            const responseText = await uploadResponse.text();
-            try {
-              uploadResult = JSON.parse(responseText);
-            } catch {
-              console.error('Server returned non-JSON response:', responseText.substring(0, 200));
-              if (responseText.toLowerCase().includes('entity too large') || uploadResponse.status === 413) {
-                throw new Error('Файлы слишком большие. Попробуйте меньше файлов или уменьшите размер');
-              }
-              throw new Error('Ошибка сервера при загрузке файлов');
-            }
-            
-            if (!uploadResponse.ok) {
-              console.error('Upload failed:', uploadResult);
-              throw new Error(uploadResult.error || 'Не удалось загрузить файлы');
-            }
-            
-            if (uploadResult.urls && uploadResult.urls.length > 0) {
-              processedSettings[setting.name] = uploadResult.urls;
-              console.log(`Files uploaded: ${uploadResult.urls.length}`);
-            } else {
-              throw new Error('Файлы не были загружены');
+              console.log(`Uploading ${base64Files.length} files for ${setting.name}...`);
+              const urls = await uploadDataUrls(base64Files);
+              processedSettings[setting.name] = urls;
+              console.log(`Files uploaded: ${urls.length}`);
+            } catch (uploadErr: any) {
+              console.error('Upload failed:', uploadErr);
+              throw uploadErr;
             }
           }
         }

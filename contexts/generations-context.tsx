@@ -32,16 +32,32 @@ const POLLING_INTERVAL = 10000; // 10 секунд обычно
 const POLLING_INTERVAL_SLOW = 20000; // 20 секунд при ошибках
 const MAX_CONSECUTIVE_ERRORS = 3;
 
-export function GenerationsProvider({ children }: { children: ReactNode }) {
+interface GenerationsProviderProps {
+  children: ReactNode;
+  isAuthenticated?: boolean;
+}
+
+export function GenerationsProvider({ children, isAuthenticated = true }: GenerationsProviderProps) {
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isOffline, setIsOffline] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [isWindowVisible, setIsWindowVisible] = useState(
+    typeof document === 'undefined' ? true : document.visibilityState !== 'hidden'
+  );
+  const [pollInterval, setPollInterval] = useState(POLLING_INTERVAL);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const consecutiveErrorsRef = useRef(0);
-  const currentIntervalRef = useRef(POLLING_INTERVAL);
+  const pollIntervalRef = useRef(POLLING_INTERVAL);
+
+  useEffect(() => {
+    pollIntervalRef.current = pollInterval;
+  }, [pollInterval]);
 
   const refreshGenerations = useCallback(async () => {
+    if (!isAuthenticated || !isWindowVisible) {
+      return;
+    }
     // Пропускаем если офлайн
     if (!isOnline()) {
       setIsOffline(true);
@@ -67,13 +83,8 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
         consecutiveErrorsRef.current = 0;
         
         // Возвращаем нормальный интервал
-        if (currentIntervalRef.current !== POLLING_INTERVAL) {
-          currentIntervalRef.current = POLLING_INTERVAL;
-          // Перезапускаем интервал с новым значением
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = setInterval(refreshGenerations, POLLING_INTERVAL);
-          }
+        if (pollIntervalRef.current !== POLLING_INTERVAL) {
+          setPollInterval(POLLING_INTERVAL);
         }
       } else if (response.status === 401) {
         // Не авторизован - не показываем как сетевую ошибку
@@ -103,16 +114,12 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
         }
         
         // Увеличиваем интервал при ошибках
-        if (currentIntervalRef.current !== POLLING_INTERVAL_SLOW) {
-          currentIntervalRef.current = POLLING_INTERVAL_SLOW;
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = setInterval(refreshGenerations, POLLING_INTERVAL_SLOW);
-          }
+        if (pollIntervalRef.current !== POLLING_INTERVAL_SLOW) {
+          setPollInterval(POLLING_INTERVAL_SLOW);
         }
       }
     }
-  }, []);
+  }, [isAuthenticated, isWindowVisible]);
 
   const addGeneration = useCallback((generation: Generation) => {
     setGenerations((prev) => [generation, ...prev.slice(0, 19)]);
@@ -164,14 +171,49 @@ export function GenerationsProvider({ children }: { children: ReactNode }) {
 
   // Polling
   useEffect(() => {
+    if (!isAuthenticated || !isWindowVisible) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
     refreshGenerations();
-    
-    intervalRef.current = setInterval(refreshGenerations, POLLING_INTERVAL);
-    
+    intervalRef.current = setInterval(refreshGenerations, pollInterval);
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+    };
+  }, [refreshGenerations, isAuthenticated, isWindowVisible, pollInterval]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      const visible = document.visibilityState !== 'hidden';
+      setIsWindowVisible(visible);
+      if (visible) {
+        refreshGenerations();
+      }
+    };
+
+    const handleFocus = () => {
+      setIsWindowVisible(true);
+      refreshGenerations();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [refreshGenerations]);
 

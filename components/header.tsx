@@ -3,45 +3,39 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, LogOut, WifiOff } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
-import { createBrowserClient } from '@supabase/ssr';
+import { useUser } from '@/contexts/user-context';
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { unviewedCount, hasActiveGenerations, isOffline, networkError } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
+  const { email: userEmail, setEmail: setUserEmail } = useUser();
 
-  // Мемоизируем Supabase клиент - создаём только один раз
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
-
-  useEffect(() => {
-    let isMounted = true;
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && isMounted) {
-        setUserEmail(user.email || null);
+  const handleLogout = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        console.error('Logout failed', await response.text());
       }
-    };
-    getUser();
-    return () => { isMounted = false; };
-  }, [supabase]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
+    } catch (error) {
+      console.error('Logout error', error);
+    } finally {
+      setUserEmail(null);
+      router.push('/login');
+      router.refresh();
+    }
+  }, [router, setUserEmail]);
 
   // Close mobile menu on route change
   useEffect(() => {

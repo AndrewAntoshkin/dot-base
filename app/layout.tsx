@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
-import { GenerationsProvider } from '@/contexts/generations-context';
+import { AppProviders } from '@/components/providers/app-providers';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 // Локальный шрифт Inter - работает без VPN, не зависит от Google
 const inter = localFont({
@@ -63,17 +64,30 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  let userEmail: string | null = null;
+  let isAuthenticated = false;
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    userEmail = user?.email ?? null;
+    isAuthenticated = !!user;
+  } catch (error) {
+    console.error('Failed to fetch user for layout:', error);
+  }
+
   return (
     <html lang="ru">
       <body className={`${inter.variable} font-inter`}>
-        <GenerationsProvider>
+        <AppProviders initialUserEmail={userEmail} isAuthenticated={isAuthenticated}>
           {children}
-        </GenerationsProvider>
+        </AppProviders>
       </body>
     </html>
   );

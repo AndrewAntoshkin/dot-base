@@ -1,10 +1,8 @@
-'use client';
-
-import React from 'react';
+import { ReactNode } from 'react';
 
 interface FormFieldCardProps {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
   description?: string;
   defaultValue?: string;
   className?: string;
@@ -18,7 +16,7 @@ interface FormFieldCardProps {
  * - 16px rounded corners
  * - Small uppercase label
  */
-export function FormFieldCard({ 
+export function FormFieldCard({
   label, 
   children, 
   description, 
