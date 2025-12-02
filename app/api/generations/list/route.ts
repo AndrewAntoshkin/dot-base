@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Supabase error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Ошибка при загрузке истории' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('List generations error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Ошибка при загрузке истории' },
       { status: 500 }
     );
   }

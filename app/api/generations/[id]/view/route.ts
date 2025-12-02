@@ -50,14 +50,15 @@ export async function POST(
       .eq('user_id', user.id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('Mark as viewed DB error:', error);
+      return NextResponse.json({ error: 'Ошибка при обновлении статуса' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Mark as viewed error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Ошибка при обновлении статуса' },
       { status: 500 }
     );
   }

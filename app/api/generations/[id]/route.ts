@@ -145,20 +145,31 @@ export async function GET(
             generation.output_urls = outputUrls;
           }
         } else if (prediction.status === 'failed') {
+          // Очищаем ошибку от технических деталей
+          let cleanError = 'Генерация не удалась. Попробуйте изменить параметры';
+          if (prediction.error) {
+            const errorLower = prediction.error.toLowerCase();
+            if (errorLower.includes('nsfw') || errorLower.includes('safety') || errorLower.includes('blocked')) {
+              cleanError = 'Контент заблокирован фильтром безопасности';
+            } else if (errorLower.includes('timeout')) {
+              cleanError = 'Превышено время генерации';
+            }
+          }
+          
           await supabase
             .from('generations')
             .update({
               status: 'failed',
-              error_message: prediction.error || 'Unknown error',
+              error_message: cleanError,
               replicate_output: prediction,
             })
             .eq('id', id);
 
           generation.status = 'failed';
-          generation.error_message = prediction.error || 'Unknown error';
+          generation.error_message = cleanError;
         }
       } catch (replicateError: any) {
-        console.error('Error checking Replicate status:', replicateError);
+        console.error('Error checking prediction status:', replicateError);
       }
     }
 
@@ -166,7 +177,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Get generation error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Ошибка при получении данных' },
       { status: 500 }
     );
   }

@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         if (replicateUrls.length === 0) {
           console.error('No valid URLs found in output:', output);
           updateData.status = 'failed';
-          updateData.error_message = 'No output URLs received from Replicate';
+          updateData.error_message = 'Не удалось получить результат генерации';
         } else {
           console.log('Saving media to storage...', { 
             count: replicateUrls.length,
