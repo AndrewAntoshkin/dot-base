@@ -1,6 +1,36 @@
 import { createServiceRoleClient } from './server';
 
 /**
+ * Выполнить операцию с ретраями
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000,
+  operationName: string = 'operation'
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`${operationName} attempt ${attempt}/${maxRetries} failed:`, error.message);
+      
+      if (attempt < maxRetries) {
+        // Экспоненциальная задержка
+        const delay = delayMs * Math.pow(2, attempt - 1);
+        console.log(`Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
  * Определить тип медиа и расширение по URL и content-type
  */
 function getMediaTypeInfo(url: string, contentType?: string): { extension: string; mimeType: string; isVideo: boolean } {
@@ -44,7 +74,7 @@ function getMediaTypeInfo(url: string, contentType?: string): { extension: strin
 
 /**
  * Сохранить медиа файл с Replicate в Supabase Storage
- * Поддерживает изображения и видео
+ * Поддерживает изображения и видео, включает ретраи
  */
 export async function saveMediaToStorage(
   mediaUrl: string,
@@ -54,12 +84,23 @@ export async function saveMediaToStorage(
   try {
     const supabase = createServiceRoleClient();
 
-    // Скачать файл
-    const response = await fetch(mediaUrl);
-    if (!response.ok) {
-      console.error('Failed to fetch media:', response.statusText);
-      return null;
-    }
+    // Скачать файл с ретраями
+    const fetchMedia = async () => {
+      const response = await fetch(mediaUrl, {
+        signal: AbortSignal.timeout(30000), // 30 секунд таймаут
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response;
+    };
+    
+    const response = await withRetry(
+      fetchMedia, 
+      3, 
+      2000, 
+      `Fetch media ${index}`
+    );
 
     const contentType = response.headers.get('content-type') || '';
     const mediaInfo = getMediaTypeInfo(mediaUrl, contentType);
@@ -74,18 +115,22 @@ export async function saveMediaToStorage(
     const buffer = await blob.arrayBuffer();
     const fileName = `${generationId}-${index}.${mediaInfo.extension}`;
 
-    // Загрузить в Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('generations')
-      .upload(fileName, buffer, {
-        contentType: mediaInfo.mimeType,
-        upsert: true,
-      });
-
-    if (error) {
-      console.error('Storage upload error:', error);
-      return null;
-    }
+    // Загрузить в Supabase Storage с ретраями
+    const uploadToStorage = async () => {
+      const { data, error } = await supabase.storage
+        .from('generations')
+        .upload(fileName, buffer, {
+          contentType: mediaInfo.mimeType,
+          upsert: true,
+        });
+      
+      if (error) {
+        throw new Error(`Storage upload: ${error.message}`);
+      }
+      return data;
+    };
+    
+    await withRetry(uploadToStorage, 3, 1000, `Upload ${fileName}`);
 
     // Получить публичный URL
     const { data: publicUrlData } = supabase.storage
@@ -94,8 +139,8 @@ export async function saveMediaToStorage(
 
     console.log('Media saved successfully:', publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
-  } catch (error) {
-    console.error('Error saving media to storage:', error);
+  } catch (error: any) {
+    console.error('Error saving media to storage after retries:', error.message);
     return null;
   }
 }

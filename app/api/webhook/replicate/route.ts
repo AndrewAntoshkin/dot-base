@@ -2,6 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 
+/**
+ * Выполнить операцию с ретраями
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000,
+  operationName: string = 'operation'
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`${operationName} attempt ${attempt}/${maxRetries} failed:`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = delayMs * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 // Проверяем, является ли action текстовым (analyze)
 function isTextAction(action: string): boolean {
   return action.startsWith('analyze_');
@@ -70,12 +98,25 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceRoleClient();
 
-    // Найти генерацию по prediction ID
-    const { data: generation } = await supabase
-      .from('generations')
-      .select('*')
-      .eq('replicate_prediction_id', predictionId)
-      .single();
+    // Найти генерацию по prediction ID (с ретраями на случай проблем с БД)
+    const findGeneration = async () => {
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('replicate_prediction_id', predictionId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    };
+    
+    let generation;
+    try {
+      generation = await withRetry(findGeneration, 3, 1000, 'Find generation');
+    } catch (findError) {
+      console.error('Generation not found for prediction after retries:', predictionId);
+      return NextResponse.json({ error: 'Generation not found' }, { status: 404 });
+    }
 
     if (!generation) {
       console.error('Generation not found for prediction:', predictionId);
@@ -204,17 +245,34 @@ export async function POST(request: NextRequest) {
       updateData.error_message = errorMessage;
     }
 
-    await supabase
-      .from('generations')
-      .update(updateData)
-      .eq('id', generation.id);
+    // Обновить БД с ретраями
+    const updateGeneration = async () => {
+      const { error } = await supabase
+        .from('generations')
+        .update(updateData)
+        .eq('id', generation.id);
+      
+      if (error) throw error;
+    };
+    
+    try {
+      await withRetry(updateGeneration, 3, 1000, 'Update generation');
+      console.log('Webhook completed successfully for generation:', generation.id);
+    } catch (updateError: any) {
+      console.error('Failed to update generation after retries:', updateError.message);
+      // Возвращаем 500 чтобы Replicate попробовал снова
+      return NextResponse.json(
+        { error: 'Failed to save result' },
+        { status: 500 }
+      );
+    }
 
-    console.log('Webhook completed successfully for generation:', generation.id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Webhook error:', error);
+    // Возвращаем 500 чтобы Replicate попробовал отправить webhook снова
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Webhook processing failed' },
       { status: 500 }
     );
   }

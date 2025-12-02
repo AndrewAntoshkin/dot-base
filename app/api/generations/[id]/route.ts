@@ -5,6 +5,30 @@ import { getReplicateClient } from '@/lib/replicate/client';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 
+/**
+ * Выполнить операцию с ретраями
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 500
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -41,13 +65,26 @@ export async function GET(
 
     const supabase = createServiceRoleClient();
 
-    // Получить генерацию только своего пользователя
-    const { data: generation, error } = await supabase
-      .from('generations')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
+    // Получить генерацию с ретраями на случай проблем с БД
+    const fetchGeneration = async () => {
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    };
+    
+    let generation;
+    let error;
+    try {
+      generation = await withRetry(fetchGeneration, 3, 500);
+    } catch (e) {
+      error = e;
+    }
 
     if (error || !generation) {
       return NextResponse.json(
