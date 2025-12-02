@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { MobileSelect, SelectOption } from '@/components/ui/mobile-select';
+import { TooltipLabel } from '@/components/ui/tooltip-label';
 import { 
   X, 
   Image as ImageIcon,
@@ -841,17 +842,8 @@ export function SettingsForm({
         );
 
       case 'checkbox':
-        return (
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!value}
-              onChange={(e) => updateFormData(setting.name, e.target.checked)}
-              className="w-4 h-4 rounded accent-white"
-            />
-            <span className="font-inter text-[14px] text-white">{setting.label}</span>
-          </label>
-        );
+        // Checkbox рендерится в основном цикле с TooltipLabel
+        return null;
 
       case 'file':
         return (
@@ -910,16 +902,25 @@ export function SettingsForm({
         const meta = getSettingMeta(setting);
         const isAspectRatio = setting.name === 'aspect_ratio';
         
-        // Checkbox рендерится без карточки (или внутри простой карточки)
+        // Checkbox рендерится с тултипом на label
         if (setting.type === 'checkbox') {
+          const Icon = getFieldIcon(setting.name, setting.type);
           return (
             <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
-              {renderSetting(setting)}
-              {meta.description && (
-                <p className="font-inter text-[14px] leading-[20px] text-[#959595]">
-                  {meta.description}
-                </p>
-              )}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={!!(formData[setting.name] ?? setting.default ?? false)}
+                  onChange={(e) => updateFormData(setting.name, e.target.checked)}
+                  className="w-4 h-4 rounded accent-white cursor-pointer"
+                />
+                <TooltipLabel
+                  label={setting.label}
+                  description={meta.description}
+                  defaultValue={setting.default !== undefined ? (setting.default ? 'Включено' : 'Выключено') : undefined}
+                  icon={Icon}
+                />
+              </div>
             </div>
           );
         }
@@ -929,11 +930,13 @@ export function SettingsForm({
           const Icon = getFieldIcon(setting.name, setting.type);
           return (
             <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
-              <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                <Icon className="w-3 h-3" />
-                {setting.label}
-                {setting.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
+              <TooltipLabel
+                label={setting.label}
+                description={meta.description}
+                defaultValue={meta.defaultLabel}
+                required={setting.required}
+                icon={Icon}
+              />
               {renderSetting(setting)}
             </div>
           );
@@ -942,31 +945,17 @@ export function SettingsForm({
         const Icon = getFieldIcon(setting.name, setting.type);
         return (
           <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
-            {/* Label - 10px uppercase with icon */}
-            <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-              <Icon className="w-3 h-3" />
-              {setting.label}
-              {setting.required && <span className="text-red-500 ml-1">*</span>}
-            </label>
+            {/* Label with tooltip on hover */}
+            <TooltipLabel
+              label={setting.label}
+              description={meta.description}
+              defaultValue={meta.defaultLabel}
+              required={setting.required}
+              icon={Icon}
+            />
             
             {/* Field */}
             {renderSetting(setting)}
-            
-            {/* Description and default value */}
-            {(meta.description || meta.defaultLabel) && (
-              <div className="flex flex-col gap-1.5">
-                {meta.description && (
-                  <p className="font-inter text-[14px] leading-[20px] text-[#959595]">
-                    {meta.description}
-                  </p>
-                )}
-                {meta.defaultLabel && (
-                  <p className="font-inter font-medium text-[12px] leading-[16px] text-[#e0e0e0]">
-                    По умолчанию {meta.defaultLabel}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
         );
       })}
