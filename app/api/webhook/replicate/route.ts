@@ -106,8 +106,8 @@ async function performAutoRetry(
     // Обновляем генерацию с новым prediction ID и увеличиваем счётчик ретраев
     const newRetryCount = (generation.settings?.auto_retry_count || 0) + 1;
     
-    await supabase
-      .from('generations')
+    await (supabase
+      .from('generations') as any)
       .update({
         replicate_prediction_id: prediction.id,
         replicate_token_index: tokenId,
@@ -373,8 +373,8 @@ export async function POST(request: NextRequest) {
 
     // Обновить БД с ретраями
     const updateGeneration = async () => {
-      const { error } = await supabase
-        .from('generations')
+      const { error } = await (supabase
+        .from('generations') as any)
         .update(updateData)
         .eq('id', generation.id);
       

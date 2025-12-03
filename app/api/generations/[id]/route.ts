@@ -128,8 +128,8 @@ export async function GET(
             }
             
             if (textOutput) {
-              await supabase
-                .from('generations')
+              await (supabase
+                .from('generations') as any)
                 .update({
                   status: 'completed',
                   output_text: textOutput,
@@ -169,8 +169,8 @@ export async function GET(
               }
             }
 
-            await supabase
-              .from('generations')
+            await (supabase
+              .from('generations') as any)
               .update({
                 status: 'completed',
                 output_urls: outputUrls,
@@ -193,8 +193,8 @@ export async function GET(
             }
           }
           
-          await supabase
-            .from('generations')
+          await (supabase
+            .from('generations') as any)
             .update({
               status: 'failed',
               error_message: cleanError,

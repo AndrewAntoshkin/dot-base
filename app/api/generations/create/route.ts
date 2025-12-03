@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Создать запись в БД
-    const { data: generation, error: insertError } = await supabase
-      .from('generations')
+    const { data: generation, error: insertError } = await (supabase
+      .from('generations') as any)
       .insert({
         user_id: userId,
         action: validatedData.action,
@@ -180,8 +180,8 @@ export async function POST(request: NextRequest) {
       });
 
       // Обновить запись с prediction ID
-      await supabase
-        .from('generations')
+      await (supabase
+        .from('generations') as any)
         .update({
           replicate_prediction_id: prediction.id,
           replicate_token_index: tokenId,
@@ -210,8 +210,8 @@ export async function POST(request: NextRequest) {
       const userFacingError = replicateError.message || 'Ошибка при генерации';
       
       // Обновить статус на failed
-      await supabase
-        .from('generations')
+      await (supabase
+        .from('generations') as any)
         .update({
           status: 'failed',
           error_message: userFacingError,

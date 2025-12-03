@@ -47,8 +47,8 @@ export async function POST() {
       }
 
       // Create user in public.users
-      const { error: insertError } = await supabase
-        .from('users')
+      const { error: insertError } = await (supabase
+        .from('users') as any)
         .insert({
           id: authUser.id,
           telegram_username: authUser.email?.split('@')[0] || `user_${authUser.id.substring(0, 8)}`,

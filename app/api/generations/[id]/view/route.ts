@@ -40,8 +40,8 @@ export async function POST(
     const supabase = createServiceRoleClient();
 
     // Mark generation as viewed - только свою генерацию
-    const { error } = await supabase
-      .from('generations')
+    const { error } = await (supabase
+      .from('generations') as any)
       .update({
         viewed: true,
         viewed_at: new Date().toISOString(),

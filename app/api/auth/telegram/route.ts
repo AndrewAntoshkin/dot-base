@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
 
     if (!existingUser) {
       // Create new user
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
+      const { data: newUser, error: insertError } = await (supabase
+        .from('users') as any)
         .insert({
           telegram_id: userData.id,
           telegram_username: userData.username || `user_${userData.id}`,
@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
       existingUser = newUser;
     } else {
       // Update last login
-      await supabase
-        .from('users')
+      await (supabase
+        .from('users') as any)
         .update({ last_login: new Date().toISOString() })
         .eq('id', existingUser.id);
     }
