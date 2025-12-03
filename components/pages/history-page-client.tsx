@@ -140,15 +140,41 @@ export default function HistoryPageClient() {
     }
   }, []);
 
+  // Синхронизация статусов processing генераций с Replicate
+  const syncProcessingStatuses = useCallback(async () => {
+    try {
+      const response = await fetch('/api/generations/sync-status', { method: 'POST' });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.synced > 0) {
+          console.log(`Synced ${data.synced} generations`);
+          // Перезагрузить данные после синхронизации
+          fetchGenerations(true);
+        }
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    }
+  }, [fetchGenerations]);
+
   // Сброс страницы при смене таба
   useEffect(() => {
     setPage(1);
   }, [activeTab]);
 
-  // Начальная загрузка
+  // Начальная загрузка + синхронизация
   useEffect(() => {
     fetchGenerations();
-  }, [fetchGenerations]);
+    // Синхронизируем статусы при загрузке страницы
+    syncProcessingStatuses();
+  }, [fetchGenerations, syncProcessingStatuses]);
+
+  // Синхронизация при переключении на таб "В работе"
+  useEffect(() => {
+    if (activeTab === 'processing') {
+      syncProcessingStatuses();
+    }
+  }, [activeTab, syncProcessingStatuses]);
 
   // Polling для обновления - быстрее на табе "В работе" или при активных генерациях
   useEffect(() => {
@@ -159,8 +185,13 @@ export default function HistoryPageClient() {
       clearInterval(pollingRef.current);
     }
     
-    pollingRef.current = setInterval(() => {
-      fetchGenerations(true);
+    pollingRef.current = setInterval(async () => {
+      // Если есть активные генерации - сначала синхронизируем статусы
+      if (hasActiveGenerations) {
+        await syncProcessingStatuses();
+      } else {
+        fetchGenerations(true);
+      }
     }, interval);
     
     return () => {
@@ -168,7 +199,7 @@ export default function HistoryPageClient() {
         clearInterval(pollingRef.current);
       }
     };
-  }, [hasActiveGenerations, activeTab, fetchGenerations]);
+  }, [hasActiveGenerations, activeTab, fetchGenerations, syncProcessingStatuses]);
 
   // Supabase Real-time подписка на изменения
   useEffect(() => {
