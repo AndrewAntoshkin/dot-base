@@ -5,6 +5,19 @@ import { getReplicateClient } from '@/lib/replicate/client';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 
+// Type for generation from DB
+interface GenerationRecord {
+  id: string;
+  user_id: string;
+  status: string;
+  replicate_prediction_id?: string;
+  output_urls?: string[];
+  output_text?: string;
+  error_message?: string;
+  action?: string;
+  [key: string]: any;
+}
+
 /**
  * Выполнить операцию с ретраями
  */
@@ -78,10 +91,10 @@ export async function GET(
       return data;
     };
     
-    let generation;
+    let generation: GenerationRecord | null = null;
     let error;
     try {
-      generation = await withRetry(fetchGeneration, 3, 500);
+      generation = await withRetry(fetchGeneration, 3, 500) as GenerationRecord;
     } catch (e) {
       error = e;
     }
