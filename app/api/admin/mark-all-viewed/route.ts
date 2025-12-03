@@ -6,15 +6,14 @@ export async function POST() {
     const supabase = createServiceRoleClient();
 
     // Mark all existing generations as viewed
-    const result = await supabase
+    // @ts-ignore - Supabase types issue with update
+    const { error, count } = await supabase
       .from('generations')
       .update({ 
         viewed: true,
         viewed_at: new Date().toISOString()
-      } as any)
+      })
       .eq('viewed', false);
-    
-    const { error, count } = result;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
