@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
+import { getReplicateClient } from '@/lib/replicate/client';
+import { getModelById } from '@/lib/models-config';
 
 /**
  * Выполнить операцию с ретраями
@@ -28,6 +30,107 @@ async function withRetry<T>(
   }
   
   throw lastError;
+}
+
+// Максимальное количество автоматических ретраев для нестабильных моделей
+const MAX_AUTO_RETRIES = 2;
+
+// Модели, которые могут быть нестабильными и заслуживают автоматического ретрая
+const UNSTABLE_MODELS = ['nano-banana', 'gemini'];
+
+/**
+ * Проверяет, является ли модель нестабильной и заслуживает автоматического ретрая
+ */
+function isUnstableModel(modelId: string): boolean {
+  const modelLower = (modelId || '').toLowerCase();
+  return UNSTABLE_MODELS.some(m => modelLower.includes(m));
+}
+
+/**
+ * Проверяет, можно ли сделать автоматический ретрай
+ */
+function canAutoRetry(generation: any): boolean {
+  // Проверяем, что это нестабильная модель
+  if (!isUnstableModel(generation.model_id)) {
+    return false;
+  }
+  
+  // Проверяем количество предыдущих ретраев
+  const currentRetryCount = generation.settings?.auto_retry_count || 0;
+  return currentRetryCount < MAX_AUTO_RETRIES;
+}
+
+/**
+ * Выполняет автоматический ретрай генерации
+ */
+async function performAutoRetry(
+  generation: any,
+  supabase: any
+): Promise<{ success: boolean; newPredictionId?: string }> {
+  try {
+    console.log('=== AUTO RETRY ===');
+    console.log('Generation ID:', generation.id);
+    console.log('Model:', generation.model_id);
+    console.log('Current retry count:', generation.settings?.auto_retry_count || 0);
+    
+    const model = getModelById(generation.model_id);
+    if (!model) {
+      console.error('Model not found for retry:', generation.model_id);
+      return { success: false };
+    }
+    
+    const replicateClient = getReplicateClient();
+    
+    // Webhook URL
+    const webhookUrl = process.env.NODE_ENV === 'production' 
+      ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
+      : undefined;
+    
+    // Восстанавливаем input для Replicate
+    const replicateInput = generation.replicate_input || {
+      prompt: generation.prompt,
+      ...generation.settings,
+    };
+    
+    // Удаляем наши внутренние поля
+    delete replicateInput.auto_retry_count;
+    
+    const { prediction, tokenId } = await replicateClient.run({
+      model: model.replicateModel,
+      version: model.version,
+      input: replicateInput,
+      webhook: webhookUrl,
+      webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+    });
+    
+    // Обновляем генерацию с новым prediction ID и увеличиваем счётчик ретраев
+    const newRetryCount = (generation.settings?.auto_retry_count || 0) + 1;
+    
+    await supabase
+      .from('generations')
+      .update({
+        replicate_prediction_id: prediction.id,
+        replicate_token_index: tokenId,
+        status: 'processing',
+        error_message: null,
+        settings: {
+          ...generation.settings,
+          auto_retry_count: newRetryCount,
+        },
+      })
+      .eq('id', generation.id);
+    
+    console.log('Auto retry started:', {
+      generationId: generation.id,
+      newPredictionId: prediction.id,
+      retryCount: newRetryCount,
+    });
+    
+    return { success: true, newPredictionId: prediction.id };
+  } catch (error: any) {
+    console.error('Auto retry failed:', error.message);
+    return { success: false };
+  }
 }
 
 // Проверяем, является ли action текстовым (analyze)
@@ -211,8 +314,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } else if (status === 'failed') {
-      updateData.status = 'failed';
-      
       // Детальный разбор ошибки
       let errorMessage = error || 'Unknown error';
       
@@ -224,13 +325,38 @@ export async function POST(request: NextRequest) {
       console.error('Error field:', error);
       console.error('Full body:', JSON.stringify(body, null, 2));
       
+      // Определяем, является ли это ошибкой, которую можно повторить
+      const isRetryableError = !error || error === '' || 
+        error.includes('timeout') || 
+        error.includes('overloaded') ||
+        error.includes('temporarily');
+      
+      // Пробуем автоматический ретрай для нестабильных моделей
+      if (isRetryableError && canAutoRetry(generation)) {
+        console.log('Attempting auto-retry for unstable model...');
+        const retryResult = await performAutoRetry(generation, supabase);
+        
+        if (retryResult.success) {
+          // Ретрай успешно запущен - не обновляем статус как failed
+          console.log('Auto-retry initiated, skipping failed status update');
+          return NextResponse.json({ 
+            success: true, 
+            retried: true,
+            newPredictionId: retryResult.newPredictionId 
+          });
+        }
+        console.log('Auto-retry failed, proceeding with failure status');
+      }
+      
+      updateData.status = 'failed';
+      
       // Улучшенные сообщения об ошибках
       if (!error || error === '') {
         // Replicate часто не даёт причину - проверяем типичные случаи
         const modelName = (generation.model_id || '').toLowerCase();
         
         if (modelName.includes('nano-banana') || modelName.includes('gemini')) {
-          errorMessage = 'Контент заблокирован фильтром безопасности Google. Попробуйте изменить запрос';
+          errorMessage = 'Генерация не удалась. Попробуйте изменить параметры';
         } else if (body.logs?.includes('NSFW') || body.logs?.includes('safety')) {
           errorMessage = 'Контент заблокирован фильтром безопасности';
         } else if (body.logs?.includes('timeout') || body.logs?.includes('exceeded')) {
@@ -238,7 +364,7 @@ export async function POST(request: NextRequest) {
         } else if (body.logs?.includes('memory') || body.logs?.includes('OOM')) {
           errorMessage = 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
         } else {
-          errorMessage = 'Генерация не удалась. Попробуйте изменить параметры или выбрать другую модель';
+          errorMessage = 'Генерация не удалась. Попробуйте изменить параметры';
         }
       }
       

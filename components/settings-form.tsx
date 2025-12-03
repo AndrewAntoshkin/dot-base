@@ -403,7 +403,7 @@ function FileUploader({
         h-12 flex items-center pl-3 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
         ${isDragging 
           ? 'border-white bg-white/5' 
-          : 'border-[#656565] hover:border-white bg-[#101010]'
+          : 'border-[#656565] hover:border-white bg-neutral-900'
         }
       `}
     >
@@ -615,18 +615,31 @@ export function SettingsForm({
   const [selectedIndices, setSelectedIndices] = useState<Record<string, number>>({});
   // Ref для хранения handleSubmit функции (чтобы использовать в useEffect до определения функции)
   const handleSubmitRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // Ref для отслеживания применённых initialData (предотвращает бесконечный цикл)
+  const appliedInitialDataRef = useRef<string>('');
+  // Ref для предыдущего formData (предотвращает лишние вызовы onFormDataChange)
+  const prevFormDataRef = useRef<string>('');
 
-  // Sync initialData to formData when it changes
+  // Sync initialData to formData when it changes (only if actually different)
   React.useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      setFormData(initialData);
+      const initialDataKey = JSON.stringify(initialData) + modelId;
+      // Применяем только если данные реально изменились
+      if (appliedInitialDataRef.current !== initialDataKey) {
+        appliedInitialDataRef.current = initialDataKey;
+        setFormData(initialData);
+      }
     }
   }, [initialData, modelId]);
 
-  // Expose form data to parent
+  // Expose form data to parent (only if actually different)
   React.useEffect(() => {
     if (onFormDataChange && model) {
-      onFormDataChange(formData);
+      const formDataKey = JSON.stringify(formData);
+      if (prevFormDataRef.current !== formDataKey) {
+        prevFormDataRef.current = formDataKey;
+        onFormDataChange(formData);
+      }
     }
   }, [formData, onFormDataChange, model]);
 
@@ -792,7 +805,7 @@ export function SettingsForm({
             placeholder={setting.placeholder || 'Напишите запрос'}
             required={setting.required}
             rows={4}
-            className="bg-[#101010] border-0 rounded-[8px] min-h-[80px]"
+            className="bg-neutral-900 border-0 rounded-[8px] min-h-[80px]"
           />
         );
 
@@ -808,7 +821,7 @@ export function SettingsForm({
             min={setting.min}
             max={setting.max}
             step={setting.step}
-            className="bg-[#101010] border-0 h-12 rounded-[8px]"
+            className="bg-neutral-900 border-0 h-12 rounded-[8px]"
           />
         );
 
@@ -956,7 +969,7 @@ export function SettingsForm({
         if (setting.type === 'checkbox') {
           const Icon = getFieldIcon(setting.name, setting.type);
           return (
-            <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+            <div key={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -979,7 +992,7 @@ export function SettingsForm({
         if (isAspectRatio) {
           const Icon = getFieldIcon(setting.name, setting.type);
           return (
-            <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+            <div key={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
               <TooltipLabel
                 label={setting.label}
                 description={meta.description}
@@ -994,7 +1007,7 @@ export function SettingsForm({
         
         const Icon = getFieldIcon(setting.name, setting.type);
         return (
-          <div key={setting.name} className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+          <div key={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
             {/* Label with tooltip on hover */}
             <TooltipLabel
               label={setting.label}

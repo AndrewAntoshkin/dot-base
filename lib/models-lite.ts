@@ -157,16 +157,16 @@ export function getModelsByActionLite(action: ActionType): ModelLite[] {
  */
 export function getActionLabel(action: ActionType): string {
   const labels: Record<ActionType, string> = {
-    create: 'Создать изображение',
+    create: 'Создать',
     edit: 'Редактировать',
     upscale: 'Улучшить качество',
     remove_bg: 'Удалить фон',
-    video_create: 'Создать видео',
+    video_create: 'Создать',
     video_i2v: 'Картинка → Видео',
-    video_edit: 'Редактировать видео',
-    video_upscale: 'Улучшить видео',
-    analyze_describe: 'Описать изображение',
-    analyze_ocr: 'Извлечь текст (OCR)',
+    video_edit: 'Редактировать',
+    video_upscale: 'Улучшить качество',
+    analyze_describe: 'Описать',
+    analyze_ocr: 'Извлечь текст',
     analyze_prompt: 'Получить промпт',
   };
   return labels[action];

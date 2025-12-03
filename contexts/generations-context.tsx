@@ -27,10 +27,22 @@ interface GenerationsContextType {
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
-// Интервалы polling
-const POLLING_INTERVAL = 10000; // 10 секунд обычно
-const POLLING_INTERVAL_SLOW = 20000; // 20 секунд при ошибках
+// Адаптивные интервалы polling
+const POLLING_ACTIVE = 3000;      // 3 сек - есть активные генерации
+const POLLING_IDLE = 30000;       // 30 сек - нет активных генераций
+const POLLING_BACKGROUND = 60000; // 60 сек - вкладка в фоне
+const POLLING_ERROR = 45000;      // 45 сек - при ошибках соединения
 const MAX_CONSECUTIVE_ERRORS = 3;
+
+/**
+ * Проверка, является ли ошибка AbortError (запрос отменён)
+ */
+function isAbortError(error: any): boolean {
+  return error?.name === 'AbortError' || 
+         error?.code === 'ABORT_ERR' || 
+         error?.message?.includes('aborted') ||
+         error?.message?.includes('abort');
+}
 
 interface GenerationsProviderProps {
   children: ReactNode;
@@ -41,21 +53,57 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isOffline, setIsOffline] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
-  const [isWindowVisible, setIsWindowVisible] = useState(
-    typeof document === 'undefined' ? true : document.visibilityState !== 'hidden'
-  );
-  const [pollInterval, setPollInterval] = useState(POLLING_INTERVAL);
+  const [isWindowVisible, setIsWindowVisible] = useState(true);
+  const [pollInterval, setPollInterval] = useState(POLLING_IDLE);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const consecutiveErrorsRef = useRef(0);
-  const pollIntervalRef = useRef(POLLING_INTERVAL);
+  const pollIntervalRef = useRef(POLLING_IDLE);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  const isWindowVisibleRef = useRef(true);
+  const hasActiveRef = useRef(false);
+
+  // Обновляем refs при изменении props/state
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    isWindowVisibleRef.current = isWindowVisible;
+  }, [isWindowVisible]);
 
   useEffect(() => {
     pollIntervalRef.current = pollInterval;
   }, [pollInterval]);
 
+  /**
+   * Вычислить оптимальный интервал polling на основе текущего состояния
+   * Определён до refreshGenerations чтобы избежать циклической зависимости
+   */
+  const calculateOptimalInterval = useCallback((): number => {
+    // При ошибках - медленный интервал
+    if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+      return POLLING_ERROR;
+    }
+    
+    // Вкладка в фоне - самый медленный
+    if (!isWindowVisibleRef.current) {
+      return POLLING_BACKGROUND;
+    }
+    
+    // Есть активные генерации - быстрый polling
+    if (hasActiveRef.current) {
+      return POLLING_ACTIVE;
+    }
+    
+    // Обычный режим - умеренный интервал
+    return POLLING_IDLE;
+  }, []);
+
+  // refreshGenerations без зависимостей для стабильности
   const refreshGenerations = useCallback(async () => {
-    if (!isAuthenticated || !isWindowVisible) {
+    if (!isAuthenticatedRef.current || !isWindowVisibleRef.current) {
       return;
     }
     // Пропускаем если офлайн
@@ -67,24 +115,41 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     
     setIsOffline(false);
     
+    // Отменяем предыдущий запрос если он ещё выполняется
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     try {
       const response = await fetchWithTimeout('/api/generations/list?limit=20', {
         timeout: 15000, // 15 секунд timeout
         retries: 1,
         credentials: 'include',
+        signal: abortController.signal,
       });
+      
+      // Проверяем что запрос не был отменён
+      if (abortController.signal.aborted) return;
       
       if (response.ok) {
         const data = await response.json();
+        
+        // Ещё одна проверка
+        if (abortController.signal.aborted) return;
+        
         setGenerations(data.generations || []);
         setNetworkError(null);
         
         // Сбрасываем счётчик ошибок при успехе
         consecutiveErrorsRef.current = 0;
         
-        // Возвращаем нормальный интервал
-        if (pollIntervalRef.current !== POLLING_INTERVAL) {
-          setPollInterval(POLLING_INTERVAL);
+        // Пересчитываем оптимальный интервал
+        const newInterval = calculateOptimalInterval();
+        if (pollIntervalRef.current !== newInterval) {
+          setPollInterval(newInterval);
         }
       } else if (response.status === 401) {
         // Не авторизован - не показываем как сетевую ошибку
@@ -93,6 +158,14 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error: any) {
+      // Игнорируем AbortError - это нормальная ситуация
+      if (isAbortError(error)) {
+        return;
+      }
+      
+      // Проверяем что запрос не был отменён
+      if (abortController.signal.aborted) return;
+      
       consecutiveErrorsRef.current++;
       
       console.error('[Generations] Refresh error:', {
@@ -113,13 +186,14 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
           setNetworkError('Проблемы с соединением');
         }
         
-        // Увеличиваем интервал при ошибках
-        if (pollIntervalRef.current !== POLLING_INTERVAL_SLOW) {
-          setPollInterval(POLLING_INTERVAL_SLOW);
+        // Пересчитываем оптимальный интервал
+        const newInterval = calculateOptimalInterval();
+        if (pollIntervalRef.current !== newInterval) {
+          setPollInterval(newInterval);
         }
       }
     }
-  }, [isAuthenticated, isWindowVisible]);
+  }, [calculateOptimalInterval]); // Добавляем calculateOptimalInterval
 
   const addGeneration = useCallback((generation: Generation) => {
     setGenerations((prev) => [generation, ...prev.slice(0, 19)]);
@@ -142,8 +216,11 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
         retries: 1,
         credentials: 'include',
       });
-    } catch (error) {
-      console.error('[Generations] Mark viewed error:', error);
+    } catch (error: any) {
+      // Игнорируем AbortError
+      if (!isAbortError(error)) {
+        console.error('[Generations] Mark viewed error:', error);
+      }
     }
   }, []);
 
@@ -153,6 +230,11 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
   const hasActiveGenerations = unviewedGenerations.some(
     (g) => g.status === 'pending' || g.status === 'processing'
   );
+
+  // Обновляем ref для использования в вычислении интервала
+  useEffect(() => {
+    hasActiveRef.current = hasActiveGenerations;
+  }, [hasActiveGenerations]);
 
   // Подписка на изменения сети
   useEffect(() => {
@@ -169,9 +251,20 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     return unsubscribe;
   }, [refreshGenerations]);
 
-  // Polling
+  // Автоматическое переключение интервала при изменении состояния
   useEffect(() => {
-    if (!isAuthenticated || !isWindowVisible) {
+    if (!isAuthenticated) return;
+    
+    const newInterval = calculateOptimalInterval();
+    if (pollIntervalRef.current !== newInterval) {
+      console.log(`[Generations] Adaptive polling: ${pollIntervalRef.current}ms → ${newInterval}ms (active: ${hasActiveGenerations}, visible: ${isWindowVisible})`);
+      setPollInterval(newInterval);
+    }
+  }, [hasActiveGenerations, isWindowVisible, isAuthenticated, calculateOptimalInterval]);
+
+  // Polling - главный эффект
+  useEffect(() => {
+    if (!isAuthenticated) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -179,7 +272,10 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
       return;
     }
 
+    // Начальная загрузка
     refreshGenerations();
+    
+    // Устанавливаем интервал
     intervalRef.current = setInterval(refreshGenerations, pollInterval);
 
     return () => {
@@ -187,9 +283,14 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      // Отменяем текущий запрос при размонтировании
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
-  }, [refreshGenerations, isAuthenticated, isWindowVisible, pollInterval]);
+  }, [isAuthenticated, pollInterval, refreshGenerations]);
 
+  // Отслеживание видимости окна
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') {
       return;
@@ -198,14 +299,16 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     const handleVisibilityChange = () => {
       const visible = document.visibilityState !== 'hidden';
       setIsWindowVisible(visible);
-      if (visible) {
+      if (visible && isAuthenticatedRef.current) {
         refreshGenerations();
       }
     };
 
     const handleFocus = () => {
       setIsWindowVisible(true);
-      refreshGenerations();
+      if (isAuthenticatedRef.current) {
+        refreshGenerations();
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);

@@ -3512,6 +3512,7 @@ export const VIDEO_EDIT_MODELS: Model[] = [
     name: 'mmaudio',
     displayName: 'MMAudio',
     replicateModel: 'zsxkib/mmaudio',
+    version: '62871fb59889b2d7c13777f08deb3b36bdff88f7e1d53a50ad7694548a41b484',
     action: 'video_edit',
     description: 'Добавить звук к видео с помощью AI',
     settings: [
@@ -3525,15 +3526,15 @@ export const VIDEO_EDIT_MODELS: Model[] = [
         name: 'prompt',
         label: 'Prompt',
         type: 'textarea',
-        placeholder: 'Опишите желаемый звук...',
+        placeholder: 'Describe the sound in English...',
         default: '',
-        description: 'galloping, rain, birds chirping...',
+        description: 'galloping, rain, birds chirping, dog barking...',
       },
       {
         name: 'negative_prompt',
         label: 'Negative Prompt',
         type: 'textarea',
-        placeholder: 'Что исключить...',
+        placeholder: 'What to exclude...',
         default: 'music',
       },
       {

@@ -93,7 +93,7 @@ export function MobileSelect({
           type="button"
           onClick={() => setBottomSheetOpen(true)}
           className={cn(
-            'flex h-12 w-full items-center justify-between rounded-[8px] bg-[#101010] px-3 py-[10px] font-inter font-normal text-[14px] text-white',
+            'flex h-12 w-full items-center justify-between rounded-[8px] bg-neutral-900 px-3 py-2 font-inter font-normal text-[14px] leading-[20px] text-white',
             triggerClassName
           )}
         >
@@ -201,7 +201,7 @@ export function MobileSelect({
     <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
       <SelectPrimitive.Trigger
         className={cn(
-          'flex h-12 w-full items-center justify-between rounded-[8px] bg-[#101010] px-3 py-[10px] font-inter font-normal text-[14px] text-white placeholder:text-[#959595] focus:outline-none focus:border focus:border-white transition-colors',
+          'flex h-12 w-full items-center justify-between rounded-[8px] bg-neutral-900 px-3 py-2 font-inter font-normal text-[14px] leading-[20px] text-white placeholder:text-[#959595] focus:outline-none focus:border focus:border-white transition-colors',
           triggerClassName
         )}
       >

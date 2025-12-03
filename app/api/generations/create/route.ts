@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     console.log('=== CREATE GENERATION START ===');
     
     // Get current user from session
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabaseAuth = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

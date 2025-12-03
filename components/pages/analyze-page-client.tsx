@@ -48,32 +48,44 @@ function AnalyzeContent() {
   useEffect(() => {
     if (!generationIdParam) return;
 
+    let isCancelled = false;
+    const abortController = new AbortController();
+
     const loadGeneration = async () => {
       try {
-        const response = await fetch(`/api/generations/${generationIdParam}`);
+        const response = await fetch(`/api/generations/${generationIdParam}`, {
+          signal: abortController.signal,
+        });
+        
+        if (isCancelled) return;
+        
         if (response.ok) {
           const generation = await response.json();
           
-          // Set action and model
-          setSelectedAction(generation.action);
-          setSelectedModelId(generation.model_id);
+          if (isCancelled) return;
           
-          // Fill form with generation data
+          // Batch all state updates together
+          setCurrentGenerationId(generation.id);
+          setSelectedAction(generation.action as ActionType);
+          setSelectedModelId(generation.model_id);
           setFormData({
             prompt: generation.prompt,
             ...generation.settings,
           });
-          
-          // Show result
-          setCurrentGenerationId(generation.id);
           setMobileActiveTab('output');
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || isCancelled) return;
         console.error('Error loading generation:', error);
       }
     };
 
     loadGeneration();
+    
+    return () => {
+      isCancelled = true;
+      abortController.abort();
+    };
   }, [generationIdParam]);
 
   const handleGenerationCreated = (generationId: string, generation: any) => {

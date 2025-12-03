@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== UPLOAD API START ===');
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabaseAuth = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

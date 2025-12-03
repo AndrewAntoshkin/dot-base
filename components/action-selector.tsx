@@ -1,8 +1,5 @@
 'use client';
 
-// Используем лёгкую версию для быстрой загрузки
-'use client';
-
 import { ActionType, getActionLabel } from '@/lib/models-lite';
 import { Command } from 'lucide-react';
 
@@ -13,7 +10,7 @@ interface ActionSelectorProps {
 }
 
 const IMAGE_ACTIONS: ActionType[] = ['create', 'edit', 'upscale', 'remove_bg'];
-const VIDEO_ACTIONS: ActionType[] = ['video_create', 'video_i2v', 'video_edit', 'video_upscale'];
+const VIDEO_ACTIONS: ActionType[] = ['video_create', 'video_edit', 'video_i2v', 'video_upscale'];
 const ANALYZE_ACTIONS: ActionType[] = ['analyze_describe', 'analyze_ocr', 'analyze_prompt'];
 
 export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelectorProps) {
@@ -24,7 +21,7 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
   const row2 = actions.slice(2, 4);
 
   return (
-    <div className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+    <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
       {/* Label - 10px uppercase with icon */}
       <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
         <Command className="w-3 h-3" />
@@ -43,10 +40,10 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
               className={`
                 flex-1 h-[56px] px-6 py-2 rounded-[16px] 
                 font-inter text-[13px] leading-[18px] text-center text-white
-                transition-all
+                transition-all bg-neutral-900
                 ${value === action 
-                  ? 'bg-[#101010] border border-white' 
-                  : 'bg-[#101010] border border-transparent hover:border-[#404040]'
+                  ? 'border border-white' 
+                  : 'border border-transparent hover:border-[#404040]'
                 }`}
             >
               {getActionLabel(action)}
@@ -65,10 +62,10 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
                 className={`
                   flex-1 h-[56px] px-6 py-2 rounded-[16px] 
                   font-inter text-[13px] leading-[18px] text-center text-white
-                  transition-all
+                  transition-all bg-neutral-900
                   ${value === action 
-                    ? 'bg-[#101010] border border-white' 
-                    : 'bg-[#101010] border border-transparent hover:border-[#404040]'
+                    ? 'border border-white' 
+                    : 'border border-transparent hover:border-[#404040]'
                   }`}
               >
                 {getActionLabel(action)}

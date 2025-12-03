@@ -38,7 +38,17 @@ interface FetchWithTimeoutOptions extends RequestInit {
 }
 
 /**
+ * Проверка, является ли ошибка AbortError
+ */
+function isAbortError(error: any): boolean {
+  return error?.name === 'AbortError' || 
+         error?.code === 'ABORT_ERR' || 
+         error?.message?.includes('aborted');
+}
+
+/**
  * Fetch с поддержкой timeout и retry
+ * Поддерживает внешний signal для отмены запроса при размонтировании компонента
  */
 export async function fetchWithTimeout(
   url: string,
@@ -48,6 +58,7 @@ export async function fetchWithTimeout(
     timeout = getRecommendedTimeout(),
     retries = 2,
     retryDelay = 1000,
+    signal: externalSignal,
     ...fetchOptions
   } = options;
 
@@ -55,12 +66,25 @@ export async function fetchWithTimeout(
   if (!isOnline()) {
     throw new NetworkError('Нет подключения к интернету', 'OFFLINE');
   }
+  
+  // Проверяем, не отменён ли внешний сигнал
+  if (externalSignal?.aborted) {
+    const abortError = new Error('Request aborted');
+    abortError.name = 'AbortError';
+    throw abortError;
+  }
 
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    // Слушаем внешний сигнал отмены
+    const externalAbortHandler = () => controller.abort();
+    if (externalSignal) {
+      externalSignal.addEventListener('abort', externalAbortHandler);
+    }
 
     try {
       const response = await fetch(url, {
@@ -69,26 +93,46 @@ export async function fetchWithTimeout(
       });
       
       clearTimeout(timeoutId);
+      if (externalSignal) {
+        externalSignal.removeEventListener('abort', externalAbortHandler);
+      }
       return response;
     } catch (error: any) {
       clearTimeout(timeoutId);
+      if (externalSignal) {
+        externalSignal.removeEventListener('abort', externalAbortHandler);
+      }
+      
+      // Если внешний сигнал отменил запрос - пробрасываем AbortError без retry
+      if (externalSignal?.aborted) {
+        const abortError = new Error('Request aborted');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
+      
       lastError = error;
 
-      // Логируем ошибку для диагностики
-      console.error(`[Network] Attempt ${attempt + 1}/${retries + 1} failed:`, {
-        url: url.substring(0, 50),
-        error: error.name,
-        message: error.message,
-        online: isOnline(),
-        slowConnection: isSlowConnection(),
-      });
-
-      // Если это timeout
-      if (error.name === 'AbortError') {
-        lastError = new NetworkError(
-          'Превышено время ожидания. Проверьте соединение',
-          'TIMEOUT'
-        );
+      // Если это AbortError от внешнего сигнала - не логируем как ошибку
+      if (isAbortError(error)) {
+        // Это может быть timeout или внешняя отмена
+        // Для timeout создаём специальную ошибку
+        if (!externalSignal?.aborted) {
+          lastError = new NetworkError(
+            'Превышено время ожидания. Проверьте соединение',
+            'TIMEOUT'
+          );
+        } else {
+          throw error; // Внешняя отмена - пробрасываем
+        }
+      } else {
+        // Логируем только не-AbortError ошибки
+        console.error(`[Network] Attempt ${attempt + 1}/${retries + 1} failed:`, {
+          url: url.substring(0, 50),
+          error: error.name,
+          message: error.message,
+          online: isOnline(),
+          slowConnection: isSlowConnection(),
+        });
       }
 
       // Если это сетевая ошибка и есть ещё попытки
@@ -101,6 +145,13 @@ export async function fetchWithTimeout(
         // Проверяем онлайн снова перед retry
         if (!isOnline()) {
           throw new NetworkError('Потеряно подключение к интернету', 'OFFLINE');
+        }
+        
+        // Проверяем внешний сигнал перед retry
+        if (externalSignal?.aborted) {
+          const abortError = new Error('Request aborted');
+          abortError.name = 'AbortError';
+          throw abortError;
         }
       }
     }

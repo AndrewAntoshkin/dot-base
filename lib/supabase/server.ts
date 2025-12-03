@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { Database } from './types';
 
@@ -32,22 +33,32 @@ export async function createServerSupabaseClient() {
   );
 }
 
-// Service role client (for admin operations)
-export function createServiceRoleClient() {
-  return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get() {
-          return undefined;
+/**
+ * Singleton Service Role Client
+ * Повторно использует одно подключение для всех admin операций
+ * Снижает latency и нагрузку на Supabase
+ */
+let serviceRoleClientInstance: SupabaseClient<Database> | null = null;
+
+export function createServiceRoleClient(): SupabaseClient<Database> {
+  if (!serviceRoleClientInstance) {
+    serviceRoleClientInstance = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
         },
-        set() {},
-        remove() {},
-      },
-    }
-  );
+      }
+    );
+    console.log('[Supabase] Service role client initialized (singleton)');
+  }
+  return serviceRoleClientInstance;
 }
+
+// Alias для обратной совместимости
+export const getServiceRoleClient = createServiceRoleClient;
 
 
 

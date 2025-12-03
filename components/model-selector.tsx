@@ -46,7 +46,7 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
   const currentModel = value ? models.find((m) => m.id === value) : null;
 
   return (
-    <div className="bg-[#1a1a1a] rounded-[16px] p-4 flex flex-col gap-2">
+    <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
       {/* Label */}
       <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
         <AlignRight className="w-3 h-3" />

@@ -35,6 +35,16 @@ function isValidMediaUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
 
+/**
+ * Проверка, является ли ошибка AbortError (запрос отменён)
+ */
+function isAbortError(error: any): boolean {
+  return error?.name === 'AbortError' || 
+         error?.code === 'ABORT_ERR' || 
+         error?.message?.includes('aborted') ||
+         error?.message?.includes('abort');
+}
+
 // Интервалы polling с адаптацией под качество сети
 const POLLING_INTERVAL = 5000; // 5 секунд обычно
 const POLLING_INTERVAL_SLOW = 10000; // 10 секунд для медленного соединения
@@ -48,11 +58,17 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
   const [networkError, setNetworkError] = useState<string | null>(null);
   
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const consecutiveErrorsRef = useRef(0);
 
   useEffect(() => {
-    isMountedRef.current = true;
+    // Флаг для отслеживания актуальности этого эффекта
+    let isCurrentEffect = true;
+    
+    // Отменяем предыдущий запрос
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     
     if (pollTimeoutRef.current) {
       clearTimeout(pollTimeoutRef.current);
@@ -67,17 +83,26 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       return;
     }
 
+    // Создаём новый AbortController для этого запроса
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setIsLoading(true);
     setSelectedImageIndex(0);
     setNetworkError(null);
     consecutiveErrorsRef.current = 0;
 
     const fetchGeneration = async () => {
+      // Проверяем что этот эффект ещё актуален
+      if (!isCurrentEffect || abortController.signal.aborted) {
+        return;
+      }
+      
       // Пропускаем если офлайн
       if (!isOnline()) {
-        setNetworkError('Нет подключения к интернету');
-        // Продолжаем polling на случай восстановления
-        if (isMountedRef.current) {
+        if (isCurrentEffect) {
+          setNetworkError('Нет подключения к интернету');
+          // Продолжаем polling на случай восстановления
           pollTimeoutRef.current = setTimeout(fetchGeneration, POLLING_INTERVAL_SLOW);
         }
         return;
@@ -88,56 +113,77 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
           timeout: isSlowConnection() ? 20000 : 10000,
           retries: 1,
           credentials: 'include',
+          signal: abortController.signal,
         });
         
-        if (!response.ok || !isMountedRef.current) return;
+        // Проверяем ещё раз после await
+        if (!isCurrentEffect || abortController.signal.aborted) {
+          return;
+        }
+        
+        if (!response.ok) return;
         
         const data = await response.json();
+        
+        // Финальная проверка перед обновлением стейта
+        if (!isCurrentEffect || abortController.signal.aborted) {
+          return;
+        }
+        
         setGeneration(data);
         setIsLoading(false);
         setNetworkError(null);
         consecutiveErrorsRef.current = 0;
 
         // Polling если обрабатывается
-        if ((data.status === 'processing' || data.status === 'pending') && isMountedRef.current) {
+        if ((data.status === 'processing' || data.status === 'pending') && isCurrentEffect) {
           const interval = isSlowConnection() ? POLLING_INTERVAL_SLOW : POLLING_INTERVAL;
           pollTimeoutRef.current = setTimeout(fetchGeneration, interval);
         }
       } catch (error: any) {
+        // Игнорируем AbortError - это нормальная ситуация при отмене запроса
+        if (isAbortError(error)) {
+          console.log('[OutputPanel] Request aborted (normal during navigation)');
+          return;
+        }
+        
+        // Проверяем актуальность перед обновлением стейта
+        if (!isCurrentEffect || abortController.signal.aborted) {
+          return;
+        }
+        
         console.error('[OutputPanel] Fetch error:', error);
         consecutiveErrorsRef.current++;
         
-        if (isMountedRef.current) {
-          setIsLoading(false);
-          
-          // Показываем ошибку после нескольких попыток
-          if (consecutiveErrorsRef.current >= 3) {
-            if (error.code === 'TIMEOUT') {
-              setNetworkError('Медленное соединение');
-            } else if (error.code === 'OFFLINE') {
-              setNetworkError('Нет подключения');
-            } else {
-              setNetworkError('Ошибка загрузки');
-            }
-          }
-          
-          // Продолжаем polling для processing генераций
-          if (generation?.status === 'processing' || generation?.status === 'pending') {
-            pollTimeoutRef.current = setTimeout(fetchGeneration, POLLING_INTERVAL_SLOW);
+        setIsLoading(false);
+        
+        // Показываем ошибку после нескольких попыток
+        if (consecutiveErrorsRef.current >= 3) {
+          if (error.code === 'TIMEOUT') {
+            setNetworkError('Медленное соединение');
+          } else if (error.code === 'OFFLINE') {
+            setNetworkError('Нет подключения');
+          } else {
+            setNetworkError('Ошибка загрузки');
           }
         }
+        
+        // НЕ продолжаем polling при ошибке - пользователь может обновить вручную
       }
     };
 
     fetchGeneration();
 
     return () => {
-      isMountedRef.current = false;
+      isCurrentEffect = false;
+      // Отменяем текущий запрос при размонтировании или смене generationId
+      abortController.abort();
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
     };
-  }, [generationId]);
+  }, [generationId]); // Убрали лишние зависимости
 
   const handleDownload = async () => {
     const url = generation?.output_urls?.[selectedImageIndex] || generation?.output_urls?.[0];

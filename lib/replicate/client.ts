@@ -165,22 +165,25 @@ export class ReplicateClient {
   }
 
   /**
-   * Проверка, является ли ошибка временной (можно retry)
+   * Проверка, является ли ошибка НЕ восстановимой (не нужно retry)
+   * По умолчанию делаем retry для всех ошибок, кроме явных проблем
    */
-  private isRetryableError(error: any): boolean {
+  private isNonRetryableError(error: any): boolean {
     const message = error.message?.toLowerCase() || '';
-    const retryablePatterns = [
-      'timeout',
-      'rate limit',
-      'too many requests',
-      '429',
-      '503',
-      '502',
-      'temporarily unavailable',
-      'overloaded',
-      'try again',
+    // Эти ошибки точно НЕ нужно повторять
+    const noRetryPatterns = [
+      'invalid token',
+      'authentication',
+      '401',
+      '403',
+      'permission denied',
+      'not found',
+      '404',
+      'does not exist',
+      'is required', // Missing required field
+      'invalid type', // Wrong parameter type
     ];
-    return retryablePatterns.some(pattern => message.includes(pattern));
+    return noRetryPatterns.some(pattern => message.includes(pattern));
   }
 
   /**
@@ -267,23 +270,16 @@ export class ReplicateClient {
           await this.tokenPool.deactivateToken(tokenData.id);
         }
 
-        // Если ошибка НЕ временная - не retry
-        if (!this.isRetryableError(error) && attempt < this.maxRetries) {
-          // Проверяем специфичные ошибки которые не стоит повторять
-          const noRetryPatterns = ['invalid', 'not found', 'does not exist', 'permission'];
-          const shouldNotRetry = noRetryPatterns.some(p => 
-            error.message?.toLowerCase().includes(p)
-          );
-          if (shouldNotRetry) {
-            console.log('Non-retryable error, stopping attempts');
-            break;
-          }
+        // Если ошибка точно не восстановимая - не retry
+        if (this.isNonRetryableError(error)) {
+          console.log('Non-retryable error detected, stopping attempts:', error.message?.substring(0, 100));
+          break;
         }
 
-        // Ждем перед следующей попыткой
+        // Ждем перед следующей попыткой (retry для всех остальных ошибок)
         if (attempt < this.maxRetries) {
           const delay = this.retryDelay * attempt; // Exponential backoff
-          console.log(`Waiting ${delay}ms before retry...`);
+          console.log(`Retryable error, waiting ${delay}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }

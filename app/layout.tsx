@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import { AppProviders } from '@/components/providers/app-providers';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 // Локальный шрифт Inter - работает без VPN, не зависит от Google
@@ -85,9 +86,11 @@ export default async function RootLayout({
   return (
     <html lang="ru">
       <body className={`${inter.variable} font-inter`}>
-        <AppProviders initialUserEmail={userEmail} isAuthenticated={isAuthenticated}>
-          {children}
-        </AppProviders>
+        <ErrorBoundary>
+          <AppProviders initialUserEmail={userEmail} isAuthenticated={isAuthenticated}>
+            {children}
+          </AppProviders>
+        </ErrorBoundary>
       </body>
     </html>
   );
