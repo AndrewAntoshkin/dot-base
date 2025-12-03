@@ -4,6 +4,15 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 // Количество генераций которые оставляем по умолчанию
 const DEFAULT_KEEP_LATEST = 20;
 
+// Тип для генерации из БД
+interface Generation {
+  id: string;
+  model_name: string;
+  created_at: string;
+  output_urls: string[] | null;
+  input_image_url?: string | null;
+}
+
 /**
  * POST /api/admin/cleanup
  * Очистка старых генераций (записи + файлы Storage)
@@ -37,9 +46,8 @@ export async function POST(request: Request) {
     }
 
     // 2. Определяем что удалять
-    type GenerationType = typeof allGenerations[number];
-    const toKeep: GenerationType[] = allGenerations.slice(0, keepLatest);
-    const toDelete: GenerationType[] = allGenerations.slice(keepLatest);
+    const toKeep: Generation[] = allGenerations.slice(0, keepLatest);
+    const toDelete: Generation[] = allGenerations.slice(keepLatest);
 
     if (toDelete.length === 0) {
       return NextResponse.json({ 
