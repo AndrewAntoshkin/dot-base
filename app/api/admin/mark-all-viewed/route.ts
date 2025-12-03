@@ -8,7 +8,7 @@ export async function POST() {
     // Mark all existing generations as viewed
     const { error, count } = await supabase
       .from('generations')
-      .update({ 
+      .update<{ viewed: boolean; viewed_at: string }>({ 
         viewed: true,
         viewed_at: new Date().toISOString()
       })
