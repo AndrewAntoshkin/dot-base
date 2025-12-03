@@ -504,11 +504,11 @@ export default function HistoryPageClient() {
                         </p>
 
                         {/* Дата и кнопки */}
-                        <div className="flex items-end justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
                           <span className="font-inter font-medium text-[10px] lg:text-[12px] text-[#4d4d4d] leading-5 whitespace-nowrap">
                             {formatDateCustom(generation.created_at)}
                           </span>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 self-end sm:self-auto">
                             {/* Кнопка удаления */}
                             <button
                               onClick={(e) => handleDelete(e, generation.id)}
