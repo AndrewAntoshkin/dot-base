@@ -13,6 +13,13 @@ interface Generation {
   input_image_url?: string | null;
 }
 
+// Тип для статистики генерации
+interface GenerationStats {
+  id: string;
+  created_at: string;
+  output_urls: string[] | null;
+}
+
 /**
  * POST /api/admin/cleanup
  * Очистка старых генераций (записи + файлы Storage)
@@ -155,7 +162,7 @@ export async function GET() {
     const supabase = createServiceRoleClient();
 
     // Получить все генерации
-    const { data: generations, error } = await supabase
+    const { data: generationsData, error } = await supabase
       .from('generations')
       .select('id, created_at, output_urls')
       .order('created_at', { ascending: false });
@@ -164,6 +171,8 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const generations: GenerationStats[] = generationsData || [];
+
     // Получить список файлов в Storage
     const { data: storageFiles, error: storageError } = await supabase.storage
       .from('generations')
@@ -171,7 +180,7 @@ export async function GET() {
 
     // Посчитать статистику
     let totalOutputUrls = 0;
-    generations?.forEach(gen => {
+    generations.forEach(gen => {
       if (gen.output_urls && Array.isArray(gen.output_urls)) {
         totalOutputUrls += gen.output_urls.length;
       }
@@ -179,13 +188,13 @@ export async function GET() {
 
     // Группировка по дням
     const byDay: Record<string, number> = {};
-    generations?.forEach(gen => {
+    generations.forEach(gen => {
       const day = new Date(gen.created_at).toISOString().split('T')[0];
       byDay[day] = (byDay[day] || 0) + 1;
     });
 
     return NextResponse.json({
-      totalGenerations: generations?.length || 0,
+      totalGenerations: generations.length,
       totalOutputUrls,
       storageFiles: storageFiles?.length || 0,
       storageError: storageError?.message,
