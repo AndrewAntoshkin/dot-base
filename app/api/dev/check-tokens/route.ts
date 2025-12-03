@@ -16,13 +16,15 @@ export async function GET() {
   try {
     const supabase = createServiceRoleClient();
 
-    const { data: tokens, error } = await supabase
+    const { data, error } = await supabase
       .from('replicate_tokens')
       .select('id, is_active, request_count, error_count, last_used_at, created_at');
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    const tokens = data as { id: number; is_active: boolean; request_count: number; error_count: number; last_used_at: string | null; created_at: string }[] | null;
 
     return NextResponse.json({
       total: tokens?.length || 0,
