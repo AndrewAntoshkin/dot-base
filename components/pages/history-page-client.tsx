@@ -127,6 +127,19 @@ export default function HistoryPageClient() {
     }
   }, [page, activeTab]);
 
+  // Быстрое обновление только счётчиков (отдельный легковесный эндпоинт)
+  const updateCounts = useCallback(async () => {
+    try {
+      const response = await fetch('/api/generations/counts');
+      if (response.ok) {
+        const data = await response.json();
+        setCounts(data);
+      }
+    } catch (error) {
+      console.error('Update counts error:', error);
+    }
+  }, []);
+
   // Сброс страницы при смене таба
   useEffect(() => {
     setPage(1);
@@ -137,9 +150,10 @@ export default function HistoryPageClient() {
     fetchGenerations();
   }, [fetchGenerations]);
 
-  // Polling для обновления при активных генерациях
+  // Polling для обновления - быстрее на табе "В работе" или при активных генерациях
   useEffect(() => {
-    const interval = hasActiveGenerations ? POLLING_ACTIVE : POLLING_IDLE;
+    const needsFastPolling = activeTab === 'processing' || hasActiveGenerations;
+    const interval = needsFastPolling ? POLLING_ACTIVE : POLLING_IDLE;
     
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -154,7 +168,7 @@ export default function HistoryPageClient() {
         clearInterval(pollingRef.current);
       }
     };
-  }, [hasActiveGenerations, fetchGenerations]);
+  }, [hasActiveGenerations, activeTab, fetchGenerations]);
 
   // Supabase Real-time подписка на изменения
   useEffect(() => {
@@ -170,16 +184,35 @@ export default function HistoryPageClient() {
           table: 'generations',
         },
         (payload) => {
-          console.log('[History] Real-time update:', payload.new.id, payload.new.status);
-          setGenerations(prev => 
-            prev.map(g => 
-              g.id === payload.new.id 
-                ? { ...g, ...payload.new as Generation }
-                : g
-            )
-          );
-          // Refresh counts
-          fetchGenerations(true);
+          const newData = payload.new as Generation;
+          console.log('[History] Real-time update:', newData.id, newData.status);
+          
+          // Проверяем, должна ли генерация оставаться в текущем табе
+          const shouldBeInCurrentTab = (gen: Generation) => {
+            switch (activeTab) {
+              case 'processing':
+                return gen.status === 'pending' || gen.status === 'processing';
+              case 'favorites':
+                return gen.is_favorite === true;
+              case 'failed':
+                return gen.status === 'failed';
+              default: // 'all'
+                return true;
+            }
+          };
+          
+          setGenerations(prev => {
+            // Обновляем генерацию
+            const updated = prev.map(g => 
+              g.id === newData.id ? { ...g, ...newData } : g
+            );
+            
+            // Фильтруем - убираем те, что больше не соответствуют табу
+            return updated.filter(shouldBeInCurrentTab);
+          });
+          
+          // Обновляем счётчики (отдельный запрос)
+          updateCounts();
         }
       )
       .subscribe();
@@ -187,7 +220,7 @@ export default function HistoryPageClient() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchGenerations]);
+  }, [activeTab, updateCounts]);
 
   const handleDownload = async (e: React.MouseEvent, url: string, id: string) => {
     e.preventDefault();
