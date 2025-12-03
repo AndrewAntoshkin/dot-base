@@ -425,8 +425,8 @@ export default function HistoryPageClient() {
           </div>
         ) : (
           <>
-            {/* Grid - 5 колонок на desktop, 2 на mobile */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Grid - 5 колонок на xl (1280px+), 4 на lg, 3 на md, 2 на mobile */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {generations.map((generation) => {
                 const isFailed = generation.status === 'failed';
                 const isRetrying = retryingIds.has(generation.id);
