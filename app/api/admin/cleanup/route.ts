@@ -37,8 +37,9 @@ export async function POST(request: Request) {
     }
 
     // 2. Определяем что удалять
-    const toKeep = allGenerations.slice(0, keepLatest);
-    const toDelete = allGenerations.slice(keepLatest);
+    type GenerationType = typeof allGenerations[number];
+    const toKeep: GenerationType[] = allGenerations.slice(0, keepLatest);
+    const toDelete: GenerationType[] = allGenerations.slice(keepLatest);
 
     if (toDelete.length === 0) {
       return NextResponse.json({ 
