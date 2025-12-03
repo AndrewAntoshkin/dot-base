@@ -270,12 +270,14 @@ export async function DELETE(
     const supabase = createServiceRoleClient();
 
     // Получить генерацию только своего пользователя
-    const { data: generation } = await supabase
+    const { data } = await supabase
       .from('generations')
       .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
       .single();
+
+    const generation = data as GenerationRecord | null;
 
     if (!generation) {
       return NextResponse.json(
@@ -309,7 +311,7 @@ export async function DELETE(
             const match = url.match(/\/generations\/([^?]+)/);
             return match ? match[1] : null;
           })
-          .filter(Boolean);
+          .filter((name): name is string => name !== null);
 
         if (fileNames.length > 0) {
           const { error: storageError } = await supabase.storage

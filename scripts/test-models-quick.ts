@@ -189,7 +189,7 @@ async function testModel(replicate: Replicate, config: TestConfig): Promise<Test
       return {
         name: config.name,
         status: 'success',
-        predictionId: prediction.id,
+        predictionId: (prediction as any).id,
         output: result.output,
         duration
       };
@@ -198,8 +198,8 @@ async function testModel(replicate: Replicate, config: TestConfig): Promise<Test
       return {
         name: config.name,
         status: 'failed',
-        predictionId: prediction.id,
-        error: result.error,
+        predictionId: (prediction as any).id,
+        error: result.error as string | undefined,
         duration
       };
     } else {
@@ -207,7 +207,7 @@ async function testModel(replicate: Replicate, config: TestConfig): Promise<Test
       return {
         name: config.name,
         status: 'pending',
-        predictionId: prediction.id,
+        predictionId: (prediction as any).id,
         duration
       };
     }

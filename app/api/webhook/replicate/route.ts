@@ -4,6 +4,23 @@ import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
 
+// Type for generation from DB
+interface GenerationRecord {
+  id: string;
+  user_id: string;
+  status: string;
+  replicate_prediction_id?: string;
+  output_urls?: string[];
+  output_text?: string;
+  error_message?: string;
+  action: string;
+  model_id: string;
+  settings?: Record<string, any>;
+  cost_credits?: number;
+  replicate_input?: Record<string, any>;
+  [key: string]: any;
+}
+
 /**
  * Выполнить операцию с ретраями
  */
@@ -213,9 +230,9 @@ export async function POST(request: NextRequest) {
       return data;
     };
     
-    let generation;
+    let generation: GenerationRecord | null = null;
     try {
-      generation = await withRetry(findGeneration, 3, 1000, 'Find generation');
+      generation = await withRetry(findGeneration, 3, 1000, 'Find generation') as GenerationRecord;
     } catch (findError) {
       console.error('Generation not found for prediction after retries:', predictionId);
       return NextResponse.json({ error: 'Generation not found' }, { status: 404 });
@@ -305,7 +322,7 @@ export async function POST(request: NextRequest) {
       // Вычесть кредиты у пользователя (если функция существует)
       if (updateData.status === 'completed') {
         try {
-          await supabase.rpc('decrement_credits', {
+          await (supabase.rpc as any)('decrement_credits', {
             user_id_param: generation.user_id,
             credits_param: generation.cost_credits || 1,
           });

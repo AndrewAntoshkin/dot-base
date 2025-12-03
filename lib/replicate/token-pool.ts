@@ -8,6 +8,15 @@ interface CachedToken {
   errorCount: number;
 }
 
+// Type for token from DB
+interface TokenRecord {
+  id: number;
+  token: string;
+  request_count: number;
+  error_count: number;
+  is_active?: boolean;
+}
+
 /**
  * Token Pool Manager для распределения нагрузки между токенами Replicate
  * 
@@ -96,7 +105,8 @@ export class ReplicateTokenPool {
       }
 
       if (data && data.length > 0) {
-        this.tokens = data.map(t => ({
+        const tokens = data as TokenRecord[];
+        this.tokens = tokens.map(t => ({
           id: t.id,
           token: t.token,
           lastUsed: 0,
@@ -138,8 +148,8 @@ export class ReplicateTokenPool {
 
     // Обновляем в БД
     const supabase = createServiceRoleClient();
-    await supabase
-      .from('replicate_tokens')
+    await (supabase
+      .from('replicate_tokens') as any)
       .update({
         error_count: cachedToken?.errorCount || 1,
         last_error: errorMessage,
@@ -157,8 +167,8 @@ export class ReplicateTokenPool {
     
     // Обновляем в БД
     const supabase = createServiceRoleClient();
-    await supabase
-      .from('replicate_tokens')
+    await (supabase
+      .from('replicate_tokens') as any)
       .update({ is_active: false })
       .eq('id', tokenId);
     

@@ -13,6 +13,7 @@ import {
   VIDEO_EDIT_MODELS,
   VIDEO_UPSCALE_MODELS,
   ANALYZE_DESCRIBE_MODELS,
+  ActionType,
   ANALYZE_OCR_MODELS,
   ANALYZE_PROMPT_MODELS,
   Model
@@ -102,7 +103,13 @@ async function testModel(model: Model, dryRun: boolean = false): Promise<TestRes
     const input = getTestInput(model);
     
     // Construct the request body matching the API schema
-    const body = {
+    const body: {
+      action: ActionType;
+      model_id: string;
+      prompt: any;
+      settings: Record<string, any>;
+      input_image_url?: string;
+    } = {
       action: model.action,
       model_id: model.id,
       prompt: input.prompt,
