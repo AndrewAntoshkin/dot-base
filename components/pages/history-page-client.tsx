@@ -478,8 +478,8 @@ export default function HistoryPageClient() {
                           </div>
                         )}
                         
-                        {/* Badge модели */}
-                        <div className="absolute top-2 left-2 bg-[#181818] px-1.5 py-1 rounded">
+                        {/* Badge модели - на мобильных внизу слева, на больших экранах вверху */}
+                        <div className="absolute bottom-2 sm:bottom-auto sm:top-2 left-2 bg-[#181818] px-1.5 py-1 rounded">
                           <span className="font-inter font-medium text-[10px] text-[#bbbbbb] uppercase tracking-[-0.2px] leading-4">
                             {generation.model_name}
                           </span>
