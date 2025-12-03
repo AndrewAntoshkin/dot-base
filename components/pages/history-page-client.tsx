@@ -360,8 +360,8 @@ export default function HistoryPageClient() {
             История генераций
           </h1>
           
-          {/* Tabs */}
-          <div className="flex gap-3 border-b border-[#2e2e2e]">
+          {/* Tabs - горизонтальный скролл на мобильных */}
+          <div className="flex gap-3 border-b border-[#2e2e2e] overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
             {TABS.map(tab => {
               const isActive = activeTab === tab.id;
               const count = counts[tab.id];
@@ -371,14 +371,14 @@ export default function HistoryPageClient() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    flex items-center gap-2 py-[10px] px-0 
+                    flex items-center gap-2 py-[10px] px-0 shrink-0
                     ${isActive ? 'border-b-2 border-white' : 'border-b-2 border-transparent'}
                   `}
                 >
                   <div className="flex items-center gap-2 py-1">
                     <span 
                       className={`
-                        font-inter text-[14px] leading-[20px]
+                        font-inter text-[14px] leading-[20px] whitespace-nowrap
                         ${isActive ? 'font-medium text-white' : 'font-normal text-[#959595]'}
                       `}
                     >
