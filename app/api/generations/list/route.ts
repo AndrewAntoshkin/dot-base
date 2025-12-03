@@ -5,6 +5,9 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
+// Tab filter types
+type TabFilter = 'all' | 'processing' | 'favorites' | 'failed';
+
 export async function GET(request: NextRequest) {
   try {
     // Get current user from session
@@ -42,42 +45,91 @@ export async function GET(request: NextRequest) {
     const supabase = createServiceRoleClient();
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
     const action = searchParams.get('action');
-    const status = searchParams.get('status');
+    const tab = (searchParams.get('tab') || 'all') as TabFilter;
 
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Фильтруем по user_id текущего пользователя
+    // Build query based on tab filter
     let query = supabase
       .from('generations')
-      .select('id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed')
+      .select('id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .range(from, to);
+      .order('created_at', { ascending: false });
+
+    // Apply tab filter
+    switch (tab) {
+      case 'processing':
+        query = query.in('status', ['pending', 'processing']);
+        break;
+      case 'favorites':
+        query = query.eq('is_favorite', true);
+        break;
+      case 'failed':
+        query = query.eq('status', 'failed');
+        break;
+      // 'all' - no additional filter
+    }
 
     if (action) {
       query = query.eq('action', action);
     }
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-
-    const { data, error } = await query;
+    // Get paginated data
+    const { data, error } = await query.range(from, to);
 
     if (error) {
       console.error('Supabase error:', error);
       return NextResponse.json({ error: 'Ошибка при загрузке истории' }, { status: 500 });
     }
 
+    // Get counts for all tabs (parallel queries for speed)
+    const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
+      supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'processing']),
+      supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_favorite', true),
+      supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'failed'),
+    ]);
+
+    const counts = {
+      all: allCount.count || 0,
+      processing: processingCount.count || 0,
+      favorites: favoritesCount.count || 0,
+      failed: failedCount.count || 0,
+    };
+
+    // Calculate total pages for current tab
+    let totalForTab = counts.all;
+    if (tab === 'processing') totalForTab = counts.processing;
+    else if (tab === 'favorites') totalForTab = counts.favorites;
+    else if (tab === 'failed') totalForTab = counts.failed;
+
+    const totalPages = Math.ceil(totalForTab / limit) || 1;
+
     return NextResponse.json({
       generations: data || [],
-      total: data?.length || 0,
+      total: totalForTab,
       page,
       limit,
-      totalPages: 1, // Упрощено для скорости
+      totalPages,
+      counts,
     });
   } catch (error: any) {
     console.error('List generations error:', error);
@@ -87,4 +139,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

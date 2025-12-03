@@ -77,6 +77,7 @@ export interface Database {
           viewed_at: string | null;
           replicate_input: Json | null;
           replicate_output: Json | null;
+          is_favorite: boolean;
         };
         Insert: {
           id?: string;
