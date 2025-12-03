@@ -85,35 +85,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Ошибка при загрузке истории' }, { status: 500 });
     }
 
-    // Get counts for all tabs (parallel queries for speed)
-    const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
-      supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
-      supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', ['pending', 'processing']),
-      supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_favorite', true),
-      supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'failed'),
-    ]);
-
-    const counts = {
-      all: allCount.count || 0,
-      processing: processingCount.count || 0,
-      favorites: favoritesCount.count || 0,
-      failed: failedCount.count || 0,
-    };
+    // Get counts - skip if not needed (для silent polling можно пропустить)
+    const skipCounts = searchParams.get('skipCounts') === 'true';
+    
+    let counts = { all: 0, processing: 0, favorites: 0, failed: 0 };
+    
+    if (!skipCounts) {
+      // Parallel count queries (все индексированы)
+      const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
+        supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .in('status', ['pending', 'processing']),
+        supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_favorite', true),
+        supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'failed'),
+      ]);
+      
+      counts = {
+        all: allCount.count || 0,
+        processing: processingCount.count || 0,
+        favorites: favoritesCount.count || 0,
+        failed: failedCount.count || 0,
+      };
+    }
 
     // Calculate total pages for current tab
     let totalForTab = counts.all;

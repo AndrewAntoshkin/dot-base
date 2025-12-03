@@ -104,17 +104,19 @@ export default function HistoryPageClient() {
     g => g.status === 'processing' || g.status === 'pending'
   );
 
-  const fetchGenerations = useCallback(async (silent = false) => {
+  const fetchGenerations = useCallback(async (silent = false, skipCounts = false) => {
     if (!silent) {
       setIsLoading(true);
     }
     try {
-      const response = await fetch(`/api/generations/list?page=${page}&limit=20&tab=${activeTab}`);
+      const url = `/api/generations/list?page=${page}&limit=20&tab=${activeTab}${skipCounts ? '&skipCounts=true' : ''}`
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
         setTotalPages(data.totalPages || 1);
-        if (data.counts) {
+        // Обновляем счётчики только если они пришли (не skipCounts)
+        if (data.counts && (data.counts.all > 0 || data.counts.processing > 0 || data.counts.favorites > 0 || data.counts.failed > 0)) {
           setCounts(data.counts);
         }
       }
