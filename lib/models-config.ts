@@ -1616,13 +1616,7 @@ export const EDIT_MODELS: Model[] = [
           { value: '3:4', label: '3:4' },
         ],
       },
-      {
-        name: 'canvas_size',
-        label: 'Размер канвы',
-        type: 'text',
-        default: '[1000, 1000]',
-        description: '[ширина, высота]',
-      },
+      // canvas_size - сложный параметр, убран из UI (используется aspect_ratio вместо него)
       {
         name: 'seed',
         label: 'Seed',
@@ -3390,8 +3384,8 @@ export const VIDEO_I2V_MODELS: Model[] = [
           { value: '4:3', label: '4:3' },
           { value: '3:4', label: '3:4' },
           { value: '1:1', label: '1:1' },
-          { value: '21:9', label: '21:9' },
         ],
+        description: 'Игнорируется если передано изображение',
       },
       {
         name: 'duration',

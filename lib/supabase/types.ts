@@ -8,12 +8,29 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+// User roles
+export type UserRole = 'user' | 'admin' | 'super_admin';
+
+// Admin stats view
+export interface AdminStats {
+  total_users: number;
+  active_today: number;
+  total_generations: number;
+  generations_today: number;
+  completed_generations: number;
+  failed_generations: number;
+  processing_generations: number;
+  total_credits_spent: number;
+  avg_processing_time_ms: number;
+}
+
 export interface Database {
   public: {
     Tables: {
       users: {
         Row: {
           id: string;
+          email: string | null;
           telegram_username: string;
           telegram_id: number | null;
           telegram_first_name: string | null;
@@ -23,10 +40,11 @@ export interface Database {
           last_login: string;
           is_active: boolean;
           credits: number;
-          role: 'user' | 'admin';
+          role: UserRole;
         };
         Insert: {
           id?: string;
+          email?: string | null;
           telegram_username: string;
           telegram_id?: number | null;
           telegram_first_name?: string | null;
@@ -36,10 +54,11 @@ export interface Database {
           last_login?: string;
           is_active?: boolean;
           credits?: number;
-          role?: 'user' | 'admin';
+          role?: UserRole;
         };
         Update: {
           id?: string;
+          email?: string | null;
           telegram_username?: string;
           telegram_id?: number | null;
           telegram_first_name?: string | null;
@@ -49,7 +68,7 @@ export interface Database {
           last_login?: string;
           is_active?: boolean;
           credits?: number;
-          role?: 'user' | 'admin';
+          role?: UserRole;
         };
       };
       generations: {
@@ -162,17 +181,49 @@ export interface Database {
         };
       };
     };
-    Views: {};
+    Views: {
+      admin_stats: {
+        Row: AdminStats;
+      };
+    };
     Functions: {
       get_next_replicate_token: {
-        Args: {};
+        Args: Record<string, never>;
         Returns: Array<{
           id: number;
           token: string;
         }>;
       };
+      is_admin_or_super: {
+        Args: { user_email: string };
+        Returns: boolean;
+      };
+      is_super_admin: {
+        Args: { user_email: string };
+        Returns: boolean;
+      };
+      get_user_role: {
+        Args: { user_email: string };
+        Returns: string;
+      };
     };
     Enums: {};
   };
+}
+
+// Helper type for user with generation count
+export interface UserWithStats {
+  id: string;
+  email: string | null;
+  telegram_username: string;
+  telegram_first_name: string | null;
+  telegram_last_name: string | null;
+  created_at: string;
+  last_login: string;
+  is_active: boolean;
+  credits: number;
+  role: UserRole;
+  generations_count?: number;
+  total_credits_spent?: number;
 }
 

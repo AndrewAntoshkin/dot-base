@@ -38,16 +38,33 @@ export class ReplicateClient {
   /**
    * Валидация и очистка input параметров
    */
-  private validateAndCleanInput(input: Record<string, any>): Record<string, any> {
+  private validateAndCleanInput(input: Record<string, any>, modelName?: string): Record<string, any> {
     const cleaned = { ...input };
     
-    // Fallback для aspect_ratio: если match_input_image но нет изображения
+    // Модели которые НЕ поддерживают match_input_image
+    // Для них всегда конвертируем в стандартный формат
+    const modelsWithoutMatchInput = [
+      'flux-2-pro',
+      'black-forest-labs/flux-2-pro',
+    ];
+    
+    const modelDoesntSupportMatchInput = modelName && 
+      modelsWithoutMatchInput.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
+    
+    // Fallback для aspect_ratio: если match_input_image
     if (cleaned.aspect_ratio === 'match_input_image') {
       const hasImage = cleaned.image || cleaned.input_image || cleaned.image_input || 
                        cleaned.start_image || cleaned.first_frame_image;
-      if (!hasImage) {
-        console.log('aspect_ratio fallback: match_input_image → 1:1 (no input image)');
+      
+      // Всегда конвертируем для моделей без поддержки ИЛИ если нет изображения
+      if (!hasImage || modelDoesntSupportMatchInput) {
+        console.log(`aspect_ratio fallback: match_input_image → 1:1 (model: ${modelName}, hasImage: ${!!hasImage})`);
         cleaned.aspect_ratio = '1:1';
+      } else {
+        // Даже если есть изображение, некоторые модели не принимают match_input_image
+        // Удаляем параметр чтобы модель сама определила по изображению
+        console.log(`aspect_ratio: removing match_input_image, letting model determine from image`);
+        delete cleaned.aspect_ratio;
       }
     }
     
@@ -77,6 +94,62 @@ export class ReplicateClient {
           }
           console.log(`Converted ${field}: "${input[field]}" → ${cleaned[field]}`);
         }
+      }
+    }
+    
+    // Специальная валидация для duration на видео моделях
+    // Разные модели имеют разные допустимые значения duration
+    if (cleaned.duration !== undefined) {
+      const duration = Number(cleaned.duration);
+      const modelLower = (modelName || '').toLowerCase();
+      
+      // Kling, Wan и Gen4 модели принимают только 5 или 10
+      if (modelLower.includes('kling') || modelLower.includes('wan') || modelLower.includes('gen4')) {
+        if (duration <= 7) {
+          cleaned.duration = 5;
+        } else {
+          cleaned.duration = 10;
+        }
+        console.log(`Duration validated for ${modelName}: ${duration} → ${cleaned.duration}`);
+      }
+      // Hailuo модели принимают 6 или 10
+      else if (modelLower.includes('hailuo') || modelLower.includes('minimax')) {
+        if (duration <= 8) {
+          cleaned.duration = 6;
+        } else {
+          cleaned.duration = 10;
+        }
+        console.log(`Duration validated for ${modelName}: ${duration} → ${cleaned.duration}`);
+      }
+      // Seedance принимает 2-12 (оставляем как есть, но ограничиваем диапазон)
+      else if (modelLower.includes('seedance')) {
+        cleaned.duration = Math.max(2, Math.min(12, Math.round(duration)));
+        console.log(`Duration clamped for ${modelName}: ${duration} → ${cleaned.duration}`);
+      }
+      // Veo принимает 5 или 8
+      else if (modelLower.includes('veo')) {
+        if (duration <= 6) {
+          cleaned.duration = 5;
+        } else {
+          cleaned.duration = 8;
+        }
+        console.log(`Duration validated for ${modelName}: ${duration} → ${cleaned.duration}`);
+      }
+    }
+    
+    // Конвертация canvas_size для bria/expand-image
+    if (cleaned.canvas_size !== undefined && typeof cleaned.canvas_size === 'string') {
+      try {
+        // Парсим строку как JSON array
+        const parsed = JSON.parse(cleaned.canvas_size);
+        if (Array.isArray(parsed) && parsed.length === 2) {
+          cleaned.canvas_size = parsed.map(Number);
+          console.log(`canvas_size converted: ${cleaned.canvas_size}`);
+        }
+      } catch {
+        // Если не удалось распарсить - удаляем
+        console.warn('Invalid canvas_size format, removing');
+        delete cleaned.canvas_size;
       }
     }
     
@@ -194,7 +267,7 @@ export class ReplicateClient {
     tokenId: number;
   }> {
     // Валидация и очистка input
-    const cleanedInput = this.validateAndCleanInput(options.input);
+    const cleanedInput = this.validateAndCleanInput(options.input, options.model);
     
     let lastError: any = null;
     let lastTokenId: number | null = null;

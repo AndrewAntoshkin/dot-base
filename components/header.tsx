@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Loader2, LogOut, WifiOff } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
+import { isAdminEmail } from '@/lib/admin-client';
 
 export function Header() {
   const pathname = usePathname();
@@ -60,7 +61,10 @@ export function Header() {
   }, [isMobileMenuOpen]);
 
   // Get current mode based on pathname
-  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : 'image';
+  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : 'image';
+  
+  // Check if user is admin
+  const isAdmin = useMemo(() => isAdminEmail(userEmail), [userEmail]);
   
   return (
     <>
@@ -117,6 +121,17 @@ export function Header() {
               >
                 Analyze
               </Link>
+              <Link
+                href="/brainstorm"
+                className={`h-10 px-3 rounded flex items-center gap-1.5 font-inter font-medium text-base tracking-[-0.32px] ${
+                  pathname === '/brainstorm' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+                }`}
+              >
+                Brainstorm
+                <span className="bg-[#9e4f1e] px-1.5 py-0.5 rounded-md font-inter font-medium text-xs text-white tracking-[-0.24px]">
+                  βeta
+                </span>
+              </Link>
             </nav>
           </div>
 
@@ -148,13 +163,29 @@ export function Header() {
                 </button>
               )}
 
-              {/* Галерея link - Desktop Only */}
+              {/* История link - Desktop Only */}
               <Link
                 href="/history"
-                className="hidden lg:block px-3 py-2 rounded font-inter font-medium text-base text-white tracking-[-0.32px]"
+                className={`hidden lg:block px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
+                  pathname === '/history' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+                }`}
               >
-                Галерея
+                История
               </Link>
+
+              {/* Dashboard link - Desktop Only, only for admins */}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`hidden lg:block px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
+                    pathname === '/admin' || pathname.startsWith('/admin/') 
+                      ? 'bg-[#1f1f1f] text-white' 
+                      : 'text-white hover:text-white/80'
+                  }`}
+                >
+                  Dashboard
+                </Link>
+              )}
 
               {/* User menu */}
               <div className="relative">
@@ -245,6 +276,20 @@ export function Header() {
             >
               ANALYZE
             </Link>
+            
+            {/* BRAINSTORM */}
+            <Link
+              href="/brainstorm"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white flex items-center gap-2 ${
+                currentMode === 'brainstorm' ? 'bg-black' : ''
+              }`}
+            >
+              BRAINSTORM
+              <span className="bg-[#9e4f1e] px-1.5 py-0.5 rounded-md font-inter font-medium text-xs text-white tracking-[-0.24px]">
+                βeta
+              </span>
+            </Link>
           </div>
           
           {/* Divider */}
@@ -260,6 +305,19 @@ export function Header() {
           >
             Галерея
           </Link>
+          
+          {/* Dashboard - only for admins */}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
+                pathname === '/admin' || pathname.startsWith('/admin/') ? 'bg-black' : ''
+              }`}
+            >
+              Dashboard
+            </Link>
+          )}
         </div>
       )}
 

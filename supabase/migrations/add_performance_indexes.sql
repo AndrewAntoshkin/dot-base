@@ -86,3 +86,4 @@ ANALYZE replicate_tokens;
 -- FROM pg_indexes 
 -- WHERE tablename IN ('generations', 'replicate_tokens');
 
+

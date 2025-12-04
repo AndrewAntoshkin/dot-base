@@ -7,3 +7,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE generations;
 -- Note: If you get an error that the table is already part of the publication,
 -- that means real-time is already enabled.
 
+

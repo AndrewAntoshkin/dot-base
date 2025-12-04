@@ -28,3 +28,4 @@ WHERE action LIKE 'analyze_%';
 COMMENT ON COLUMN generations.output_text IS 'Text output from analyze models (descriptions, OCR results, prompts)';
 
 
+

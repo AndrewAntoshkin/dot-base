@@ -17,3 +17,4 @@ CREATE INDEX IF NOT EXISTS idx_generations_user_failed ON generations(user_id, s
 -- Add index for processing generations (for "In Progress" tab)
 CREATE INDEX IF NOT EXISTS idx_generations_user_processing ON generations(user_id, status) WHERE status IN ('pending', 'processing');
 
+
