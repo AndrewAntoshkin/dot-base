@@ -429,7 +429,6 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               data={currentMediaUrl}
               type="image/svg+xml"
               className="max-w-full max-h-[660px]"
-              onLoad={handleImageLoad}
             >
               {/* Fallback to img if object fails */}
               <img
