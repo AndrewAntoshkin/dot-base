@@ -349,7 +349,6 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
                 data={currentMediaUrl}
                 type="image/svg+xml"
                 className="w-full h-auto"
-                onLoad={handleImageLoad}
               >
                 <img src={currentMediaUrl} alt="Generated SVG" className="w-full h-auto" onLoad={handleImageLoad} />
               </object>
