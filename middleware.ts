@@ -25,7 +25,7 @@ async function getUserRoleFromDb(email: string | null | undefined): Promise<stri
       .from('users')
       .select('role')
       .eq('email', email.toLowerCase())
-      .single();
+      .single() as { data: { role: string } | null };
     
     return data?.role || 'user';
   } catch (error) {

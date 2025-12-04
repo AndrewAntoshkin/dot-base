@@ -24,7 +24,7 @@ export async function getUserRoleFromDb(email: string | null | undefined): Promi
       .from('users')
       .select('role')
       .eq('email', email.toLowerCase())
-      .single();
+      .single() as { data: { role: string } | null };
     
     return (data?.role as UserRole) || 'user';
   } catch (error) {
