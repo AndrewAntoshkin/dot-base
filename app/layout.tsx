@@ -90,7 +90,7 @@ export default async function RootLayout({
         .from('users')
         .select('role')
         .eq('email', user.email)
-        .single();
+        .single() as { data: { role: string } | null };
       
       if (userData?.role) {
         userRole = userData.role as UserRole;
