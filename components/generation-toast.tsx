@@ -160,11 +160,12 @@ export function GenerationToastContainer() {
   const { unviewedGenerations, markAsViewed } = useGenerations();
   const [isHovered, setIsHovered] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const [toastTimers, setToastTimers] = useState<Map<string, number>>(new Map());
+  const [toastTimers] = useState<Map<string, number>>(() => new Map());
 
-  // Filter toasts to show (not dismissed)
+  // Filter toasts to show (not dismissed) - only completed/failed for auto-dismiss
   const toasts: ToastItem[] = unviewedGenerations
     .filter(g => !dismissedIds.has(g.id))
+    .filter(g => g.status === 'completed' || g.status === 'failed' || g.status === 'cancelled')
     .slice(0, 5) // Max 5 toasts
     .map(g => ({
       id: g.id,
@@ -178,11 +179,7 @@ export function GenerationToastContainer() {
     const now = Date.now();
     toasts.forEach(toast => {
       if (!toastTimers.has(toast.id)) {
-        setToastTimers(prev => {
-          const next = new Map(prev);
-          next.set(toast.id, now);
-          return next;
-        });
+        toastTimers.set(toast.id, now);
       }
     });
   }, [toasts, toastTimers]);
@@ -190,14 +187,16 @@ export function GenerationToastContainer() {
   // Auto-dismiss toasts after timeout (only when not hovered)
   useEffect(() => {
     if (isHovered) return; // Don't dismiss while hovering
+    if (toasts.length === 0) return;
     
     const interval = setInterval(() => {
       const now = Date.now();
       const toastsToDismiss: string[] = [];
       
-      toastTimers.forEach((startTime, id) => {
-        if (now - startTime >= AUTO_DISMISS_TIMEOUT) {
-          toastsToDismiss.push(id);
+      toasts.forEach(toast => {
+        const startTime = toastTimers.get(toast.id);
+        if (startTime && now - startTime >= AUTO_DISMISS_TIMEOUT) {
+          toastsToDismiss.push(toast.id);
         }
       });
       
@@ -207,30 +206,22 @@ export function GenerationToastContainer() {
           toastsToDismiss.forEach(id => next.add(id));
           return next;
         });
-        setToastTimers(prev => {
-          const next = new Map(prev);
-          toastsToDismiss.forEach(id => next.delete(id));
-          return next;
-        });
+        toastsToDismiss.forEach(id => toastTimers.delete(id));
       }
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isHovered, toastTimers]);
+  }, [isHovered, toasts, toastTimers]);
 
-  // Reset timers when hover ends (give user another 5 seconds)
+  // Reset timers when hover ends (give user another 3 seconds)
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
-    // Reset all timers to give another 5 seconds after hover ends
+    // Reset all timers to give another 3 seconds after hover ends
     const now = Date.now();
-    setToastTimers(prev => {
-      const next = new Map();
-      toasts.forEach(toast => {
-        next.set(toast.id, now);
-      });
-      return next;
+    toasts.forEach(toast => {
+      toastTimers.set(toast.id, now);
     });
-  }, [toasts]);
+  }, [toasts, toastTimers]);
 
   const handleNavigate = useCallback((id: string) => {
     markAsViewed(id);
