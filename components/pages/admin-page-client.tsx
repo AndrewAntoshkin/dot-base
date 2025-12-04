@@ -350,11 +350,11 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     URL.revokeObjectURL(url);
   };
 
-  // Stats cards data
+  // Stats cards data (ошибки только для super_admin)
   const statsCards = [
     { label: 'Пользователи', value: stats?.totalUsers || 0, change: stats?.activeToday ? `+${stats.activeToday} сегодня` : null },
     { label: 'Генерации', value: stats?.totalGenerations || 0, change: stats?.generationsToday ? `+${stats.generationsToday} сегодня` : null },
-    { label: 'Ошибки', value: stats?.failedGenerations || 0, change: stats?.failedToday ? `+${stats.failedToday} сегодня` : null, isError: true },
+    ...(isSuperAdmin ? [{ label: 'Ошибки', value: stats?.failedGenerations || 0, change: stats?.failedToday ? `+${stats.failedToday} сегодня` : null, isError: true }] : []),
     { label: 'Моделей', value: stats?.uniqueModelsCount || 0, change: null },
   ];
 
@@ -831,8 +831,8 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
         </div>
       )}
 
-      {/* Error Analysis Modal */}
-      {showErrorAnalysis && (
+      {/* Error Analysis Modal (только для super_admin) */}
+      {showErrorAnalysis && isSuperAdmin && (
         <div 
           className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-8"
           onClick={() => setShowErrorAnalysis(false)}
