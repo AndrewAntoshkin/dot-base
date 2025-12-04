@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, LogOut, WifiOff } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
-import { isAdminEmail } from '@/lib/admin-client';
 
 export function Header() {
   const pathname = usePathname();
@@ -18,7 +17,7 @@ export function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { unviewedCount, hasActiveGenerations, isOffline, networkError } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { email: userEmail, setEmail: setUserEmail } = useUser();
+  const { email: userEmail, setEmail: setUserEmail, isAdmin } = useUser();
 
   const handleLogout = useCallback(async () => {
     try {
@@ -63,15 +62,14 @@ export function Header() {
   // Get current mode based on pathname
   const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : 'image';
   
-  // Check if user is admin
-  const isAdmin = useMemo(() => isAdminEmail(userEmail), [userEmail]);
+  // isAdmin теперь приходит из UserContext (роль загружается из БД)
   
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#131313]">
-        <div className="px-4 lg:px-20 py-3 lg:py-3 flex items-center justify-between">
-          {/* Mobile: Hamburger + Logo */}
-          <div className="flex items-center gap-4 lg:gap-6">
+      <header className="sticky top-0 z-50 bg-[#101010] border-b border-[#2f2f2f]">
+        <div className="px-4 lg:px-20 py-3 flex items-center">
+          {/* Left section - Logo (+ hamburger on mobile) */}
+          <div className="flex items-center gap-6 flex-1">
             {/* Hamburger Menu - Mobile Only */}
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -84,151 +82,150 @@ export function Header() {
             </button>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center">
               <Image 
                 src="/LogoBase.svg" 
                 alt="BASE" 
                 width={65} 
                 height={18}
                 priority
-                className="h-4 lg:h-[18px] w-auto"
+                className="h-[18px] w-auto"
               />
             </Link>
-
-            {/* Navigation Links - Desktop Only */}
-            <nav className="hidden lg:flex items-start gap-1">
-              <Link
-                href="/"
-                className={`px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
-                  pathname === '/' ? 'bg-[#1f1f1f] text-white' : 'text-[#656565] hover:text-white'
-                }`}
-              >
-                Image
-              </Link>
-              <Link
-                href="/video"
-                className={`px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
-                  pathname === '/video' ? 'bg-[#1f1f1f] text-white' : 'text-[#656565] hover:text-white'
-                }`}
-              >
-                Video
-              </Link>
-              <Link
-                href="/analyze"
-                className={`px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
-                  pathname === '/analyze' ? 'bg-[#1f1f1f] text-white' : 'text-[#656565] hover:text-white'
-                }`}
-              >
-                Analyze
-              </Link>
-              <Link
-                href="/brainstorm"
-                className={`h-10 px-3 rounded flex items-center gap-1.5 font-inter font-medium text-base tracking-[-0.32px] ${
-                  pathname === '/brainstorm' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-                }`}
-              >
-                Brainstorm
-                <span className="bg-[#9e4f1e] px-1.5 py-0.5 rounded-md font-inter font-medium text-xs text-white tracking-[-0.24px]">
-                  βeta
-                </span>
-              </Link>
-            </nav>
           </div>
 
-          {/* Right side - Status, Галерея (desktop), Avatar */}
-          <div className="flex items-center gap-2 lg:gap-6">
-            <div className="flex items-center gap-2 lg:gap-1 relative">
-              {/* Network status indicator */}
-              {(isOffline || networkError) && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full">
-                  <WifiOff className="w-3.5 h-3.5 text-yellow-500" />
-                  <span className="hidden sm:inline font-inter text-xs text-yellow-500">
-                    {isOffline ? 'Офлайн' : 'Проблемы с сетью'}
-                  </span>
-                </div>
-              )}
-              
-              {/* Generation status indicator - clickable */}
-              {unviewedCount > 0 && (
-                <button
-                  onClick={() => setIsQueueOpen(!isQueueOpen)}
-                  className="border border-[#303030] rounded-full h-8 px-2.5 pr-3 flex items-center gap-2 hover:bg-[#1f1f1f] transition-colors"
-                >
-                  {hasActiveGenerations && (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  )}
-                  <span className="font-inter font-medium text-base text-white tracking-[-0.32px]">
-                    {unviewedCount}
-                  </span>
-                </button>
-              )}
+          {/* Center section - Navigation Links (Desktop Only) - Absolutely centered */}
+          <nav className="hidden lg:flex items-center justify-center gap-2 absolute left-1/2 -translate-x-1/2">
+            <Link
+              href="/"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Image
+            </Link>
+            <Link
+              href="/video"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/video' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Video
+            </Link>
+            <Link
+              href="/analyze"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/analyze' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Analyze
+            </Link>
+            <Link
+              href="/brainstorm"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center gap-2 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/brainstorm' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Brainstorm
+              <span className="bg-[#9e4f1e] px-1.5 py-0.5 rounded-md font-inter font-medium text-xs text-white tracking-[-0.24px] normal-case">
+                βeta
+              </span>
+            </Link>
+          </nav>
 
-              {/* История link - Desktop Only */}
+          {/* Right section - История, Dashboard, Count, Avatar */}
+          <div className="flex items-center gap-3 flex-1 justify-end">
+            {/* Network status indicator */}
+            {(isOffline || networkError) && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full">
+                <WifiOff className="w-3.5 h-3.5 text-yellow-500" />
+                <span className="hidden sm:inline font-inter text-xs text-yellow-500">
+                  {isOffline ? 'Офлайн' : 'Проблемы с сетью'}
+                </span>
+              </div>
+            )}
+
+            {/* История link - Desktop Only */}
+            <Link
+              href="/history"
+              className={`hidden lg:flex h-9 px-3 py-2 rounded-2xl items-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/history' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              История
+            </Link>
+
+            {/* Dashboard link - Desktop Only, only for admins */}
+            {isAdmin && (
               <Link
-                href="/history"
-                className={`hidden lg:block px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
-                  pathname === '/history' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+                href="/admin"
+                className={`hidden lg:flex h-9 px-3 py-2 rounded-2xl items-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                  pathname === '/admin' || pathname.startsWith('/admin/') 
+                    ? 'bg-[#1f1f1f] text-white' 
+                    : 'text-white hover:text-white/80'
                 }`}
               >
-                История
+                Dashboard
               </Link>
-
-              {/* Dashboard link - Desktop Only, only for admins */}
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className={`hidden lg:block px-3 py-2 rounded font-inter font-medium text-base tracking-[-0.32px] ${
-                    pathname === '/admin' || pathname.startsWith('/admin/') 
-                      ? 'bg-[#1f1f1f] text-white' 
-                      : 'text-white hover:text-white/80'
-                  }`}
-                >
-                  Dashboard
-                </Link>
+            )}
+            
+            {/* Generation count indicator */}
+            <button
+              onClick={() => setIsQueueOpen(!isQueueOpen)}
+              className={`w-8 h-8 rounded-full border-2 border-[#434343] flex items-center justify-center transition-colors ${
+                unviewedCount > 0 ? 'hover:border-white/50' : ''
+              }`}
+            >
+              {hasActiveGenerations ? (
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
+              ) : (
+                <span className="font-inter font-medium text-base text-white tracking-[-0.32px]">
+                  {unviewedCount}
+                </span>
               )}
+            </button>
 
-              {/* User menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
-                >
-                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">
-                      {userEmail ? userEmail[0].toUpperCase() : 'U'}
-                    </span>
+            {/* User Avatar */}
+            <div className="relative">
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
+              >
+                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">
+                    {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Dropdown menu */}
+              {isUserMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-xl z-20 overflow-hidden">
+                    {userEmail && (
+                      <div className="px-4 py-3 border-b border-[#2f2f2f]">
+                        <p className="font-inter text-sm text-[#959595]">Вы вошли как:</p>
+                        <p className="font-inter text-sm text-white truncate mt-1">{userEmail}</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-3 flex items-center gap-2 font-inter text-sm text-white hover:bg-[#2f2f2f] transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Выйти
+                    </button>
                   </div>
-                </button>
-
-                {/* Dropdown menu */}
-                {isUserMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    />
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-xl z-20 overflow-hidden">
-                      {userEmail && (
-                        <div className="px-4 py-3 border-b border-[#2f2f2f]">
-                          <p className="font-inter text-sm text-[#959595]">Вы вошли как:</p>
-                          <p className="font-inter text-sm text-white truncate mt-1">{userEmail}</p>
-                        </div>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="w-full px-4 py-3 flex items-center gap-2 font-inter text-sm text-white hover:bg-[#2f2f2f] transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Выйти
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Generations Queue Dropdown */}
-              <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+                </>
+              )}
             </div>
+
+            {/* Generations Queue Dropdown */}
+            <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
           </div>
         </div>
       </header>

@@ -31,6 +31,10 @@ function isVideoUrl(url: string): boolean {
   return videoExtensions.some(ext => url.toLowerCase().includes(ext));
 }
 
+function isSvgUrl(url: string): boolean {
+  return url.toLowerCase().includes('.svg') || url.includes('image/svg');
+}
+
 function isValidMediaUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
 }
@@ -199,7 +203,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       const suffix = generation.output_urls && generation.output_urls.length > 1 
         ? `-${selectedImageIndex + 1}` 
         : '';
-      const extension = isVideoUrl(url) ? 'mp4' : 'png';
+      const extension = isVideoUrl(url) ? 'mp4' : isSvgUrl(url) ? 'svg' : 'png';
       link.download = `generation-${generation.id}${suffix}.${extension}`;
       link.click();
       URL.revokeObjectURL(blobUrl);
@@ -332,12 +336,23 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
 
   // Mobile result
   if (isMobile) {
+    const isSvgMobile = currentMediaUrl ? isSvgUrl(currentMediaUrl) : false;
+    
     return (
       <div className="flex flex-col w-full gap-6">
         {isValidUrl && (
           <div className="relative w-full bg-[#131313] rounded-[12px] overflow-hidden">
             {isVideo ? (
               <video src={currentMediaUrl} controls autoPlay loop muted playsInline className="w-full h-auto" />
+            ) : isSvgMobile ? (
+              <object
+                data={currentMediaUrl}
+                type="image/svg+xml"
+                className="w-full h-auto"
+                onLoad={handleImageLoad}
+              >
+                <img src={currentMediaUrl} alt="Generated SVG" className="w-full h-auto" onLoad={handleImageLoad} />
+              </object>
             ) : (
               <img
                 src={currentMediaUrl}
@@ -401,6 +416,8 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     );
   }
 
+  const isSvg = currentMediaUrl ? isSvgUrl(currentMediaUrl) : false;
+
   // Desktop result
   return (
     <div className="flex flex-col w-full">
@@ -408,6 +425,21 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
         <div className="relative w-full h-[660px] bg-[#0a0a0a] rounded-2xl overflow-hidden mb-4 flex items-center justify-center">
           {isVideo ? (
             <video src={currentMediaUrl} controls autoPlay loop muted className="max-w-full max-h-[660px]" />
+          ) : isSvg ? (
+            <object
+              data={currentMediaUrl}
+              type="image/svg+xml"
+              className="max-w-full max-h-[660px]"
+              onLoad={handleImageLoad}
+            >
+              {/* Fallback to img if object fails */}
+              <img
+                src={currentMediaUrl}
+                alt="Generated SVG"
+                className={imageAspectRatio === 'landscape' ? 'w-full h-auto' : 'h-[660px] w-auto'}
+                onLoad={handleImageLoad}
+              />
+            </object>
           ) : (
             <img
               src={currentMediaUrl}

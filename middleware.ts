@@ -1,14 +1,41 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, createClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Super admin and admin emails (must match lib/admin.ts)
-const SUPER_ADMIN_EMAILS = ['andrew.antoshkin@gmail.com'];
-const ADMIN_EMAILS = ['antonbmx@list.ru'];
+/**
+ * Получить роль пользователя из БД
+ * Используем service role client для middleware
+ */
+async function getUserRoleFromDb(email: string | null | undefined): Promise<string> {
+  if (!email) return 'user';
+  
+  try {
+    // Создаём отдельный клиент для middleware (без cookies)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+    
+    const { data } = await supabase
+      .from('users')
+      .select('role')
+      .eq('email', email.toLowerCase())
+      .single();
+    
+    return data?.role || 'user';
+  } catch (error) {
+    console.error('[Middleware] Error fetching user role:', error);
+    return 'user';
+  }
+}
 
-function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const emailLower = email.toLowerCase();
-  return SUPER_ADMIN_EMAILS.includes(emailLower) || ADMIN_EMAILS.includes(emailLower);
+function isAdminRole(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'super_admin';
 }
 
 // Protected routes that require auth check
@@ -80,10 +107,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin routes - check if user has admin access
+  // Admin routes - check if user has admin access (role from DB)
   if (isAdminPath && user) {
-    const userEmailLower = user.email || '';
-    if (!isAdminEmail(userEmailLower)) {
+    const userRole = await getUserRoleFromDb(user.email);
+    if (!isAdminRole(userRole)) {
       // Redirect non-admin users to home
       const url = request.nextUrl.clone();
       url.pathname = '/';

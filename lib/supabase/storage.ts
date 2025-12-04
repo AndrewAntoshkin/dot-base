@@ -58,6 +58,9 @@ function getMediaTypeInfo(url: string, contentType?: string): { extension: strin
   }
   
   // Определяем формат изображения
+  if (lowercaseUrl.includes('.svg') || contentType === 'image/svg+xml') {
+    return { extension: 'svg', mimeType: 'image/svg+xml', isVideo: false };
+  }
   if (lowercaseUrl.includes('.webp') || contentType === 'image/webp') {
     return { extension: 'webp', mimeType: 'image/webp', isVideo: false };
   }

@@ -62,6 +62,34 @@ export async function POST(request: NextRequest) {
     console.log('User ID:', userId);
     const supabase = createServiceRoleClient();
 
+    // ========================================
+    // ЛИМИТ: Максимум 5 одновременных генераций
+    // ========================================
+    const MAX_CONCURRENT_GENERATIONS = 5;
+    
+    const { count: activeCount, error: countError } = await supabase
+      .from('generations')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('status', ['pending', 'processing']);
+    
+    if (countError) {
+      console.error('Error checking active generations:', countError);
+    }
+    
+    if (activeCount !== null && activeCount >= MAX_CONCURRENT_GENERATIONS) {
+      console.log(`User ${userId} hit concurrent limit: ${activeCount}/${MAX_CONCURRENT_GENERATIONS}`);
+      return NextResponse.json(
+        { 
+          error: `Достигнут лимит одновременных генераций (${MAX_CONCURRENT_GENERATIONS}). Дождитесь завершения текущих генераций.`,
+          code: 'CONCURRENT_LIMIT_EXCEEDED',
+          activeCount,
+          limit: MAX_CONCURRENT_GENERATIONS,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const validatedData = createGenerationSchema.parse(body);
 

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { isAdminEmail } from '@/lib/admin';
+import { getUserRoleFromDb, isAdminRole } from '@/lib/admin';
 import AdminPageClient from '@/components/pages/admin-page-client';
 
 export default async function AdminPage() {
@@ -14,7 +14,10 @@ export default async function AdminPage() {
   
   const email = user.email || null;
   
-  if (!isAdminEmail(email)) {
+  // Получаем роль из БД
+  const role = await getUserRoleFromDb(email);
+  
+  if (!isAdminRole(role)) {
     redirect('/');
   }
   

@@ -15,7 +15,7 @@ import {
   UserCheck,
   Download,
 } from 'lucide-react';
-import { isSuperAdminEmail } from '@/lib/admin-client';
+import { useUser } from '@/contexts/user-context';
 import { UserRole } from '@/lib/supabase/types';
 
 interface AdminStats {
@@ -51,6 +51,14 @@ interface UserGeneration {
   status: string;
 }
 
+interface ErrorItem {
+  id: string;
+  error_message: string;
+  model_name: string;
+  created_at: string;
+  action: string;
+}
+
 interface ErrorAnalysis {
   total: number;
   today: number;
@@ -64,6 +72,7 @@ interface ErrorAnalysis {
     model: string;
     count: number;
   }>;
+  errors: ErrorItem[];
 }
 
 interface AdminPageClientProps {
@@ -93,8 +102,10 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const [showErrorAnalysis, setShowErrorAnalysis] = useState(false);
   const [errorAnalysis, setErrorAnalysis] = useState<ErrorAnalysis | null>(null);
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
+  const [errorModalTab, setErrorModalTab] = useState<'overview' | 'table'>('overview');
   
-  const isSuperAdmin = isSuperAdminEmail(userEmail);
+  // Получаем isSuperAdmin из контекста (роль загружена из БД)
+  const { isSuperAdmin } = useUser();
   const itemsPerPage = 10;
   const generationsPerPage = 10;
 
@@ -401,8 +412,8 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
             <div 
               key={idx}
               onClick={'isError' in card && card.isError ? handleErrorsCardClick : undefined}
-              className={`flex-1 bg-[#1f1f1f] rounded-[20px] p-6 min-w-[200px] ${
-                'isError' in card && card.isError ? 'cursor-pointer hover:bg-[#252525] transition-colors' : ''
+              className={`flex-1 border border-[#2f2f2f] rounded-[20px] p-6 min-w-[200px] ${
+                'isError' in card && card.isError ? 'cursor-pointer hover:bg-[#1f1f1f] transition-colors' : ''
               }`}
             >
               <p className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2] mb-2">
@@ -844,65 +855,147 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
               </button>
             </div>
 
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-[#252525] pb-3">
+              <button
+                onClick={() => setErrorModalTab('overview')}
+                className={`px-4 py-2 rounded-lg font-inter font-medium text-sm transition-colors ${
+                  errorModalTab === 'overview' 
+                    ? 'bg-[#252525] text-white' 
+                    : 'text-[#a2a2a2] hover:text-white'
+                }`}
+              >
+                Обзор
+              </button>
+              <button
+                onClick={() => setErrorModalTab('table')}
+                className={`px-4 py-2 rounded-lg font-inter font-medium text-sm transition-colors ${
+                  errorModalTab === 'table' 
+                    ? 'bg-[#252525] text-white' 
+                    : 'text-[#a2a2a2] hover:text-white'
+                }`}
+              >
+                Таблица
+              </button>
+            </div>
+
             {isLoadingErrors ? (
               <div className="flex-1 flex items-center justify-center text-[#a2a2a2]">
                 Загрузка...
               </div>
             ) : errorAnalysis ? (
-              <div className="flex-1 overflow-auto space-y-6">
-                {/* Summary */}
-                <div className="flex gap-4">
-                  <div className="bg-[#1f1f1f] rounded-xl p-4 flex-1">
-                    <p className="text-[#a2a2a2] text-sm">Всего ошибок</p>
-                    <p className="text-red-400 text-2xl font-semibold">{errorAnalysis.total}</p>
-                  </div>
-                  <div className="bg-[#1f1f1f] rounded-xl p-4 flex-1">
-                    <p className="text-[#a2a2a2] text-sm">Сегодня</p>
-                    <p className="text-red-400 text-2xl font-semibold">{errorAnalysis.today}</p>
-                  </div>
-                </div>
-
-                {/* Top Errors */}
-                <div>
-                  <h4 className="font-inter font-semibold text-[16px] text-white mb-3">
-                    Топ ошибок
-                  </h4>
-                  <div className="space-y-2">
-                    {errorAnalysis.topErrors.map((err, idx) => (
-                      <div key={idx} className="bg-[#1f1f1f] rounded-xl p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-mono break-all">
-                              {err.message}
-                            </p>
-                            <p className="text-[#a2a2a2] text-xs mt-1">
-                              Модели: {err.models.join(', ')}
-                            </p>
-                          </div>
-                          <div className="shrink-0 bg-red-500/20 text-red-400 px-2 py-1 rounded text-sm font-semibold">
-                            {err.count}x
-                          </div>
-                        </div>
+              <>
+                {/* Overview Tab */}
+                {errorModalTab === 'overview' && (
+                  <div className="flex-1 overflow-auto space-y-6">
+                    {/* Summary */}
+                    <div className="flex gap-4">
+                      <div className="bg-[#1f1f1f] rounded-xl p-4 flex-1">
+                        <p className="text-[#a2a2a2] text-sm">Всего ошибок</p>
+                        <p className="text-red-400 text-2xl font-semibold">{errorAnalysis.total}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Errors by Model */}
-                <div>
-                  <h4 className="font-inter font-semibold text-[16px] text-white mb-3">
-                    Ошибки по моделям
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {errorAnalysis.modelErrors.map((item, idx) => (
-                      <div key={idx} className="bg-[#1f1f1f] rounded-xl p-3 flex items-center justify-between">
-                        <span className="text-white text-sm truncate">{item.model}</span>
-                        <span className="text-red-400 font-semibold ml-2">{item.count}</span>
+                      <div className="bg-[#1f1f1f] rounded-xl p-4 flex-1">
+                        <p className="text-[#a2a2a2] text-sm">Сегодня</p>
+                        <p className="text-red-400 text-2xl font-semibold">{errorAnalysis.today}</p>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Top Errors */}
+                    <div>
+                      <h4 className="font-inter font-semibold text-[16px] text-white mb-3">
+                        Топ ошибок
+                      </h4>
+                      <div className="space-y-2">
+                        {errorAnalysis.topErrors.map((err, idx) => (
+                          <div key={idx} className="bg-[#1f1f1f] rounded-xl p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-sm font-mono break-all">
+                                  {err.message}
+                                </p>
+                                <p className="text-[#a2a2a2] text-xs mt-1">
+                                  Модели: {err.models.join(', ')}
+                                </p>
+                              </div>
+                              <div className="shrink-0 bg-red-500/20 text-red-400 px-2 py-1 rounded text-sm font-semibold">
+                                {err.count}x
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Errors by Model */}
+                    <div>
+                      <h4 className="font-inter font-semibold text-[16px] text-white mb-3">
+                        Ошибки по моделям
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {errorAnalysis.modelErrors.map((item, idx) => (
+                          <div key={idx} className="bg-[#1f1f1f] rounded-xl p-3 flex items-center justify-between">
+                            <span className="text-white text-sm truncate">{item.model}</span>
+                            <span className="text-red-400 font-semibold ml-2">{item.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
+
+                {/* Table Tab */}
+                {errorModalTab === 'table' && (
+                  <div className="flex-1 overflow-auto">
+                    <table className="w-full">
+                      <thead className="sticky top-0 bg-[#151515]">
+                        <tr className="border-b border-[#252525]">
+                          <th className="h-11 px-4 text-left">
+                            <span className="font-inter font-semibold text-[12px] text-[#a2a2a2]">
+                              Модель
+                            </span>
+                          </th>
+                          <th className="h-11 px-4 text-left">
+                            <span className="font-inter font-semibold text-[12px] text-[#a2a2a2]">
+                              Ошибка
+                            </span>
+                          </th>
+                          <th className="h-11 px-4 text-left w-[140px]">
+                            <span className="font-inter font-semibold text-[12px] text-[#a2a2a2]">
+                              Дата
+                            </span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {errorAnalysis.errors.map((err) => (
+                          <tr key={err.id} className="border-b border-[#252525] hover:bg-[#1a1a1a]">
+                            <td className="h-[56px] px-4">
+                              <span className="font-inter text-[13px] text-white">
+                                {err.model_name}
+                              </span>
+                            </td>
+                            <td className="h-[56px] px-4">
+                              <p className="font-inter text-[13px] text-[#a2a2a2] font-mono truncate max-w-[400px]" title={err.error_message}>
+                                {err.error_message}
+                              </p>
+                            </td>
+                            <td className="h-[56px] px-4">
+                              <span className="font-inter text-[13px] text-[#a2a2a2]">
+                                {new Date(err.created_at).toLocaleString('ru-RU', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex-1 flex items-center justify-center text-[#a2a2a2]">
                 Не удалось загрузить данные

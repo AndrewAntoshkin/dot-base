@@ -3,7 +3,8 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { AppProviders } from '@/components/providers/app-providers';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import type { UserRole } from '@/contexts/user-context';
 
 // Локальный шрифт Inter - работает без VPN, не зависит от Google
 const inter = localFont({
@@ -71,7 +72,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   let userEmail: string | null = null;
+  let userRole: UserRole = 'user';
   let isAuthenticated = false;
+  
   try {
     const supabase = await createServerSupabaseClient();
     const {
@@ -79,6 +82,20 @@ export default async function RootLayout({
     } = await supabase.auth.getUser();
     userEmail = user?.email ?? null;
     isAuthenticated = !!user;
+    
+    // Получаем роль пользователя из БД
+    if (user?.email) {
+      const serviceClient = createServiceRoleClient();
+      const { data: userData } = await serviceClient
+        .from('users')
+        .select('role')
+        .eq('email', user.email)
+        .single();
+      
+      if (userData?.role) {
+        userRole = userData.role as UserRole;
+      }
+    }
   } catch (error) {
     console.error('Failed to fetch user for layout:', error);
   }
@@ -87,7 +104,11 @@ export default async function RootLayout({
     <html lang="ru">
       <body className={`${inter.variable} font-inter`}>
         <ErrorBoundary>
-          <AppProviders initialUserEmail={userEmail} isAuthenticated={isAuthenticated}>
+          <AppProviders 
+            initialUserEmail={userEmail} 
+            initialUserRole={userRole}
+            isAuthenticated={isAuthenticated}
+          >
             {children}
           </AppProviders>
         </ErrorBoundary>

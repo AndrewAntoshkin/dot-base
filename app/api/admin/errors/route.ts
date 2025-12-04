@@ -83,6 +83,14 @@ export async function GET() {
       today: todayCount,
       topErrors,
       modelErrors: modelErrorsList,
+      // Raw errors list for table view
+      errors: failed?.map(g => ({
+        id: g.id,
+        error_message: g.error_message || 'No error message',
+        model_name: g.model_name,
+        created_at: g.created_at,
+        action: g.action,
+      })) || [],
     });
   } catch (error) {
     console.error('Error analysis failed:', error);

@@ -1,22 +1,63 @@
 /**
  * Server-only admin utilities
- * For client components, use lib/admin-client.ts instead
+ * Роли загружаются из БД, не хардкодятся
+ * 
+ * For client components, use useUser().isAdmin from contexts/user-context.tsx
  */
 
 import { createServiceRoleClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { UserRole } from '@/lib/supabase/types';
-import { isAdminEmail, isSuperAdminEmail, getRoleFromEmail } from './admin-client';
+import { isAdminRole, isSuperAdminRole } from './admin-client';
 
-// Re-export client-safe functions for convenience in server code
-export { isAdminEmail, isSuperAdminEmail, getRoleFromEmail };
+// Re-export helper functions
+export { isAdminRole, isSuperAdminRole };
+
+/**
+ * Получить роль пользователя из БД по email
+ */
+export async function getUserRoleFromDb(email: string | null | undefined): Promise<UserRole> {
+  if (!email) return 'user';
+  
+  try {
+    const supabase = createServiceRoleClient();
+    const { data } = await supabase
+      .from('users')
+      .select('role')
+      .eq('email', email.toLowerCase())
+      .single();
+    
+    return (data?.role as UserRole) || 'user';
+  } catch (error) {
+    console.error('Error fetching user role:', error);
+    return 'user';
+  }
+}
+
+/**
+ * @deprecated Используйте isAdminRole с ролью из getUserRoleFromDb
+ */
+export function isAdminEmail(email: string | null | undefined): boolean {
+  console.warn('isAdminEmail() is deprecated. Use getUserRoleFromDb() + isAdminRole()');
+  return false;
+}
+
+/**
+ * @deprecated Используйте isSuperAdminRole с ролью из getUserRoleFromDb
+ */
+export function isSuperAdminEmail(email: string | null | undefined): boolean {
+  console.warn('isSuperAdminEmail() is deprecated. Use getUserRoleFromDb() + isSuperAdminRole()');
+  return false;
+}
 
 /**
  * Check if current user is admin or super admin
+ * Роль загружается из БД
  */
 export async function checkAdminAccess(): Promise<{
   isAdmin: boolean;
   isSuperAdmin: boolean;
   email: string | null;
+  role: UserRole;
   error?: string;
 }> {
   try {
@@ -24,17 +65,23 @@ export async function checkAdminAccess(): Promise<{
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error || !user) {
-      return { isAdmin: false, isSuperAdmin: false, email: null, error: 'Not authenticated' };
+      return { isAdmin: false, isSuperAdmin: false, email: null, role: 'user', error: 'Not authenticated' };
     }
     
     const email = user.email || null;
-    const isSuperAdmin = isSuperAdminEmail(email);
-    const isAdmin = isAdminEmail(email);
     
-    return { isAdmin, isSuperAdmin, email };
+    // Получаем роль из БД
+    const role = await getUserRoleFromDb(email);
+    
+    return { 
+      isAdmin: isAdminRole(role), 
+      isSuperAdmin: isSuperAdminRole(role), 
+      email,
+      role,
+    };
   } catch (error) {
     console.error('Error checking admin access:', error);
-    return { isAdmin: false, isSuperAdmin: false, email: null, error: 'Server error' };
+    return { isAdmin: false, isSuperAdmin: false, email: null, role: 'user', error: 'Server error' };
   }
 }
 
@@ -173,14 +220,18 @@ export async function getAdminUsers(options?: {
 
 /**
  * Update user role (super admin only can set admin role)
+ * Проверяет роль запрашивающего пользователя из БД
  */
 export async function updateUserRole(
   userId: string,
   newRole: UserRole,
   requestingUserEmail: string
 ): Promise<{ success: boolean; error?: string }> {
+  // Получаем роль запрашивающего пользователя из БД
+  const requestingRole = await getUserRoleFromDb(requestingUserEmail);
+  
   // Only super admin can change roles to admin
-  if (newRole === 'admin' && !isSuperAdminEmail(requestingUserEmail)) {
+  if (newRole === 'admin' && !isSuperAdminRole(requestingRole)) {
     return { success: false, error: 'Only super admin can assign admin role' };
   }
   
