@@ -256,8 +256,11 @@ function HomeContent() {
                   onClick={async () => {
                     if (formRef.current) {
                       setIsGenerating(true);
-                      await formRef.current.submit();
-                      setIsGenerating(false);
+                      try {
+                        await formRef.current.submit();
+                      } finally {
+                        setIsGenerating(false);
+                      }
                     }
                   }}
                   disabled={isGenerating}
@@ -377,8 +380,11 @@ function HomeContent() {
                         onClick={async () => {
                           if (formRef.current) {
                             setIsGenerating(true);
-                            await formRef.current.submit();
-                            setIsGenerating(false);
+                            try {
+                              await formRef.current.submit();
+                            } finally {
+                              setIsGenerating(false);
+                            }
                           }
                         }}
                         disabled={isGenerating}
