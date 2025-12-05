@@ -5,7 +5,7 @@
  */
 
 export type ActionType = 
-  | 'create' | 'edit' | 'upscale' | 'remove_bg'  // Image
+  | 'create' | 'edit' | 'upscale' | 'remove_bg' | 'inpaint'  // Image
   | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale'  // Video
   | 'analyze_describe' | 'analyze_ocr' | 'analyze_prompt';  // Analyze
 
@@ -2259,6 +2259,150 @@ export const REMOVE_BG_MODELS: Model[] = [
 ];
 
 /**
+ * ИНПЕЙНТИНГ - 3 модели
+ * Точечное редактирование с маской
+ */
+export const INPAINT_MODELS: Model[] = [
+  // 1. Bria GenFill - стабильная и качественная
+  {
+    id: 'bria-genfill-inpaint',
+    name: 'bria-genfill-inpaint',
+    displayName: 'Bria GenFill',
+    replicateModel: 'bria/genfill',
+    action: 'inpaint',
+    runs: '8.6K runs',
+    price: '$0.04 per image',
+    description: 'Добавление объектов и трансформация',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'mask',
+        label: 'Маска',
+        type: 'file',
+        required: true,
+        description: 'Область для заполнения',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Что добавить в область маски...',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 2. FLUX Fill Pro
+  {
+    id: 'flux-fill-pro',
+    name: 'flux-fill-pro',
+    displayName: 'FLUX Fill Pro',
+    replicateModel: 'black-forest-labs/flux-fill-pro',
+    action: 'inpaint',
+    runs: '3.4M runs',
+    price: '$0.05 per image',
+    description: 'Профессиональный инпейнтинг (лучшее качество)',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'mask',
+        label: 'Маска',
+        type: 'file',
+        required: true,
+        description: 'Чёрное = сохранить, Белое = изменить',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Что сгенерировать в выделенной области...',
+      },
+      {
+        name: 'steps',
+        label: 'Шаги',
+        type: 'slider',
+        default: 50,
+        min: 15,
+        max: 50,
+      },
+      {
+        name: 'guidance',
+        label: 'Guidance',
+        type: 'slider',
+        default: 60,
+        min: 2,
+        max: 100,
+      },
+      {
+        name: 'output_format',
+        label: 'Формат',
+        type: 'select',
+        default: 'jpg',
+        options: [
+          { value: 'jpg', label: 'JPEG' },
+          { value: 'png', label: 'PNG' },
+        ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Оставьте пустым для случайного',
+      },
+    ],
+  },
+
+  // 3. Bria Eraser (для удаления объектов)
+  {
+    id: 'bria-eraser-inpaint',
+    name: 'bria-eraser-inpaint',
+    displayName: 'Bria Eraser',
+    replicateModel: 'bria/eraser',
+    action: 'inpaint',
+    runs: '165.9K runs',
+    price: '$0.04 per image',
+    description: 'Удаление объектов с маской',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'mask',
+        label: 'Маска',
+        type: 'file',
+        required: true,
+        description: 'Область для удаления',
+      },
+    ],
+  },
+];
+
+/**
  * СОЗДАТЬ ВИДЕО (Text-to-Video) - 7 моделей
  */
 export const VIDEO_CREATE_MODELS: Model[] = [
@@ -4044,6 +4188,7 @@ export const ALL_MODELS: Model[] = [
   ...UPSCALE_MODELS,
   ...EDIT_MODELS,
   ...REMOVE_BG_MODELS,
+  ...INPAINT_MODELS,
   ...VIDEO_CREATE_MODELS,
   ...VIDEO_I2V_MODELS,
   ...VIDEO_EDIT_MODELS,
@@ -4066,6 +4211,8 @@ export function getModelsByAction(action: ActionType): Model[] {
       return EDIT_MODELS;
     case 'remove_bg':
       return REMOVE_BG_MODELS;
+    case 'inpaint':
+      return INPAINT_MODELS;
     case 'video_create':
       return VIDEO_CREATE_MODELS;
     case 'video_i2v':
@@ -4101,6 +4248,7 @@ export function getActionLabel(action: ActionType): string {
     edit: 'Редактировать',
     upscale: 'Улучшить качество',
     remove_bg: 'Удалить фон',
+    inpaint: 'Инпейнтинг',
     video_create: 'Создать видео',
     video_i2v: 'Картинка → Видео',
     video_edit: 'Редактировать видео',

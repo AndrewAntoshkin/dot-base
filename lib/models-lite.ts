@@ -7,7 +7,7 @@
  */
 
 export type ActionType = 
-  | 'create' | 'edit' | 'upscale' | 'remove_bg'  // Image
+  | 'create' | 'edit' | 'upscale' | 'remove_bg' | 'inpaint'  // Image
   | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale'  // Video
   | 'analyze_describe' | 'analyze_ocr' | 'analyze_prompt';  // Analyze
 
@@ -63,6 +63,12 @@ export const REMOVE_BG_MODELS_LITE: ModelLite[] = [
   { id: 'lucataco-remove-bg', displayName: 'Remove BG', description: 'Простое удаление фона', action: 'remove_bg' },
   { id: 'bria-remove-background', displayName: 'Bria Remove BG', description: 'Bria AI - профессиональное удаление', action: 'remove_bg' },
   { id: 'birefnet', displayName: 'BiRefNet', description: 'Точная сегментация для сложных объектов', action: 'remove_bg' },
+];
+
+export const INPAINT_MODELS_LITE: ModelLite[] = [
+  { id: 'bria-genfill-inpaint', displayName: 'Bria GenFill', description: 'Добавление объектов и трансформация', action: 'inpaint' },
+  { id: 'flux-fill-pro', displayName: 'FLUX Fill Pro', description: 'Профессиональный инпейнтинг (лучшее качество)', action: 'inpaint' },
+  { id: 'bria-eraser-inpaint', displayName: 'Bria Eraser', description: 'Удаление объектов с маской', action: 'inpaint' },
 ];
 
 export const VIDEO_CREATE_MODELS_LITE: ModelLite[] = [
@@ -133,6 +139,8 @@ export function getModelsByActionLite(action: ActionType): ModelLite[] {
       return EDIT_MODELS_LITE;
     case 'remove_bg':
       return REMOVE_BG_MODELS_LITE;
+    case 'inpaint':
+      return INPAINT_MODELS_LITE;
     case 'video_create':
       return VIDEO_CREATE_MODELS_LITE;
     case 'video_i2v':
