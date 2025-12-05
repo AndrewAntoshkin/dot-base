@@ -169,6 +169,7 @@ export function getActionLabel(action: ActionType): string {
     edit: 'Редактировать',
     upscale: 'Улучшить качество',
     remove_bg: 'Удалить фон',
+    inpaint: 'Инпейнтинг',
     video_create: 'Создать',
     video_i2v: 'Картинка → Видео',
     video_edit: 'Редактировать',
