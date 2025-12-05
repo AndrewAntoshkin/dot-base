@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 const createGenerationSchema = z.object({
   action: z.enum([
-    'create', 'edit', 'upscale', 'remove_bg',
+    'create', 'edit', 'upscale', 'remove_bg', 'inpaint',
     'video_create', 'video_i2v', 'video_edit', 'video_upscale',
     'analyze_describe', 'analyze_ocr', 'analyze_prompt'
   ]),
@@ -143,6 +143,48 @@ export async function POST(request: NextRequest) {
       }
       
       console.log('Remove BG: Image URL =', replicateInput.image?.substring(0, 100) + '...');
+    }
+    
+    // Для inpaint моделей убедимся что изображение и маска присутствуют
+    if (validatedData.action === 'inpaint') {
+      if (!replicateInput.image) {
+        console.error('Inpaint: No image provided');
+        return NextResponse.json(
+          { error: 'Требуется загрузить изображение' },
+          { status: 400 }
+        );
+      }
+      
+      if (!replicateInput.mask) {
+        console.error('Inpaint: No mask provided');
+        return NextResponse.json(
+          { error: 'Требуется нарисовать маску' },
+          { status: 400 }
+        );
+      }
+      
+      // FLUX Fill Pro: добавляем дефолтные значения и валидируем
+      if (model.replicateModel === 'black-forest-labs/flux-fill-pro') {
+        // Дефолтные значения согласно документации Replicate
+        if (!replicateInput.steps) {
+          replicateInput.steps = 50;
+        }
+        if (!replicateInput.guidance) {
+          replicateInput.guidance = 60;
+        }
+        // output_format: только jpg или png
+        if (!replicateInput.output_format || !['jpg', 'png'].includes(replicateInput.output_format)) {
+          replicateInput.output_format = 'jpg';
+        }
+        console.log('FLUX Fill Pro params:', {
+          steps: replicateInput.steps,
+          guidance: replicateInput.guidance,
+          output_format: replicateInput.output_format,
+        });
+      }
+      
+      console.log('Inpaint: Image URL =', replicateInput.image?.substring(0, 100) + '...');
+      console.log('Inpaint: Mask URL =', replicateInput.mask?.substring(0, 100) + '...');
     }
 
     // Создать запись в БД
