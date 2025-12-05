@@ -60,7 +60,7 @@ export function Header() {
   }, [isMobileMenuOpen]);
 
   // Get current mode based on pathname
-  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : 'image';
+  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : 'image';
   
   // isAdmin теперь приходит из UserContext (роль загружается из БД)
   
@@ -127,9 +127,14 @@ export function Header() {
               }`}
             >
               Brainstorm
-              <span className="bg-[#9e4f1e] px-1.5 py-0.5 rounded-md font-inter font-medium text-xs text-white tracking-[-0.24px] normal-case">
-                βeta
-              </span>
+            </Link>
+            <Link
+              href="/inpaint"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center gap-2 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/inpaint' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Inpaint
             </Link>
           </nav>
 
@@ -283,9 +288,17 @@ export function Header() {
               }`}
             >
               BRAINSTORM
-              <span className="bg-[#9e4f1e] px-1.5 py-0.5 rounded-md font-inter font-medium text-xs text-white tracking-[-0.24px]">
-                βeta
-              </span>
+            </Link>
+            
+            {/* INPAINT */}
+            <Link
+              href="/inpaint"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white flex items-center gap-2 ${
+                currentMode === 'inpaint' ? 'bg-black' : ''
+              }`}
+            >
+              INPAINT
             </Link>
           </div>
           
