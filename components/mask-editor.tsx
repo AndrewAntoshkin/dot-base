@@ -143,6 +143,7 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
     maskCtx.putImageData(history[newIndex].imageData, 0, 0);
     setHistoryIndex(newIndex);
     exportMask();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyIndex, history]);
 
   // Redo
@@ -159,6 +160,7 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
     maskCtx.putImageData(history[newIndex].imageData, 0, 0);
     setHistoryIndex(newIndex);
     exportMask();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyIndex, history]);
 
   // Clear mask
@@ -172,6 +174,7 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     saveToHistory();
     exportMask();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveToHistory]);
 
   // Export mask as data URL (scaled to original image size)
