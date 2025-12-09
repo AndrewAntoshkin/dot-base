@@ -4,8 +4,8 @@
  * Обновлено: 2025-11-26
  */
 
-export type ActionType = 
-  | 'create' | 'edit' | 'upscale' | 'remove_bg' | 'inpaint'  // Image
+export type ActionType =
+  | 'create' | 'edit' | 'upscale' | 'remove_bg' | 'inpaint' | 'expand'  // Image
   | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale'  // Video
   | 'analyze_describe' | 'analyze_ocr' | 'analyze_prompt';  // Analyze
 
@@ -17,7 +17,8 @@ export type SettingType =
   | 'select' 
   | 'checkbox' 
   | 'file'
-  | 'file_array';
+  | 'file_array'
+  | 'directional_expand';
 
 export interface ModelSetting {
   name: string;
@@ -268,6 +269,109 @@ export const CREATE_MODELS: Model[] = [
           { value: 'auto', label: 'Авто (серии, вариации)' },
         ],
         description: 'Включите для генерации нескольких связанных изображений.',
+      },
+    ],
+  },
+
+  // 3. SeeDream 4.5
+  {
+    id: 'seedream-4.5',
+    name: 'seedream-4.5',
+    displayName: 'SeeDream 4.5',
+    replicateModel: 'bytedance/seedream-4.5',
+    action: 'create',
+    runs: '43.1K runs',
+    price: '$0.03 per image',
+    description: 'ByteDance - улучшенная модель с лучшим пониманием пространства и знаний',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изображение...',
+        description: 'Текстовое описание для генерации. Опишите, что хотите создать.',
+      },
+      {
+        name: 'image_input',
+        label: 'Референсные изображения',
+        type: 'file_array',
+        description: '1-14 референсных изображений для img2img.',
+        maxFiles: 14,
+      },
+      {
+        name: 'size',
+        label: 'Разрешение',
+        type: 'select',
+        default: '2K',
+        options: [
+          { value: '2K', label: '2K (2048px)' },
+          { value: '4K', label: '4K (4096px)' },
+          { value: 'custom', label: 'Свой размер' },
+        ],
+        description: 'Выходное разрешение. Выше = лучше качество, но медленнее.',
+      },
+      {
+        name: 'width',
+        label: 'Ширина',
+        type: 'slider',
+        default: 2048,
+        min: 1024,
+        max: 4096,
+        step: 64,
+        description: 'Точная ширина в пикселях. Работает только при выборе "Свой размер".',
+      },
+      {
+        name: 'height',
+        label: 'Высота',
+        type: 'slider',
+        default: 2048,
+        min: 1024,
+        max: 4096,
+        step: 64,
+        description: 'Точная высота в пикселях. Работает только при выборе "Свой размер".',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Формат (Aspect Ratio)',
+        type: 'select',
+        default: 'match_input_image',
+        options: [
+          { value: 'match_input_image', label: 'Как входное изображение' },
+          { value: '1:1', label: '1:1' },
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+        ],
+        description: 'Соотношение сторон. Не используется при size=custom.',
+      },
+      {
+        name: 'sequential_image_generation',
+        label: 'Групповая генерация',
+        type: 'select',
+        default: 'disabled',
+        options: [
+          { value: 'disabled', label: 'Выключено' },
+          { value: 'auto', label: 'Авто (серии, вариации)' },
+        ],
+        description: 'Включите для генерации нескольких связанных изображений.',
+      },
+      {
+        name: 'max_images',
+        label: 'Макс. изображений',
+        type: 'slider',
+        default: 1,
+        min: 1,
+        max: 15,
+        description: 'Максимальное количество изображений при sequential_image_generation=auto. Общее количество (входные + сгенерированные) не может превышать 15.',
+      },
+      {
+        name: 'enhance_prompt',
+        label: 'Улучшить промпт',
+        type: 'checkbox',
+        default: true,
+        description: 'AI улучшит ваш промпт для более качественного результата (может увеличить время генерации).',
       },
     ],
   },
@@ -1124,7 +1228,8 @@ export const CREATE_MODELS: Model[] = [
         name: 'reference_images',
         label: 'Референсные изображения',
         type: 'file_array',
-        description: 'До 3 изображений для сохранения персонажа/локации',
+        required: true,
+        description: '⚠️ ОБЯЗАТЕЛЬНО! До 3 изображений для сохранения стиля',
         maxFiles: 3,
       },
       {
@@ -1360,7 +1465,91 @@ export const EDIT_MODELS: Model[] = [
     ],
   },
 
-  // 4. Bria Eraser
+  // 4. SeeDream 4.5 (Edit)
+  {
+    id: 'seedream-4.5-edit',
+    name: 'seedream-4.5',
+    displayName: 'SeeDream 4.5',
+    replicateModel: 'bytedance/seedream-4.5',
+    action: 'edit',
+    runs: '43.1K runs',
+    price: '$0.03 per image',
+    description: 'ByteDance - улучшенное редактирование с лучшим пониманием пространства',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изменения одним предложением...',
+        description: 'Текстовое описание изменений, которые нужно внести в изображение.',
+      },
+      {
+        name: 'image_input',
+        label: 'Изображения',
+        type: 'file_array',
+        required: true,
+        description: '1-14 изображений для редактирования',
+        maxFiles: 14,
+      },
+      {
+        name: 'size',
+        label: 'Разрешение',
+        type: 'select',
+        default: '2K',
+        options: [
+          { value: '2K', label: '2K (2048px)' },
+          { value: '4K', label: '4K (4096px)' },
+          { value: 'custom', label: 'Свой размер' },
+        ],
+        description: 'Выходное разрешение. Выше = лучше качество, но медленнее.',
+      },
+      {
+        name: 'width',
+        label: 'Ширина',
+        type: 'slider',
+        default: 2048,
+        min: 1024,
+        max: 4096,
+        step: 64,
+        description: 'Точная ширина в пикселях. Работает только при выборе "Свой размер".',
+      },
+      {
+        name: 'height',
+        label: 'Высота',
+        type: 'slider',
+        default: 2048,
+        min: 1024,
+        max: 4096,
+        step: 64,
+        description: 'Точная высота в пикселях. Работает только при выборе "Свой размер".',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: 'match_input_image',
+        options: [
+          { value: 'match_input_image', label: 'Как входное' },
+          { value: '1:1', label: '1:1' },
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+        ],
+        description: 'Соотношение сторон. Не используется при size=custom.',
+      },
+      {
+        name: 'enhance_prompt',
+        label: 'Улучшить промпт',
+        type: 'checkbox',
+        default: true,
+        description: 'AI улучшит ваш промпт для более качественного результата (может увеличить время генерации).',
+      },
+    ],
+  },
+
+  // 5. Bria Eraser
   {
     id: 'bria-eraser',
     name: 'bria-eraser',
@@ -1580,10 +1769,10 @@ export const EDIT_MODELS: Model[] = [
     name: 'bria-expand',
     displayName: 'Bria Expand',
     replicateModel: 'bria/expand-image',
-    action: 'edit',
+    action: 'expand',
     runs: '103.4K runs',
     price: '$0.04 per image',
-    description: 'Расширение границ изображения',
+    description: 'Расширение границ изображения с AI генерацией',
     settings: [
       {
         name: 'image',
@@ -1604,20 +1793,6 @@ export const EDIT_MODELS: Model[] = [
         placeholder: 'Что исключить...',
       },
       {
-        name: 'aspect_ratio',
-        label: 'Соотношение сторон',
-        type: 'select',
-        default: '1:1',
-        options: [
-          { value: '1:1', label: '1:1' },
-          { value: '16:9', label: '16:9' },
-          { value: '9:16', label: '9:16' },
-          { value: '4:3', label: '4:3' },
-          { value: '3:4', label: '3:4' },
-        ],
-      },
-      // canvas_size - сложный параметр, убран из UI (используется aspect_ratio вместо него)
-      {
         name: 'seed',
         label: 'Seed',
         type: 'number',
@@ -1627,6 +1802,53 @@ export const EDIT_MODELS: Model[] = [
         label: 'Сохранить прозрачность',
         type: 'checkbox',
         default: true,
+      },
+    ],
+  },
+
+  // 7b. Outpainter (zsxkib)
+  {
+    id: 'outpainter',
+    name: 'outpainter',
+    displayName: 'Outpainter',
+    replicateModel: 'zsxkib/outpainter',
+    action: 'expand',
+    runs: '12K runs',
+    price: '$0.05 per image',
+    description: 'Outpaint в каждом направлении (top, bottom, left, right)',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        default: 'Continue the image',
+        placeholder: 'Опишите что должно появиться в расширенных областях...',
+      },
+      {
+        name: 'steps',
+        label: 'Steps',
+        type: 'slider',
+        default: 50,
+        min: 15,
+        max: 50,
+        step: 1,
+        description: 'Качество vs скорость',
+      },
+      {
+        name: 'guidance',
+        label: 'Guidance',
+        type: 'slider',
+        default: 30,
+        min: 1.5,
+        max: 100,
+        step: 0.5,
+        description: 'Сила следования промпту',
       },
     ],
   },
@@ -4213,6 +4435,8 @@ export function getModelsByAction(action: ActionType): Model[] {
       return REMOVE_BG_MODELS;
     case 'inpaint':
       return INPAINT_MODELS;
+    case 'expand':
+      return ALL_MODELS.filter(m => m.action === 'expand');
     case 'video_create':
       return VIDEO_CREATE_MODELS;
     case 'video_i2v':
@@ -4249,6 +4473,7 @@ export function getActionLabel(action: ActionType): string {
     upscale: 'Улучшить качество',
     remove_bg: 'Удалить фон',
     inpaint: 'Инпейнтинг',
+    expand: 'Расширить изображение',
     video_create: 'Создать видео',
     video_i2v: 'Картинка → Видео',
     video_edit: 'Редактировать видео',

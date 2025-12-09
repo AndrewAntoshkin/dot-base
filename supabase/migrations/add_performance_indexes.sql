@@ -87,3 +87,6 @@ ANALYZE replicate_tokens;
 -- WHERE tablename IN ('generations', 'replicate_tokens');
 
 
+
+
+

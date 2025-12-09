@@ -102,3 +102,6 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 COMMENT ON COLUMN users.role IS 'User role: user, admin, or super_admin. Managed via admin panel or SQL. No longer hardcoded!';
 
+
+
+

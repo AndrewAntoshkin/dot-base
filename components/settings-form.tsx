@@ -37,6 +37,58 @@ import {
   LucideIcon,
 } from 'lucide-react';
 import { AspectRatioSelector } from './aspect-ratio-selector';
+import { DirectionalExpandSelector, ExpandDirection } from './directional-expand-selector';
+
+// Helper function to get image dimensions
+function getImageDimensions(imageSrc: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = reject;
+    img.src = imageSrc;
+  });
+}
+
+// Wrapper component for directional expand selector with image dimensions loading
+function DirectionalExpandSelectorWrapper({
+  imageUrl,
+  value,
+  onChange,
+  expandAmount,
+  onExpandAmountChange,
+}: {
+  imageUrl?: string | null;
+  value: ExpandDirection;
+  onChange: (direction: ExpandDirection) => void;
+  expandAmount: number;
+  onExpandAmountChange: (amount: number) => void;
+}) {
+  const [imageDimensions, setImageDimensions] = React.useState<{ width?: number; height?: number }>({});
+  
+  React.useEffect(() => {
+    if (imageUrl) {
+      getImageDimensions(imageUrl)
+        .then(dims => setImageDimensions(dims))
+        .catch(() => setImageDimensions({}));
+    } else {
+      setImageDimensions({});
+    }
+  }, [imageUrl]);
+  
+  return (
+    <DirectionalExpandSelector
+      value={value}
+      onChange={onChange}
+      expandAmount={expandAmount}
+      onExpandAmountChange={onExpandAmountChange}
+      imageWidth={imageDimensions.width}
+      imageHeight={imageDimensions.height}
+      imageUrl={imageUrl}
+    />
+  );
+}
 
 // Маппинг иконок по названию поля
 const FIELD_ICONS: Record<string, LucideIcon> = {
@@ -593,6 +645,7 @@ interface SettingsFormProps {
   onGenerationCreated: (generationId: string, generation: any) => void;
   onFormDataChange?: (data: Record<string, any>) => void;
   onSubmitStart?: () => void;
+  onSubmitEnd?: () => void;
   onError?: (error: string) => void;
   initialData?: Record<string, any>;
   formRef?: React.MutableRefObject<SettingsFormRef | null>;
@@ -603,6 +656,7 @@ export function SettingsForm({
   onGenerationCreated,
   onFormDataChange,
   onSubmitStart,
+  onSubmitEnd,
   onError,
   initialData,
   formRef,
@@ -735,6 +789,82 @@ export function SettingsForm({
         }
       }
       
+      // Обработка направленного расширения для Bria Expand
+      if (model.replicateModel === 'bria/expand-image' && processedSettings.expand_direction) {
+        // Получаем изображение из formData (может быть base64) или из processedSettings (уже URL)
+        const imageData = formData.image || processedSettings.image;
+        if (imageData) {
+          // Получаем размеры изображения
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = imageData; // Работает и с base64 и с URL
+          });
+          
+          const imageWidth = img.naturalWidth;
+          const imageHeight = img.naturalHeight;
+          const expandAmount = processedSettings.expand_amount || 20;
+          const direction = processedSettings.expand_direction as ExpandDirection;
+          
+          // Рассчитываем параметры для Bria Expand
+          const expandRatio = expandAmount / 100;
+          let newWidth = imageWidth;
+          let newHeight = imageHeight;
+          let offsetX = 0;
+          let offsetY = 0;
+          
+          switch (direction) {
+            case 'up':
+              newHeight = Math.round(imageHeight * (1 + expandRatio));
+              offsetY = Math.round(imageHeight * expandRatio);
+              break;
+            case 'down':
+              newHeight = Math.round(imageHeight * (1 + expandRatio));
+              offsetY = 0;
+              break;
+            case 'left':
+              newWidth = Math.round(imageWidth * (1 + expandRatio));
+              offsetX = Math.round(imageWidth * expandRatio);
+              break;
+            case 'right':
+              newWidth = Math.round(imageWidth * (1 + expandRatio));
+              offsetX = 0;
+              break;
+            case 'all':
+              newWidth = Math.round(imageWidth * (1 + expandRatio));
+              newHeight = Math.round(imageHeight * (1 + expandRatio));
+              offsetX = Math.round(imageWidth * expandRatio / 2);
+              offsetY = Math.round(imageHeight * expandRatio / 2);
+              break;
+          }
+          
+          // Ensure max canvas size (25M pixels for Bria)
+          const maxArea = 25_000_000;
+          if (newWidth * newHeight > maxArea) {
+            const scale = Math.sqrt(maxArea / (newWidth * newHeight));
+            newWidth = Math.round(newWidth * scale);
+            newHeight = Math.round(newHeight * scale);
+            offsetX = Math.round(offsetX * scale);
+            offsetY = Math.round(offsetY * scale);
+          }
+          
+          // Устанавливаем параметры для Bria Expand API
+          processedSettings.canvas_size = [newWidth, newHeight];
+          processedSettings.original_image_size = [imageWidth, imageHeight];
+          processedSettings.original_image_location = [offsetX, offsetY];
+          
+          // Удаляем aspect_ratio если используется направленное расширение
+          delete processedSettings.aspect_ratio;
+          
+          console.log('Bria Expand directional params:', {
+            canvas_size: processedSettings.canvas_size,
+            original_image_size: processedSettings.original_image_size,
+            original_image_location: processedSettings.original_image_location,
+          });
+        }
+      }
+      
       // Проверяем соединение перед созданием генерации
       if (!isOnline()) {
         throw new Error('Нет подключения к интернету. Проверьте соединение');
@@ -783,6 +913,7 @@ export function SettingsForm({
       if (onError) onError(errorMsg);
     } finally {
       setIsLoading(false);
+      if (onSubmitEnd) onSubmitEnd();
     }
   };
 
@@ -944,6 +1075,30 @@ export function SettingsForm({
           />
         );
 
+      case 'directional_expand':
+        // Получаем изображение из разных возможных полей
+        const imageUrl = formData.image 
+          || (formData.image_input && Array.isArray(formData.image_input) && formData.image_input[0])
+          || (formData.image_input && typeof formData.image_input === 'string' && formData.image_input)
+          || formData.input_image
+          || formData.start_image
+          || formData.first_frame_image;
+        
+        // Отладка (можно убрать в продакшене)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('DirectionalExpandSelector imageUrl:', imageUrl, 'formData keys:', Object.keys(formData));
+        }
+        
+        return (
+          <DirectionalExpandSelectorWrapper
+            imageUrl={imageUrl}
+            value={formData[setting.name] || 'all'}
+            onChange={(direction) => updateFormData(setting.name, direction)}
+            expandAmount={formData.expand_amount || 20}
+            onExpandAmountChange={(amount) => updateFormData('expand_amount', amount)}
+          />
+        );
+
       default:
         return null;
     }
@@ -964,6 +1119,11 @@ export function SettingsForm({
       {model.settings.map((setting) => {
         const meta = getSettingMeta(setting);
         const isAspectRatio = setting.name === 'aspect_ratio';
+        
+        // Скрываем aspect_ratio если выбрано направление расширения
+        if (isAspectRatio && formData.expand_direction) {
+          return null;
+        }
         
         // Checkbox рендерится с тултипом на label
         if (setting.type === 'checkbox') {

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, X } from 'lucide-react';
 import { useGenerations } from '@/contexts/generations-context';
 
 interface ToastItem {
@@ -58,16 +58,28 @@ function GenerationToast({
   onNavigate,
   onDismiss 
 }: GenerationToastProps) {
-  // Calculate position based on hover state
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startXRef = useRef<number>(0);
+  const currentXRef = useRef<number>(0);
+  const swipeOffsetRef = useRef<number>(0);
+  const SWIPE_THRESHOLD = 100; // Minimum swipe distance to dismiss
+
+  // Calculate position based on hover state and swipe
   const getTransform = () => {
-    if (isHovered) {
-      // Expanded: each toast moves down by its full height + gap
-      return `translateY(${index * 64}px)`;
+    const baseTransform = isHovered
+      ? `translateY(${index * 64}px)` // Expanded
+      : (() => {
+          const stackOffset = Math.min(index * 8, 24);
+          const scale = 1 - Math.min(index * 0.02, 0.06);
+          return `translateY(${stackOffset}px) scale(${scale})`;
+        })();
+    
+    // Add swipe offset (only horizontal)
+    if (swipeOffset !== 0) {
+      return `${baseTransform} translateX(${swipeOffset}px)`;
     }
-    // Stacked: slight offset for visual depth
-    const stackOffset = Math.min(index * 8, 24); // Max 24px offset
-    const scale = 1 - Math.min(index * 0.02, 0.06); // Slight scale down
-    return `translateY(${stackOffset}px) scale(${scale})`;
+    return baseTransform;
   };
 
   const getZIndex = () => {
@@ -77,8 +89,100 @@ function GenerationToast({
   const getOpacity = () => {
     if (isHovered) return 1;
     // Fade out items further back in stack
-    return Math.max(1 - index * 0.15, 0.6);
+    const baseOpacity = Math.max(1 - index * 0.15, 0.6);
+    // Fade out during swipe
+    if (swipeOffset !== 0) {
+      return baseOpacity * (1 - Math.abs(swipeOffset) / 300);
+    }
+    return baseOpacity;
   };
+
+  // Touch/Mouse handlers for swipe
+  const handleStart = (clientX: number) => {
+    setIsDragging(true);
+    startXRef.current = clientX;
+    currentXRef.current = clientX;
+  };
+
+  const handleMove = useCallback((clientX: number) => {
+    if (!isDragging) return;
+    currentXRef.current = clientX;
+    const deltaX = currentXRef.current - startXRef.current;
+    // Only allow swiping left (negative deltaX)
+    if (deltaX < 0) {
+      const newOffset = Math.max(deltaX, -300); // Max swipe distance
+      swipeOffsetRef.current = newOffset;
+      setSwipeOffset(newOffset);
+    }
+  }, [isDragging]);
+
+  const handleEnd = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    
+    // If swiped enough, dismiss
+    const currentOffset = swipeOffsetRef.current;
+    if (Math.abs(currentOffset) >= SWIPE_THRESHOLD) {
+      onDismiss(toast.id);
+    } else {
+      // Snap back
+      swipeOffsetRef.current = 0;
+      setSwipeOffset(0);
+    }
+    
+    startXRef.current = 0;
+    currentXRef.current = 0;
+  }, [isDragging, toast.id, onDismiss]);
+
+  // Touch events
+  const handleTouchStart = (e: React.TouchEvent) => {
+    handleStart(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault(); // Prevent scrolling while swiping
+    handleMove(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    handleEnd();
+  };
+
+  // Mouse events (for desktop drag)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handleStart(e.clientX);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    handleMove(e.clientX);
+  };
+
+  const handleMouseUp = () => {
+    handleEnd();
+  };
+
+  // Global mouse move/up listeners for drag
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientX);
+    };
+
+    const handleGlobalMouseUp = () => {
+      handleEnd();
+    };
+
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isDragging, handleMove, handleEnd]);
 
   const getStatusText = () => {
     switch (toast.status) {
@@ -113,14 +217,35 @@ function GenerationToast({
 
   return (
     <div
-      className="absolute top-0 right-0 w-[300px] bg-[#1a1a1a] rounded-xl p-3 shadow-[0px_4px_16px_0px_rgba(0,0,0,0.5)] flex items-center gap-3 transition-all duration-300 ease-out cursor-pointer"
+      className="absolute top-0 right-0 w-[300px] bg-[#1a1a1a] rounded-xl p-3 shadow-[0px_4px_16px_0px_rgba(0,0,0,0.5)] flex items-center gap-3 transition-all duration-300 ease-out cursor-pointer relative group"
       style={{
         transform: getTransform(),
         zIndex: getZIndex(),
         opacity: getOpacity(),
+        touchAction: 'pan-y', // Allow vertical scrolling but handle horizontal swipe
       }}
-      onClick={() => onNavigate(toast.id)}
+      onClick={() => {
+        if (!isDragging && swipeOffset === 0) {
+          onNavigate(toast.id);
+        }
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
     >
+      {/* Close button - visible on hover */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss(toast.id);
+        }}
+        className="absolute top-2 right-2 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-full hover:bg-[#2a2a2a] z-10"
+        aria-label="Close"
+      >
+        <X className="w-4 h-4 text-[#bbbbbb] hover:text-white" />
+      </button>
+
       {/* Status Icon */}
       <div className="shrink-0">
         {getStatusIcon()}
@@ -140,7 +265,9 @@ function GenerationToast({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onNavigate(toast.id);
+          if (!isDragging && swipeOffset === 0) {
+            onNavigate(toast.id);
+          }
         }}
         className="shrink-0 h-8 px-2 bg-[#212121] rounded-lg flex items-center justify-center hover:bg-[#2a2a2a] transition-colors"
       >
@@ -154,18 +281,97 @@ function GenerationToast({
 
 // Auto-dismiss timeout in ms
 const AUTO_DISMISS_TIMEOUT = 3000;
+const STORAGE_KEY_SHOWN_TOASTS = 'generation-toasts-shown';
+const STORAGE_KEY_SESSION_START = 'generation-toasts-session-start';
+
+/**
+ * Get shown toast IDs from sessionStorage
+ */
+function getShownToastIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY_SHOWN_TOASTS);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Save shown toast IDs to sessionStorage
+ */
+function saveShownToastIds(ids: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(STORAGE_KEY_SHOWN_TOASTS, JSON.stringify(Array.from(ids)));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Get session start time (when page was loaded)
+ */
+function getSessionStartTime(): number {
+  if (typeof window === 'undefined') return Date.now();
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY_SESSION_START);
+    if (stored) {
+      return parseInt(stored, 10);
+    }
+    // First load - save current time
+    const now = Date.now();
+    sessionStorage.setItem(STORAGE_KEY_SESSION_START, now.toString());
+    return now;
+  } catch {
+    return Date.now();
+  }
+}
 
 export function GenerationToastContainer() {
   const router = useRouter();
   const { unviewedGenerations, markAsViewed } = useGenerations();
   const [isHovered, setIsHovered] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => getShownToastIds());
   const [toastTimers] = useState<Map<string, number>>(() => new Map());
+  const sessionStartTimeRef = useRef<number>(getSessionStartTime());
+  const previousGenerationsRef = useRef<Set<string>>(new Set());
 
-  // Filter toasts to show (not dismissed) - only completed/failed for auto-dismiss
+  // Initialize session start time on mount
+  useEffect(() => {
+    sessionStartTimeRef.current = getSessionStartTime();
+  }, []);
+
+  // Track which generations were already present when page loaded
+  useEffect(() => {
+    if (unviewedGenerations.length > 0 && previousGenerationsRef.current.size === 0) {
+      // First load - mark all existing generations as "already shown" (don't show toasts for them)
+      const existingIds = new Set(unviewedGenerations.map(g => g.id));
+      previousGenerationsRef.current = existingIds;
+      // Mark them as dismissed so they don't show as toasts
+      setDismissedIds(prev => {
+        const next = new Set(prev);
+        existingIds.forEach(id => next.add(id));
+        saveShownToastIds(next);
+        return next;
+      });
+    }
+  }, [unviewedGenerations]);
+
+  // Filter toasts to show:
+  // 1. Only completed/failed/cancelled (not pending/processing)
+  // 2. Not dismissed
+  // 3. Only NEW generations that completed AFTER page load (not old unviewed ones)
   const toasts: ToastItem[] = unviewedGenerations
     .filter(g => !dismissedIds.has(g.id))
     .filter(g => g.status === 'completed' || g.status === 'failed' || g.status === 'cancelled')
+    .filter(g => {
+      // Only show toasts for generations that completed AFTER session started
+      // OR that weren't present when page first loaded
+      const createdAt = new Date(g.created_at).getTime();
+      const wasPresentOnLoad = previousGenerationsRef.current.has(g.id);
+      return !wasPresentOnLoad && createdAt >= sessionStartTimeRef.current - 5000; // 5 second buffer
+    })
     .slice(0, 5) // Max 5 toasts
     .map(g => ({
       id: g.id,
@@ -225,12 +431,20 @@ export function GenerationToastContainer() {
 
   const handleNavigate = useCallback((id: string) => {
     markAsViewed(id);
-    setDismissedIds(prev => new Set(prev).add(id));
+    setDismissedIds(prev => {
+      const next = new Set(prev).add(id);
+      saveShownToastIds(next);
+      return next;
+    });
     router.push(`/result/${id}`);
   }, [markAsViewed, router]);
 
   const handleDismiss = useCallback((id: string) => {
-    setDismissedIds(prev => new Set(prev).add(id));
+    setDismissedIds(prev => {
+      const next = new Set(prev).add(id);
+      saveShownToastIds(next);
+      return next;
+    });
   }, []);
 
   // Don't render if no toasts

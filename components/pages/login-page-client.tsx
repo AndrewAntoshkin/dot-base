@@ -72,7 +72,7 @@ export default function LoginPageClient() {
             {/* Logo */}
             <div className="flex flex-col gap-4 items-center w-full">
               <Image
-                src="/LogoBase.svg"
+                src="/baseLogoNew.svg"
                 alt="BASE"
                 width={85}
                 height={24}
@@ -130,7 +130,7 @@ export default function LoginPageClient() {
           {/* Logo */}
           <div className="flex flex-col gap-4 items-center w-full">
             <Image
-              src="/LogoBase.svg"
+              src="/baseLogoNew.svg"
               alt="BASE"
               width={85}
               height={24}

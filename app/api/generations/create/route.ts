@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 const createGenerationSchema = z.object({
   action: z.enum([
-    'create', 'edit', 'upscale', 'remove_bg', 'inpaint',
+    'create', 'edit', 'upscale', 'remove_bg', 'inpaint', 'expand',
     'video_create', 'video_i2v', 'video_edit', 'video_upscale',
     'analyze_describe', 'analyze_ocr', 'analyze_prompt'
   ]),
@@ -118,6 +118,17 @@ export async function POST(request: NextRequest) {
 
     if (validatedData.input_image_url) {
       replicateInput.image = validatedData.input_image_url;
+    }
+    
+    // Логирование для отладки Bria Expand
+    if (validatedData.model_id === 'bria-expand') {
+      console.log('[Bria Expand] Settings received:', JSON.stringify(validatedData.settings, null, 2));
+      console.log('[Bria Expand] Final replicateInput:', JSON.stringify({
+        canvas_size: replicateInput.canvas_size,
+        original_image_size: replicateInput.original_image_size,
+        original_image_location: replicateInput.original_image_location,
+        prompt: replicateInput.prompt,
+      }, null, 2));
     }
 
     if (validatedData.input_video_url) {

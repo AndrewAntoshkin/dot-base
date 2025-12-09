@@ -89,7 +89,7 @@ export default async function RootLayout({
       const { data: userData } = await serviceClient
         .from('users')
         .select('role')
-        .eq('email', user.email)
+        .eq('email', user.email.toLowerCase())
         .single() as { data: { role: string } | null };
       
       if (userData?.role) {

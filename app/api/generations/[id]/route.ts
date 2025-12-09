@@ -195,6 +195,12 @@ export async function GET(
             generation.output_urls = outputUrls;
           }
         } else if (prediction.status === 'failed') {
+          // Логируем оригинальную ошибку для отладки
+          console.error('=== REPLICATE PREDICTION FAILED ===');
+          console.error('Prediction ID:', generation.replicate_prediction_id);
+          console.error('Error:', prediction.error);
+          console.error('Full prediction:', JSON.stringify(prediction, null, 2));
+          
           // Очищаем ошибку от технических деталей
           let cleanError = 'Генерация не удалась. Попробуйте изменить параметры';
           if (prediction.error) {

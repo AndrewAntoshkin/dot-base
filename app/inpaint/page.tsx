@@ -4,3 +4,5 @@ export default function InpaintPage() {
   return <InpaintPageClient />;
 }
 
+
+

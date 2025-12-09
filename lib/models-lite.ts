@@ -22,6 +22,7 @@ export interface ModelLite {
 export const CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'flux-2-pro', displayName: 'FLUX 2 Pro', description: 'Генерация и редактирование с поддержкой до 8 референсных изображений', action: 'create' },
   { id: 'seedream-4', displayName: 'SeeDream 4', description: 'ByteDance - генерация и редактирование до 4K разрешения', action: 'create' },
+  { id: 'seedream-4.5', displayName: 'SeeDream 4.5', description: 'ByteDance - улучшенная модель с лучшим пониманием пространства и знаний', action: 'create' },
   { id: 'nano-banana-pro', displayName: 'Nano Banana Pro', description: 'Google Gemini 2.5 - генерация и редактирование', action: 'create' },
   { id: 'ideogram-v3-turbo', displayName: 'Ideogram V3 Turbo', description: 'Быстрая генерация с поддержкой стилей и inpainting', action: 'create' },
   { id: 'flux-1.1-pro', displayName: 'FLUX 1.1 Pro', description: 'Быстрая генерация с отличным качеством', action: 'create' },
@@ -40,13 +41,20 @@ export const EDIT_MODELS_LITE: ModelLite[] = [
   { id: 'nano-banana-pro-edit', displayName: 'Nano Banana Pro', description: 'Google Gemini 3 Pro - редактирование и генерация с текстом', action: 'edit' },
   { id: 'flux-kontext-max-edit', displayName: 'FLUX Kontext Max', description: 'Премиум редактирование с текстом', action: 'edit' },
   { id: 'seedream-4-edit', displayName: 'SeeDream 4', description: 'ByteDance - точное редактирование до 4K', action: 'edit' },
+  { id: 'seedream-4.5-edit', displayName: 'SeeDream 4.5', description: 'ByteDance - улучшенное редактирование с лучшим пониманием пространства', action: 'edit' },
   { id: 'bria-eraser', displayName: 'Bria Eraser', description: 'SOTA удаление объектов', action: 'edit' },
   { id: 'bria-genfill', displayName: 'Bria GenFill', description: 'Добавление объектов и трансформация', action: 'edit' },
   { id: 'flux-kontext-fast', displayName: 'FLUX Kontext Fast', description: 'Ультрабыстрое редактирование', action: 'edit' },
-  { id: 'bria-expand', displayName: 'Bria Expand', description: 'Расширение границ изображения', action: 'edit' },
+  { id: 'bria-expand', displayName: 'Bria Expand', description: 'Расширение границ изображения', action: 'expand' },
+  { id: 'outpainter', displayName: 'Outpainter', description: 'Outpaint в каждом направлении', action: 'expand' },
   { id: 'reve-edit', displayName: 'Reve Edit', description: 'Редактирование от Reve', action: 'edit' },
   { id: 'flux-fill-pro', displayName: 'FLUX Fill Pro', description: '🔥 Zoom Out / Outpainting - расширение кадра как в Midjourney', action: 'edit' },
   { id: 'luma-reframe-image', displayName: 'Luma Reframe', description: '🖼️ Zoom Out - изменение aspect ratio с AI (не обрезка!)', action: 'edit' },
+];
+
+export const EXPAND_MODELS_LITE: ModelLite[] = [
+  { id: 'bria-expand', displayName: 'Bria Expand', description: 'Высокое качество, фиксированные соотношения', action: 'expand' },
+  { id: 'outpainter', displayName: 'Outpainter', description: 'Произвольное расширение в каждом направлении', action: 'expand' },
 ];
 
 export const UPSCALE_MODELS_LITE: ModelLite[] = [
@@ -141,6 +149,8 @@ export function getModelsByActionLite(action: ActionType): ModelLite[] {
       return REMOVE_BG_MODELS_LITE;
     case 'inpaint':
       return INPAINT_MODELS_LITE;
+    case 'expand':
+      return EXPAND_MODELS_LITE;
     case 'video_create':
       return VIDEO_CREATE_MODELS_LITE;
     case 'video_i2v':

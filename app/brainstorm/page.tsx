@@ -4,3 +4,6 @@ export default function BrainstormPage() {
   return <BrainstormPageClient />;
 }
 
+
+
+

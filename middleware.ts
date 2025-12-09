@@ -97,9 +97,26 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired - only when needed
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Add timeout to prevent 504 errors when Supabase is slow
+  let user = null;
+  try {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Auth timeout')), 5000)
+    );
+    const authPromise = supabase.auth.getUser();
+    const result = await Promise.race([authPromise, timeoutPromise]) as { data: { user: any } };
+    user = result.data?.user;
+  } catch (error) {
+    console.error('[Middleware] Auth check failed or timed out:', error);
+    // On timeout/error, allow request to proceed (API routes handle their own auth)
+    // For protected routes, we'll redirect to login as a fallback
+    if (needsAuthCheck(pathname) || isAdminPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({ request });
+  }
 
   // Protected routes - redirect to login if not authenticated
   if ((needsAuthCheck(pathname) || isAdminPath) && !user) {

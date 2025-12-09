@@ -204,6 +204,7 @@ function AnalyzeContent() {
                       onGenerationCreated={handleGenerationCreated}
                       onFormDataChange={setFormData}
                       onSubmitStart={() => setIsGenerating(true)}
+                      onSubmitEnd={() => setIsGenerating(false)}
                       onError={() => setIsGenerating(false)}
                       initialData={formData}
                       formRef={formRef}
@@ -322,6 +323,7 @@ function AnalyzeContent() {
                         onGenerationCreated={handleGenerationCreated}
                         onFormDataChange={setFormData}
                         onSubmitStart={() => setIsGenerating(true)}
+                        onSubmitEnd={() => setIsGenerating(false)}
                         onError={() => setIsGenerating(false)}
                         initialData={formData}
                         formRef={formRef}

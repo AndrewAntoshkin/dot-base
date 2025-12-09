@@ -226,6 +226,7 @@ function HomeContent() {
                       onGenerationCreated={handleGenerationCreated}
                       onFormDataChange={setFormData}
                       onSubmitStart={() => setIsGenerating(true)}
+                      onSubmitEnd={() => setIsGenerating(false)}
                       onError={() => setIsGenerating(false)}
                       initialData={formData}
                       formRef={formRef}
@@ -352,6 +353,7 @@ function HomeContent() {
                         onGenerationCreated={handleGenerationCreated}
                         onFormDataChange={setFormData}
                         onSubmitStart={() => setIsGenerating(true)}
+                        onSubmitEnd={() => setIsGenerating(false)}
                         onError={() => setIsGenerating(false)}
                         initialData={formData}
                         formRef={formRef}

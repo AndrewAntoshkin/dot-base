@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { useGenerations } from '@/contexts/generations-context';
 import { CREATE_MODELS_LITE } from '@/lib/models-lite';
-import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut, Download, Copy } from 'lucide-react';
+import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
+import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut, Download, Copy, Maximize2 } from 'lucide-react';
 
 // Check icon matching the design
 const CheckIcon = () => (
@@ -143,6 +144,7 @@ export default function BrainstormPageClient() {
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
   const [modalGeneration, setModalGeneration] = useState<BrainstormGeneration | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
   
   // Zoom and pan state
   const [zoom, setZoom] = useState(0.6);
@@ -757,13 +759,76 @@ export default function BrainstormPageClient() {
           {/* Empty state - centered on canvas */}
           {generations.length === 0 && (
             <div 
-              className="absolute flex items-center justify-center"
+              className="absolute flex flex-col items-center justify-center gap-6"
               style={{
                 left: CANVAS_WIDTH / 2,
                 top: CANVAS_HEIGHT / 2,
                 transform: 'translate(-50%, -50%)',
               }}
             >
+              {/* Image icon */}
+              <div className="relative w-24 h-24">
+                {/* First image frame (behind) */}
+                <svg
+                  width="96"
+                  height="96"
+                  viewBox="0 0 96 96"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="absolute"
+                  style={{ transform: 'rotate(-8deg) translate(8px, 8px)' }}
+                >
+                  <rect
+                    x="8"
+                    y="8"
+                    width="64"
+                    height="64"
+                    rx="4"
+                    stroke="#656565"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
+                  {/* Landscape inside first frame */}
+                  <path
+                    d="M16 48 L28 36 L40 40 L52 32 L64 44 L64 56 L16 56 Z"
+                    fill="#656565"
+                    fillOpacity="0.3"
+                  />
+                  {/* Sun */}
+                  <circle cx="56" cy="24" r="6" fill="#656565" fillOpacity="0.4" />
+                </svg>
+                
+                {/* Second image frame (front) */}
+                <svg
+                  width="96"
+                  height="96"
+                  viewBox="0 0 96 96"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="absolute"
+                  style={{ transform: 'rotate(8deg) translate(-8px, -8px)' }}
+                >
+                  <rect
+                    x="8"
+                    y="8"
+                    width="64"
+                    height="64"
+                    rx="4"
+                    stroke="#656565"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
+                  {/* Landscape inside second frame */}
+                  <path
+                    d="M16 48 L28 36 L40 40 L52 32 L64 44 L64 56 L16 56 Z"
+                    fill="#656565"
+                    fillOpacity="0.3"
+                  />
+                  {/* Sun */}
+                  <circle cx="56" cy="24" r="6" fill="#656565" fillOpacity="0.4" />
+                </svg>
+              </div>
+              
               <p className="font-inter text-[#656565] text-lg whitespace-nowrap">
                 Напишите промпт и выберите модели для генерации
               </p>
@@ -807,7 +872,7 @@ export default function BrainstormPageClient() {
         
         {/* Input container */}
         <div className="w-full max-w-[600px] flex flex-col gap-2 items-center pointer-events-auto">
-          <div className="w-full bg-[#191919] rounded-2xl p-4 flex flex-col gap-2">
+          <div className="w-full bg-[#191919] rounded-3xl p-5 flex flex-col gap-2">
             {/* Text area */}
             <textarea
               value={prompt}
@@ -912,7 +977,7 @@ export default function BrainstormPageClient() {
           </div>
           
           {/* Helper text */}
-          <p className="font-inter font-medium text-[13px] leading-5 text-[#656565] text-center">
+          <p className="font-inter font-medium text-[11px] leading-5 text-[#414141] text-center">
             Пробная версия генерации в нескольких моделях
           </p>
         </div>
@@ -951,6 +1016,14 @@ export default function BrainstormPageClient() {
                   >
                     <Download className="w-4 h-4 text-white" />
                   </button>
+                  {/* Fullscreen viewer button */}
+                  <button
+                    onClick={() => setIsFullscreenViewerOpen(true)}
+                    className="w-9 h-9 border border-[#2f2f2f] rounded-lg flex items-center justify-center hover:bg-[#252525] transition-colors"
+                    title="Полноэкранный просмотр"
+                  >
+                    <Maximize2 className="w-4 h-4 text-white" />
+                  </button>
                   {/* Edit button */}
                   <button
                     onClick={handleEditGeneration}
@@ -964,13 +1037,23 @@ export default function BrainstormPageClient() {
               </div>
               
               {/* Image preview */}
-              <div className="w-full h-[480px] bg-[#101010] rounded-2xl flex items-center justify-center overflow-hidden">
+              <div 
+                className="w-full h-[480px] bg-[#101010] rounded-2xl flex items-center justify-center overflow-hidden cursor-pointer hover:bg-[#0a0a0a] transition-colors group relative"
+                onClick={() => setIsFullscreenViewerOpen(true)}
+              >
                 {modalGeneration.resultUrl && (
-                  <img
-                    src={modalGeneration.resultUrl}
-                    alt={`Generated by ${modalGeneration.modelName}`}
-                    className="max-w-full max-h-full object-contain"
-                  />
+                  <>
+                    <img
+                      src={modalGeneration.resultUrl}
+                      alt={`Generated by ${modalGeneration.modelName}`}
+                      className="max-w-full max-h-full object-contain"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg px-3 py-2">
+                        <p className="text-white text-xs">Нажмите для полноэкранного просмотра</p>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
               
@@ -1009,6 +1092,16 @@ export default function BrainstormPageClient() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Fullscreen Image Viewer */}
+      {modalGeneration?.resultUrl && (
+        <ImageFullscreenViewer
+          imageUrl={modalGeneration.resultUrl}
+          isOpen={isFullscreenViewerOpen}
+          onClose={() => setIsFullscreenViewerOpen(false)}
+          alt={`Generated by ${modalGeneration.modelName}`}
+        />
       )}
     </div>
   );

@@ -60,7 +60,7 @@ export function Header() {
   }, [isMobileMenuOpen]);
 
   // Get current mode based on pathname
-  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : 'image';
+  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : pathname === '/expand' ? 'expand' : 'image';
   
   // isAdmin теперь приходит из UserContext (роль загружается из БД)
   
@@ -84,7 +84,7 @@ export function Header() {
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <Image 
-                src="/LogoBase.svg" 
+                src="/baseLogoNew.svg" 
                 alt="BASE" 
                 width={65} 
                 height={18}
@@ -135,6 +135,14 @@ export function Header() {
               }`}
             >
               Inpaint
+            </Link>
+            <Link
+              href="/expand"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center gap-2 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/expand' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Outpaint
             </Link>
           </nav>
 
@@ -299,6 +307,17 @@ export function Header() {
               }`}
             >
               INPAINT
+            </Link>
+            
+            {/* OUTPAINT */}
+            <Link
+              href="/expand"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white flex items-center gap-2 ${
+                currentMode === 'expand' ? 'bg-black' : ''
+              }`}
+            >
+              OUTPAINT
             </Link>
           </div>
           

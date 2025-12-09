@@ -8,3 +8,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE generations;
 -- that means real-time is already enabled.
 
 
+
+
+
