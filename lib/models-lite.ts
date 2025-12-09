@@ -7,7 +7,7 @@
  */
 
 export type ActionType = 
-  | 'create' | 'edit' | 'upscale' | 'remove_bg' | 'inpaint'  // Image
+  | 'create' | 'edit' | 'upscale' | 'remove_bg' | 'inpaint' | 'expand'  // Image
   | 'video_create' | 'video_i2v' | 'video_edit' | 'video_upscale'  // Video
   | 'analyze_describe' | 'analyze_ocr' | 'analyze_prompt';  // Analyze
 
@@ -180,6 +180,7 @@ export function getActionLabel(action: ActionType): string {
     upscale: 'Улучшить качество',
     remove_bg: 'Удалить фон',
     inpaint: 'Инпейнтинг',
+    expand: 'Расширить',
     video_create: 'Создать',
     video_i2v: 'Картинка → Видео',
     video_edit: 'Редактировать',
