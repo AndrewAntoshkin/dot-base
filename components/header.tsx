@@ -9,6 +9,64 @@ import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 
+// Navigation items with descriptions
+const NAV_ITEMS = [
+  { href: '/', label: 'Image', description: 'Генерация изображений из текстового описания. Выберите модель, напишите промпт и получите уникальные картинки.' },
+  { href: '/video', label: 'Video', description: 'Создание видео из текста или изображения. Превращайте статичные картинки в динамичные ролики.' },
+  { href: '/keyframes', label: 'Keyframes', description: 'Создание видео по частям с последующей склейкой. Добавляйте сегменты с начальным и конечным кадром — ИИ сгенерирует и объединит их в одно видео.' },
+  { href: '/analyze', label: 'Analyze', description: 'Анализ изображений с помощью ИИ. Получите описание, теги и информацию о содержимом картинки.' },
+  { href: '/brainstorm', label: 'Brainstorm', description: 'Генерация идей и промптов. ИИ поможет придумать креативные концепции для ваших проектов.' },
+  { href: '/inpaint', label: 'Inpaint', description: 'Редактирование части изображения. Выделите область и замените её на что-то новое по описанию.' },
+  { href: '/expand', label: 'Outpaint', description: 'Расширение границ изображения. Добавьте контент за пределами исходной картинки.' },
+];
+
+// NavLink component with tooltip
+function NavLinkWithTooltip({ href, label, description, isActive }: { 
+  href: string; 
+  label: string; 
+  description: string;
+  isActive: boolean;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div 
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Link
+        href={href}
+        className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+          isActive ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+        }`}
+      >
+        {label}
+      </Link>
+      
+      {/* Tooltip */}
+      <div 
+        className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[280px] p-4 bg-[#1A1A1A] rounded-xl z-50 transition-all duration-200 ${
+          isHovered ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1'
+        }`}
+        style={{ boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.8)' }}
+      >
+        {/* Arrow */}
+        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1A1A1A] rotate-45" />
+        
+        <div className="relative flex flex-col gap-2">
+          <span className="font-inter font-medium text-xs uppercase tracking-[-0.12px] text-white">
+            {label}
+          </span>
+          <p className="font-inter font-normal text-sm leading-5 text-[#959595]">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -96,62 +154,15 @@ export function Header() {
 
           {/* Center section - Navigation Links (Desktop Only) - Absolutely centered */}
           <nav className="hidden lg:flex items-center justify-center gap-2 absolute left-1/2 -translate-x-1/2">
-            <Link
-              href="/"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Image
-            </Link>
-            <Link
-              href="/video"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/video' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Video
-            </Link>
-            <Link
-              href="/keyframes"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/keyframes' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Keyframes
-            </Link>
-            <Link
-              href="/analyze"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/analyze' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Analyze
-            </Link>
-            <Link
-              href="/brainstorm"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center gap-2 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/brainstorm' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Brainstorm
-            </Link>
-            <Link
-              href="/inpaint"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center gap-2 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/inpaint' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Inpaint
-            </Link>
-            <Link
-              href="/expand"
-              className={`h-9 px-3 py-2 rounded-xl flex items-center gap-2 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/expand' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              Outpaint
-            </Link>
+            {NAV_ITEMS.map((item) => (
+              <NavLinkWithTooltip
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                description={item.description}
+                isActive={pathname === item.href}
+              />
+            ))}
           </nav>
 
           {/* Right section - История, Dashboard, Count, Avatar */}
