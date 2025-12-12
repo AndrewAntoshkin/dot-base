@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { saveMediaToStorage } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 
@@ -201,9 +202,14 @@ async function processKeyframeGeneration(
         );
 
         if (result.status === 'succeeded' && result.output) {
-          const videoUrl = typeof result.output === 'string' 
+          const replicateVideoUrl = typeof result.output === 'string' 
             ? result.output 
             : result.output.video || result.output[0];
+          
+          // Save video to permanent storage
+          console.log(`Saving segment ${i + 1} video to storage...`);
+          const savedVideoUrl = await saveMediaToStorage(replicateVideoUrl, generationId, 0);
+          const videoUrl = savedVideoUrl || replicateVideoUrl;
           
           segmentVideos.push(videoUrl);
           
@@ -217,7 +223,7 @@ async function processKeyframeGeneration(
             })
             .eq('id', generationId);
 
-          console.log(`Segment ${i + 1} completed: ${videoUrl}`);
+          console.log(`Segment ${i + 1} completed and saved: ${videoUrl}`);
         } else {
           throw new Error(result.error || 'Generation failed');
         }
@@ -296,11 +302,16 @@ async function processKeyframeGeneration(
       );
 
       if (mergeResult.status === 'succeeded' && mergeResult.output) {
-        const finalVideoUrl = typeof mergeResult.output === 'string' 
+        const replicateFinalUrl = typeof mergeResult.output === 'string' 
           ? mergeResult.output 
           : mergeResult.output[0];
         
-        console.log('Merge completed:', finalVideoUrl);
+        // Save merged video to permanent storage
+        console.log('Saving merged video to storage...');
+        const savedFinalUrl = await saveMediaToStorage(replicateFinalUrl, mergeGeneration.id, 0);
+        const finalVideoUrl = savedFinalUrl || replicateFinalUrl;
+        
+        console.log('Merge completed and saved:', finalVideoUrl);
         
         await (supabase.from('generations') as any)
           .update({ 
