@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, Suspense } from 'react';
+import { useState, useRef, Suspense, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
 import { ImagePlus, ArrowRight, Wand2, Plus, RefreshCw, Download, Play, Trash2 } from 'lucide-react';
 import Image from 'next/image';
@@ -43,16 +43,17 @@ function ImageUploadBox({
   onRemove: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    
     setIsUploading(true);
     try {
       const formData = new FormData();
-      formData.append('files', file); // API expects 'files' field
+      formData.append('files', file);
 
       const response = await fetch('/api/upload', {
         method: 'POST',
@@ -62,7 +63,6 @@ function ImageUploadBox({
 
       if (response.ok) {
         const result = await response.json();
-        // API returns { urls: string[] }
         const url = result.urls?.[0] || result.url;
         if (url) {
           onUpload(url);
@@ -78,7 +78,36 @@ function ImageUploadBox({
     } finally {
       setIsUploading(false);
     }
+  }, [onUpload]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadFile(file);
   };
+
+  // Handle paste from clipboard
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (!isFocused || imageUrl) return;
+    
+    if (e.clipboardData?.items) {
+      for (const item of Array.from(e.clipboardData.items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            uploadFile(file);
+            return;
+          }
+        }
+      }
+    }
+  }, [isFocused, imageUrl, uploadFile]);
+
+  // Listen for paste events when focused
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
 
   if (imageUrl) {
     return (
@@ -100,7 +129,15 @@ function ImageUploadBox({
   }
 
   return (
-    <>
+    <div
+      ref={containerRef}
+      onMouseEnter={() => setIsFocused(true)}
+      onMouseLeave={() => setIsFocused(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      tabIndex={0}
+      className="flex-1"
+    >
       <input
         ref={inputRef}
         type="file"
@@ -111,14 +148,17 @@ function ImageUploadBox({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={isUploading}
-        className="flex-1 flex items-center gap-2 p-4 bg-[#101010] border border-dashed border-[#545454] rounded-lg hover:border-white/50 transition-colors"
+        className={`w-full flex flex-col items-center gap-1 p-3 bg-[#101010] border border-dashed rounded-lg transition-colors ${
+          isFocused ? 'border-white/50' : 'border-[#545454] hover:border-white/30'
+        }`}
       >
         <ImagePlus className="w-5 h-5 text-[#959595]" />
         <span className="text-[#959595] text-xs">
           {isUploading ? 'Загрузка...' : label}
         </span>
+        <span className="text-[#555] text-[10px]">или ⌘V</span>
       </button>
-    </>
+    </div>
   );
 }
 

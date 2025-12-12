@@ -13,7 +13,8 @@ import {
   Download,
   Wand2,
   Ban,
-  X
+  X,
+  Clipboard
 } from 'lucide-react';
 
 // Форматы для расширения
@@ -158,12 +159,57 @@ export function ExpandPageClient() {
   const handleDropCanvas = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingCanvas(false);
-    
+
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
       handleImageUpload(file);
     }
   }, [handleImageUpload]);
+
+  // Handle paste from clipboard
+  const handlePaste = useCallback(async (e?: ClipboardEvent) => {
+    if (e?.clipboardData?.items) {
+      for (const item of Array.from(e.clipboardData.items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            handleImageUpload(file);
+            return;
+          }
+        }
+      }
+    } else {
+      // Fallback for button click - use Clipboard API
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(type => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const file = new File([blob], 'pasted-image.png', { type: imageType });
+            handleImageUpload(file);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('Clipboard read failed:', err);
+      }
+    }
+  }, [handleImageUpload]);
+
+  // Paste button handler
+  const handlePasteButtonClick = async () => {
+    await handlePaste();
+  };
+
+  // Listen for paste events when no image is uploaded
+  useEffect(() => {
+    if (image) return;
+    
+    const onPaste = (e: ClipboardEvent) => handlePaste(e);
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [image, handlePaste]);
 
   // Выбор пресета формата
   const handleRatioSelect = useCallback((ratio: string) => {
@@ -580,15 +626,30 @@ export function ExpandPageClient() {
               {/* Изображение */}
               <div className="border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Изображение" icon={ImageIcon} />
-                <div 
-                  className="bg-[#101010] border border-dashed border-[#656565] rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors hover:border-white/30"
-                  onClick={() => fileInputRef.current?.click()}
+                <div
+                  className="bg-[#101010] border border-dashed border-[#656565] rounded-lg p-4 flex flex-col items-center justify-center transition-colors hover:border-white/30"
                 >
-                  <ImageIcon className="w-5 h-5 text-[#959595] mb-1" />
-                  <p className="font-inter text-[14px] text-[#b7b7b7] text-center">
-                    Перетащите или выберите на устройстве
+                  <ImageIcon className="w-6 h-6 text-[#959595] mb-2" />
+                  <p className="font-inter text-[13px] text-[#b7b7b7] text-center mb-3">
+                    PNG, JPG, WEBP
                   </p>
-                  <p className="font-inter text-[12px] text-[#959595]">PNG, JPG, WEBP</p>
+                  <div className="flex gap-2 w-full">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 px-3 py-2 rounded-lg bg-white font-inter font-medium text-xs text-black hover:bg-gray-200 transition-colors"
+                    >
+                      Выбрать
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePasteButtonClick}
+                      className="flex-1 px-3 py-2 rounded-lg border border-[#656565] hover:border-white text-white font-inter font-medium text-xs transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Clipboard className="w-3 h-3" />
+                      Вставить
+                    </button>
+                  </div>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -748,17 +809,27 @@ export function ExpandPageClient() {
           >
             {!image ? (
               /* Empty state */
-              <div className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
-                <div className="relative w-[120px] h-[112px] mb-4">
-                  <div className="absolute left-0 top-0 w-[98px] h-[98px] border border-[#656565] rounded-lg" />
-                  <div className="absolute right-0 bottom-0 w-[96px] h-[96px] bg-[#1a1a1a] border border-[#656565] rounded-lg flex items-center justify-center">
-                    <ImageIcon className="w-10 h-10 text-[#656565]" strokeWidth={1} />
-                  </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <ImageIcon className="w-12 h-12 text-[#656565] mb-4" strokeWidth={1.5} />
+                <p className="font-inter text-lg font-medium text-white mb-1">Перетащите сюда</p>
+                <p className="font-inter text-sm text-[#959595] mb-5">или нажмите на кнопку</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                    className="px-5 py-2.5 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors"
+                  >
+                    Выбрать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handlePasteButtonClick(); }}
+                    className="px-5 py-2.5 rounded-xl border border-[#656565] hover:border-white text-white font-inter font-medium text-sm transition-colors flex items-center gap-1.5"
+                  >
+                    <Clipboard className="w-4 h-4" />
+                    Вставить
+                  </button>
                 </div>
-                <p className="font-inter text-[14px] text-[#6d6d6d] text-center">
-                  Перетащите картинку или{' '}
-                  <span className="text-[#5595ef]">выберите на устройстве</span>
-                </p>
               </div>
             ) : (
               /* Image loaded - interactive canvas */

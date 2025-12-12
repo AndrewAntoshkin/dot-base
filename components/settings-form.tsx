@@ -358,7 +358,9 @@ function FileUploader({
   acceptVideo?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Определяем, это видео или изображение по settingName
   const isVideoField = settingName.toLowerCase().includes('video') || acceptVideo;
@@ -413,6 +415,30 @@ function FileUploader({
     e.target.value = '';
   }, [handleFile]);
 
+  // Handle paste from clipboard
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (!isFocused || value) return;
+    
+    if (e.clipboardData?.items) {
+      for (const item of Array.from(e.clipboardData.items)) {
+        if (item.type.startsWith('image/') || (isVideoField && item.type.startsWith('video/'))) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            handleFile(file);
+            return;
+          }
+        }
+      }
+    }
+  }, [isFocused, value, handleFile, isVideoField]);
+
+  // Listen for paste events
+  React.useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
+
   // Определяем тип содержимого для превью
   const isVideoContent = value?.startsWith('data:video/');
 
@@ -447,13 +473,19 @@ function FileUploader({
 
   return (
     <div
+      ref={containerRef}
       onClick={handleClick}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
+      onMouseEnter={() => setIsFocused(true)}
+      onMouseLeave={() => setIsFocused(false)}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      tabIndex={0}
       className={`
-        h-12 flex items-center pl-3 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
-        ${isDragging 
+        h-12 flex items-center pl-3 pr-2 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
+        ${isDragging || isFocused
           ? 'border-white bg-white/5' 
           : 'border-[#656565] hover:border-white bg-neutral-900'
         }
@@ -467,9 +499,10 @@ function FileUploader({
         className="hidden"
       />
       <ImageIcon className="w-5 h-5 text-[#959595]" />
-      <span className="font-inter text-[14px] text-[#959595]">
+      <span className="font-inter text-[14px] text-[#959595] flex-1">
         {isVideoField ? 'Выберите файл' : 'Выберите на устройстве'}
       </span>
+      <span className="font-inter text-[11px] text-[#555]">⌘V</span>
     </div>
   );
 }
@@ -495,7 +528,9 @@ function MultiFileUploader({
   acceptVideo?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   // Храним текущее значение в ref для доступа из async callbacks
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -503,7 +538,7 @@ function MultiFileUploader({
   // Определяем, это видео или изображение по settingName
   const isVideoField = settingName.toLowerCase().includes('video') || acceptVideo;
 
-  const handleFiles = useCallback(async (files: FileList) => {
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
     const currentValue = valueRef.current;
     const remainingSlots = maxFiles - currentValue.length;
     const filesToProcess = Array.from(files)
@@ -550,6 +585,31 @@ function MultiFileUploader({
     e.target.value = ''; // Reset для повторной загрузки
   }, [handleFiles]);
 
+  // Handle paste from clipboard
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (!isFocused || value.length >= maxFiles) return;
+    
+    if (e.clipboardData?.items) {
+      const files: File[] = [];
+      for (const item of Array.from(e.clipboardData.items)) {
+        if (item.type.startsWith('image/') || (isVideoField && item.type.startsWith('video/'))) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        handleFiles(files);
+      }
+    }
+  }, [isFocused, value.length, maxFiles, handleFiles, isVideoField]);
+
+  // Listen for paste events
+  React.useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
+
   const removeFile = useCallback((index: number) => {
     const newValue = [...value];
     newValue.splice(index, 1);
@@ -567,13 +627,19 @@ function MultiFileUploader({
       {/* Зона загрузки */}
       {value.length < maxFiles && (
         <div
+          ref={containerRef}
           onClick={handleClick}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
+          onMouseEnter={() => setIsFocused(true)}
+          onMouseLeave={() => setIsFocused(false)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          tabIndex={0}
           className={`
-            h-12 flex items-center pl-3 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
-            ${isDragging 
+            h-12 flex items-center pl-3 pr-2 gap-2 border border-dashed rounded-[8px] cursor-pointer transition-colors
+            ${isDragging || isFocused
               ? 'border-white bg-white/5' 
               : 'border-[#656565] hover:border-white bg-[#101010]'
             }
@@ -590,9 +656,10 @@ function MultiFileUploader({
             className="hidden"
           />
           <ImageIcon className="w-5 h-5 text-[#959595]" />
-          <span className="font-inter text-[14px] text-[#959595]">
+          <span className="font-inter text-[14px] text-[#959595] flex-1">
             {isVideoField ? `Добавить файлы (${value.length}/${maxFiles})` : `Добавить изображения (${value.length}/${maxFiles})`}
           </span>
+          <span className="font-inter text-[11px] text-[#555]">⌘V</span>
         </div>
       )}
 

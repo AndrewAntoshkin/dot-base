@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Header } from '@/components/header';
 import { MaskEditor } from '@/components/mask-editor';
 import { INPAINT_MODELS } from '@/lib/models-config';
@@ -12,6 +12,7 @@ import {
   X, 
   Wand2,
   AlignRight,
+  Clipboard,
 } from 'lucide-react';
 
 interface GenerationResult {
@@ -92,6 +93,53 @@ export default function InpaintPageClient() {
       processFile(file);
     }
   };
+
+  // Handle paste from clipboard
+  const handlePaste = useCallback(async (e?: ClipboardEvent) => {
+    const clipboardItems = e?.clipboardData?.items || (await navigator.clipboard.read?.() as any);
+    
+    if (e?.clipboardData?.items) {
+      for (const item of Array.from(e.clipboardData.items)) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            processFile(file);
+            return;
+          }
+        }
+      }
+    } else {
+      // Fallback for button click - use Clipboard API
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(type => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const file = new File([blob], 'pasted-image.png', { type: imageType });
+            processFile(file);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('Clipboard read failed:', err);
+      }
+    }
+  }, []);
+
+  // Paste button handler
+  const handlePasteButtonClick = async () => {
+    await handlePaste();
+  };
+
+  // Listen for paste events when no image is uploaded
+  useEffect(() => {
+    if (uploadedImage) return;
+    
+    const onPaste = (e: ClipboardEvent) => handlePaste(e);
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [uploadedImage, handlePaste]);
 
   // Handle mask change from editor
   const handleMaskChange = useCallback((dataUrl: string) => {
@@ -323,19 +371,35 @@ export default function InpaintPageClient() {
                 
                 {!uploadedImage ? (
                   <div
-                    onClick={() => fileInputRef.current?.click()}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className={`h-32 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                    className={`min-h-[180px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors ${
                       isDragging 
                         ? 'border-white bg-white/10' 
-                        : 'border-[#3f3f3f] hover:border-[#5f5f5f] bg-[#0f0f0f]'
+                        : 'border-[#3f3f3f] bg-[#0f0f0f]'
                     }`}
                   >
-                    <Upload className="w-6 h-6 text-[#666] mb-2" />
-                    <p className="font-inter text-sm text-[#959595]">Перетащите или выберите</p>
-                    <p className="font-inter text-xs text-[#666] mt-1">PNG, JPG, WebP</p>
+                    <Upload className="w-8 h-8 text-[#666] mb-3" />
+                    <p className="font-inter text-base font-medium text-white mb-1">Перетащите сюда</p>
+                    <p className="font-inter text-xs text-[#959595] mb-4">или нажмите на кнопку</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors"
+                      >
+                        Выбрать
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePasteButtonClick}
+                        className="px-4 py-2 rounded-xl border border-[#656565] hover:border-white text-white font-inter font-medium text-sm transition-colors flex items-center gap-1.5"
+                      >
+                        <Clipboard className="w-3.5 h-3.5" />
+                        Вставить
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
@@ -545,19 +609,35 @@ export default function InpaintPageClient() {
                 Изображение
               </label>
               <div
-                onClick={() => fileInputRef.current?.click()}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`min-h-[150px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                className={`min-h-[200px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors ${
                   isDragging 
                     ? 'border-white bg-white/10' 
-                    : 'border-[#3f3f3f] hover:border-[#5f5f5f] bg-[#0f0f0f]'
+                    : 'border-[#3f3f3f] bg-[#0f0f0f]'
                 }`}
               >
-                <Upload className="w-6 h-6 text-[#666] mb-2" />
-                <p className="font-inter text-sm text-[#959595]">Загрузите изображение</p>
-                <p className="font-inter text-xs text-[#666] mt-1">PNG, JPG, WebP</p>
+                <Upload className="w-10 h-10 text-[#666] mb-4" />
+                <p className="font-inter text-lg font-medium text-white mb-1">Перетащите сюда</p>
+                <p className="font-inter text-sm text-[#959595] mb-5">или нажмите на кнопку</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-5 py-2.5 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors"
+                  >
+                    Выбрать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePasteButtonClick}
+                    className="px-5 py-2.5 rounded-xl border border-[#656565] hover:border-white text-white font-inter font-medium text-sm transition-colors flex items-center gap-1.5"
+                  >
+                    <Clipboard className="w-4 h-4" />
+                    Вставить
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
