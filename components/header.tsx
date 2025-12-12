@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, LogOut, WifiOff } from 'lucide-react';
+import { Loader2, WifiOff } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
@@ -222,6 +222,7 @@ export function Header() {
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
+                style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
               >
                 <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
@@ -230,26 +231,50 @@ export function Header() {
                 </div>
               </button>
 
-              {/* Dropdown menu */}
+              {/* User Dropdown Menu */}
               {isUserMenuOpen && (
                 <>
                   <div
                     className="fixed inset-0 z-10"
                     onClick={() => setIsUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-xl z-20 overflow-hidden">
-                    {userEmail && (
-                      <div className="px-4 py-3 border-b border-[#2f2f2f]">
-                        <p className="font-inter text-sm text-[#959595]">Вы вошли как:</p>
-                        <p className="font-inter text-sm text-white truncate mt-1">{userEmail}</p>
+                  <div 
+                    className="absolute right-0 top-full mt-2 p-5 bg-[#1A1A1A] rounded-3xl z-20 flex flex-col gap-5"
+                    style={{ boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.8)' }}
+                  >
+                    {/* User Info */}
+                    <div className="flex items-center gap-3 w-[300px]">
+                      {/* Avatar */}
+                      <div 
+                        className="w-8 h-8 rounded-full overflow-hidden shrink-0"
+                        style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
+                      >
+                        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                          <span className="text-white text-sm font-medium">
+                            {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                          </span>
+                        </div>
                       </div>
-                    )}
+                      {/* Name & Account Type */}
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className="font-inter font-medium text-sm text-white truncate">
+                          {userEmail || 'Пользователь'}
+                        </span>
+                        <span className="font-inter font-normal text-xs text-[#959595]">
+                          Персональный аккаунт
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Logout Button */}
                     <button
                       onClick={handleLogout}
-                      className="w-full px-4 py-3 flex items-center gap-2 font-inter text-sm text-white hover:bg-[#2f2f2f] transition-colors"
+                      className="w-full h-10 flex items-center justify-center gap-2 border border-[#535353] rounded-xl hover:border-white/50 transition-colors"
                     >
-                      <LogOut className="w-4 h-4" />
-                      Выйти
+                      <Image src="/icon-logout.svg" alt="" width={16} height={16} />
+                      <span className="font-inter font-medium text-sm text-white tracking-[-0.084px]">
+                        Выйти из аккаунта
+                      </span>
                     </button>
                   </div>
                 </>
