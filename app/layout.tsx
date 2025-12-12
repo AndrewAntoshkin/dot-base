@@ -25,6 +25,25 @@ const inter = localFont({
   preload: true,
 });
 
+// Alumni Sans для заголовков на лендинге — локальный, не зависит от Google
+const alumniSans = localFont({
+  src: [
+    {
+      path: '../public/fonts/AlumniSans-Latin.woff2',
+      weight: '100 900',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/AlumniSans-Cyrillic.woff2',
+      weight: '100 900',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-alumni-sans',
+  display: 'swap',
+  preload: true,
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.basecraft.ru'),
   title: '.base — Один инструмент для работы с генеративными моделями',
@@ -102,7 +121,7 @@ export default async function RootLayout({
 
   return (
     <html lang="ru">
-      <body className={`${inter.variable} font-inter`}>
+      <body className={`${inter.variable} ${alumniSans.variable} font-inter`}>
         <ErrorBoundary>
           <AppProviders 
             initialUserEmail={userEmail} 

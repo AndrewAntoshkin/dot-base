@@ -57,6 +57,8 @@ export async function GET(request: NextRequest) {
       .from('generations')
       .select('id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message')
       .eq('user_id', user.id)
+      // Hide keyframe segments (only show final merge)
+      .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true')
       .order('created_at', { ascending: false });
 
     // Apply tab filter

@@ -40,7 +40,8 @@ function isAdminRole(role: string | null | undefined): boolean {
 }
 
 // Protected routes that require auth check
-const PROTECTED_PATHS = ['/', '/history', '/result', '/video', '/analyze'];
+// Note: '/' is NOT protected - it shows landing page for unauthenticated users
+const PROTECTED_PATHS = ['/history', '/result', '/video', '/analyze', '/brainstorm', '/inpaint', '/expand', '/keyframes'];
 
 // Admin routes that require admin access
 const ADMIN_PATHS = ['/admin'];

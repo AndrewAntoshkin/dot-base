@@ -135,3 +135,5 @@ COMMENT ON FUNCTION handle_new_user() IS 'Автоматически созда�
 
 
 
+
+

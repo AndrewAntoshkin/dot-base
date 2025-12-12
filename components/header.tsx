@@ -60,7 +60,7 @@ export function Header() {
   }, [isMobileMenuOpen]);
 
   // Get current mode based on pathname
-  const currentMode = pathname === '/video' ? 'video' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : pathname === '/expand' ? 'expand' : 'image';
+  const currentMode = pathname === '/video' ? 'video' : pathname === '/keyframes' ? 'keyframes' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : pathname === '/expand' ? 'expand' : 'image';
   
   // isAdmin теперь приходит из UserContext (роль загружается из БД)
   
@@ -81,10 +81,10 @@ export function Header() {
               <div className="w-[18px] h-[2px] bg-[#d9d9d9]" />
             </button>
 
-            {/* Logo */}
-            <Link href="/" className="flex items-center">
+            {/* Logo - links to landing page */}
+            <Link href="/welcome" className="flex items-center">
               <Image 
-                src="/baseLogoNew.svg" 
+                src="/baseCRLogo.svg" 
                 alt="BASE" 
                 width={65} 
                 height={18}
@@ -111,6 +111,14 @@ export function Header() {
               }`}
             >
               Video
+            </Link>
+            <Link
+              href="/keyframes"
+              className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                pathname === '/keyframes' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+              }`}
+            >
+              Keyframes
             </Link>
             <Link
               href="/analyze"
@@ -274,6 +282,17 @@ export function Header() {
               }`}
             >
               VIDEO
+            </Link>
+            
+            {/* KEYFRAMES */}
+            <Link
+              href="/keyframes"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
+                pathname === '/keyframes' ? 'bg-black' : ''
+              }`}
+            >
+              KEYFRAMES
             </Link>
             
             {/* ANALYZE */}
