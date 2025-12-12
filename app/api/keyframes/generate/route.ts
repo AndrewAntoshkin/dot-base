@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
           },
           status: 'pending',
           replicate_input: modelConfig.inputMapper(part),
+          is_keyframe_segment: true, // Mark as segment to hide from list
         })
         .select()
         .single();
@@ -258,6 +259,7 @@ async function processKeyframeGeneration(
           video_files: segmentVideos,
           keep_audio: true,
         },
+        is_keyframe_segment: false, // Merge result - show in list
       })
       .select()
       .single();

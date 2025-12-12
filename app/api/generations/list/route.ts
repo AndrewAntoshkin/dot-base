@@ -57,8 +57,8 @@ export async function GET(request: NextRequest) {
       .from('generations')
       .select('id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message')
       .eq('user_id', user.id)
-      // Hide keyframe segments (only show final merge)
-      .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true')
+      // Hide keyframe segments (only show final merge) - use indexed boolean column
+      .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false')
       .order('created_at', { ascending: false });
 
     // Apply tab filter
@@ -94,26 +94,31 @@ export async function GET(request: NextRequest) {
     
     if (!skipCounts) {
       // Parallel count queries (все индексированы)
+      // Exclude keyframe segments from all counts
       const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id),
+          .eq('user_id', user.id)
+          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .in('status', ['pending', 'processing']),
+          .in('status', ['pending', 'processing'])
+          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .eq('is_favorite', true),
+          .eq('is_favorite', true)
+          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .eq('status', 'failed'),
+          .eq('status', 'failed')
+          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
       ]);
       
       counts = {
