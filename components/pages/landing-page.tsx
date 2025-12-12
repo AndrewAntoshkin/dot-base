@@ -391,73 +391,108 @@ export function LandingPage() {
           </p>
         </div>
 
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card 1 - Features */}
-          <div className="bg-[#212121] rounded-3xl p-1 flex flex-col">
-            <div className="p-6 h-[180px] min-h-[180px]">
-              <h3 className="font-alumni-sans font-bold text-[32px] md:text-[36px] uppercase leading-[1] tracking-[-0.4px] mb-3.5">
-                Все функции
-              </h3>
-              <p className="text-[#BDBDBD] text-sm md:text-base leading-6 tracking-[-0.16px]">
-                Генерация, редактирование, апскейл и удаление фона — всё в одном интерфейсе
-              </p>
-            </div>
-            <div className="bg-black rounded-[20px] p-6 flex flex-wrap gap-2">
-              {FEATURES.map((feature) => (
-                <span
-                  key={feature}
-                  className="border border-[#363636] rounded-full px-6 py-4 font-inter font-medium text-base md:text-lg uppercase tracking-[-0.18px]"
-                >
-                  {feature}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Card 2 - Simple Interface */}
-          <div className="bg-[#212121] rounded-3xl p-1 flex flex-col">
-            <div className="p-6 h-[180px] min-h-[180px]">
-              <h3 className="font-alumni-sans font-bold text-[32px] md:text-[36px] uppercase leading-[1] tracking-[-0.4px] mb-3.5">
+        {/* Cards - Figma exact layout */}
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Card 1 - Простой интерфейс (large, spans full height) */}
+          <div className="flex-1 border-4 border-[#212121] rounded-[32px] p-1 flex flex-col">
+            {/* Header with blur effect */}
+            <div className="p-6 flex flex-col gap-3.5 backdrop-blur-[20px] rounded-2xl">
+              <h3 className="font-alumni-sans font-bold text-[32px] uppercase leading-[1.125] tracking-[-0.32px]">
                 Простой интерфейс
               </h3>
-              <p className="text-[#BDBDBD] text-sm md:text-base leading-6 tracking-[-0.16px]">
-                Интуитивный дизайн без сложных настроек
-              </p>
+              <div className="flex gap-4 items-start">
+                <Image 
+                  src="/landing/interface-icon.svg" 
+                  alt="" 
+                  width={56} 
+                  height={56} 
+                  className="shrink-0"
+                />
+                <p className="text-[#BDBDBD] text-base leading-6 tracking-[-0.16px]">
+                  Интуитивный дизайн без сложных настроек. У каждой модели свой набор параметров – внимательно ознакомьтесь с ними перед генерацией.
+                </p>
+              </div>
             </div>
-            <div className="bg-black rounded-[20px] p-6 h-full flex items-center justify-center">
-              <div className="bg-neutral-900 rounded-2xl p-4 w-full">
-                <div className="text-[10px] text-[#959595] uppercase tracking-[0.15px] mb-2">Действие</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-neutral-950 border border-white rounded-2xl h-14 flex items-center justify-center text-[13px]">
-                    Создать
+            {/* App UI Preview */}
+            <div className="flex-1 bg-[#101010] rounded-t-2xl mt-2 p-3 min-h-[300px]">
+              <div className="bg-[#101010] rounded-xl h-full border border-[#2a2a2a] overflow-hidden">
+                {/* Mini header */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2a]">
+                  <div className="flex gap-1">
+                    {['Image', 'Video', 'Keyframes', 'Analyze'].map((tab, i) => (
+                      <span key={tab} className={`text-[8px] px-2 py-1 rounded ${i === 0 ? 'bg-[#1f1f1f] text-white' : 'text-[#666]'}`}>
+                        {tab}
+                      </span>
+                    ))}
                   </div>
-                  <div className="bg-neutral-950 rounded-2xl h-14 flex items-center justify-center text-[13px]">
-                    Редактировать
+                  <div className="flex gap-2 items-center">
+                    <span className="text-[8px] text-[#666]">История</span>
+                    <div className="w-4 h-4 rounded-full bg-[#FCED44]" />
                   </div>
-                  <div className="bg-neutral-950 rounded-2xl h-14 flex items-center justify-center text-[13px]">
-                    Улучшить
+                </div>
+                {/* Mini content */}
+                <div className="flex h-[calc(100%-32px)]">
+                  <div className="w-1/2 p-2 border-r border-[#2a2a2a]">
+                    <div className="text-[7px] text-[#666] mb-1">Input</div>
+                    <div className="space-y-1">
+                      <div className="bg-[#1a1a1a] rounded h-6" />
+                      <div className="bg-[#1a1a1a] rounded h-4" />
+                      <div className="bg-[#1a1a1a] rounded h-12" />
+                    </div>
                   </div>
-                  <div className="bg-neutral-950 rounded-2xl h-14 flex items-center justify-center text-[13px]">
-                    Удалить фон
+                  <div className="w-1/2 p-2">
+                    <div className="text-[7px] text-[#666] mb-1">Output</div>
+                    <div className="grid grid-cols-3 gap-1">
+                      <div className="bg-[#1a1a1a] rounded aspect-square" />
+                      <div className="bg-[#1a1a1a] rounded aspect-square" />
+                      <div className="bg-[#1a1a1a] rounded aspect-square" />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Card 3 - App Preview */}
-          <div className="bg-[#212121] rounded-3xl p-1 flex flex-col">
-            <div className="p-6 h-[180px] min-h-[180px]">
-              <h3 className="font-alumni-sans font-bold text-[32px] md:text-[36px] uppercase leading-[1] tracking-[-0.4px] mb-3.5">
-                Быстрый результат
-              </h3>
-              <p className="text-[#BDBDBD] text-sm md:text-base leading-6 tracking-[-0.16px]">
-                Генерация за секунды. Следите за прогрессом в реальном времени.
-              </p>
+          {/* Right column - 2 cards stacked */}
+          <div className="flex flex-col gap-4 lg:w-[400px]">
+            {/* Card 2 - Множество функций */}
+            <div className="border-4 border-[#212121] rounded-[32px] p-1 flex flex-col">
+              <div className="p-6 flex flex-col gap-3">
+                <h3 className="font-alumni-sans font-bold text-[32px] uppercase leading-[1.125] tracking-[-0.32px]">
+                  Множество функций
+                </h3>
+                <p className="text-[#BDBDBD] text-base leading-6 tracking-[-0.16px]">
+                  Генерация, редактирование, апскейл и удаление фона — всё в одном интерфейсе
+                </p>
+              </div>
+              {/* Action tags */}
+              <div className="px-6 pb-6 flex flex-wrap gap-2">
+                {FEATURES.map((action) => (
+                  <span
+                    key={action}
+                    className="border border-[#363636] rounded-full px-4 py-2 font-inter font-medium text-sm uppercase tracking-[-0.14px]"
+                  >
+                    {action}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="bg-black rounded-[20px] h-[232px] overflow-hidden flex items-center justify-center">
-              <div className="text-[#404040] text-sm">Превью приложения</div>
+
+            {/* Card 3 - Быстрый результат */}
+            <div className="border-4 border-[#212121] rounded-[32px] p-1 flex flex-col flex-1">
+              <div className="p-6 flex flex-col gap-3 flex-1">
+                <h3 className="font-alumni-sans font-bold text-[32px] uppercase leading-[1.125] tracking-[-0.32px]">
+                  Быстрый результат
+                </h3>
+                <p className="text-[#BDBDBD] text-base leading-6 tracking-[-0.16px]">
+                  Генерация за секунды. Следите за прогрессом в реальном времени.
+                </p>
+              </div>
+              <div className="px-6 pb-6">
+                <p className="text-[#666] text-xs leading-4">
+                  Возможны сбои на стороне моделей.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -924,10 +959,10 @@ function FaqItem({ question, answer, isLast = false }: FaqItemProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between gap-2.5 py-4 text-left"
       >
-        <span className="font-inter font-semibold text-base leading-[1.21] text-white">
+        <span className="font-inter font-medium text-base leading-[1.5] text-white">
           {question}
         </span>
-        <span className="w-6 h-6 flex items-center justify-center shrink-0">
+        <span className={`w-6 h-6 flex items-center justify-center shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-0' : ''}`}>
           {isOpen ? (
             <svg width="14" height="2" viewBox="0 0 14 2" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M1 1H13" stroke="white" strokeWidth="2" strokeLinecap="round"/>
@@ -939,13 +974,15 @@ function FaqItem({ question, answer, isLast = false }: FaqItemProps) {
           )}
         </span>
       </button>
-      {isOpen && (
-        <div className={`pb-4 ${!isLast ? '' : ''}`}>
-          <p className="font-inter font-normal text-lg leading-[1.21] text-[#949391]">
+      <div 
+        className={`grid transition-all duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+      >
+        <div className="overflow-hidden">
+          <p className="font-inter font-normal text-base leading-6 text-[#949391] pb-4">
             {answer}
           </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
