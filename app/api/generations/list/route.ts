@@ -53,12 +53,14 @@ export async function GET(request: NextRequest) {
     const to = from + limit - 1;
 
     // Build query based on tab filter
+    // Hide keyframe segments (only show final merge)
+    // Try using indexed boolean column first, fall back to JSONB filter
     let query = supabase
       .from('generations')
       .select('id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message')
       .eq('user_id', user.id)
-      // Hide keyframe segments (only show final merge) - use indexed boolean column
-      .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false')
+      // Filter keyframe segments - works with or without is_keyframe_segment column
+      .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true')
       .order('created_at', { ascending: false });
 
     // Apply tab filter
@@ -93,32 +95,32 @@ export async function GET(request: NextRequest) {
     let counts = { all: 0, processing: 0, favorites: 0, failed: 0 };
     
     if (!skipCounts) {
-      // Parallel count queries (все индексированы)
-      // Exclude keyframe segments from all counts
+      // Parallel count queries
+      // Exclude keyframe segments from all counts (using JSONB filter for backward compatibility)
       const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
+          .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true'),
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .in('status', ['pending', 'processing'])
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
+          .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true'),
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .eq('is_favorite', true)
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
+          .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true'),
         supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .eq('status', 'failed')
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
+          .or('settings->keyframe_index.is.null,settings->keyframe_merge.eq.true'),
       ]);
       
       counts = {

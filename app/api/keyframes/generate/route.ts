@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
           },
           status: 'pending',
           replicate_input: modelConfig.inputMapper(part),
-          is_keyframe_segment: true, // Mark as segment to hide from list
+          // Note: keyframe_index in settings is used to filter from list (not is_keyframe_segment column)
         })
         .select()
         .single();
@@ -265,7 +265,7 @@ async function processKeyframeGeneration(
           video_files: segmentVideos,
           keep_audio: true,
         },
-        is_keyframe_segment: false, // Merge result - show in list
+        // Note: keyframe_merge=true in settings makes this show in list (not is_keyframe_segment column)
       })
       .select()
       .single();
