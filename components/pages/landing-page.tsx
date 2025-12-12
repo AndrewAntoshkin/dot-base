@@ -72,6 +72,113 @@ const MODEL_CARDS = [
   { name: 'SD 3.5 Large', description: 'Сбалансированная универсальная модель для реалистичных изображений.', image: '/landing/gallery-3.png' },
 ];
 
+// How it works steps data
+const HOW_IT_WORKS_STEPS = [
+  {
+    id: 1,
+    icon: '/landing/step-num-1.svg',
+    title: 'ВЫБЕРИТЕ ДЕЙСТВИЕ',
+    description: 'Создать, редактировать, апскейл, удаление фона, анализ — переключайтесь между задачами за секунду.',
+    image: '/landing/how-step-1.png',
+  },
+  {
+    id: 2,
+    icon: '/landing/step-num-2.svg',
+    title: 'ПОДБЕРИТЕ МОДЕЛЬ',
+    description: 'Для текста на изображении, фотореализма, стилизации или видео — выбирайте оптимальную модель под задачу.',
+    image: '/landing/how-step-2.png',
+  },
+  {
+    id: 3,
+    icon: '/landing/step-num-3.svg',
+    title: 'ПОЛУЧИТЕ РЕЗУЛЬТАТ',
+    description: 'Запускайте генерацию, следите за статусом в реальном времени и скачивайте готовый результат в один клик.',
+    image: '/landing/how-step-3.png',
+  },
+];
+
+// How it works section with tabs
+function HowItWorksSection() {
+  const [activeStep, setActiveStep] = useState(0);
+
+  return (
+    <section data-fade-reveal className="fade-reveal mt-[180px] max-w-[1400px] mx-auto px-4 md:px-0">
+      {/* Header */}
+      <div className="flex flex-col gap-[15px] mb-14">
+        <h2 className="font-alumni-sans font-bold text-[36px] md:text-[52px] leading-[1] uppercase tracking-[-0.52px]">
+          Как это работает
+        </h2>
+        <p className="text-[#717171] text-base md:text-[20px] leading-[1.4] tracking-[-0.2px] max-w-[600px]">
+          Всего три шага — и у вас готовый креатив. Никаких сложных настроек: только действие, модель и результат.
+        </p>
+      </div>
+
+      {/* Content - Tabs + Image */}
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Left - Tabs */}
+        <div className="flex flex-col gap-4 lg:flex-1">
+          {HOW_IT_WORKS_STEPS.map((step, index) => (
+            <button
+              key={step.id}
+              onClick={() => setActiveStep(index)}
+              className={`flex gap-6 p-6 rounded-[20px] border-2 text-left transition-all duration-300 ${
+                activeStep === index
+                  ? 'bg-[#101010] border-[#959595]'
+                  : 'border-[#212121] hover:border-[#3a3a3a]'
+              }`}
+            >
+              <Image
+                src={step.icon}
+                alt={`${step.id}`}
+                width={32}
+                height={32}
+                className="shrink-0"
+              />
+              <div className="flex flex-col gap-2">
+                <h3 className="font-alumni-sans font-bold text-[28px] md:text-[32px] uppercase leading-[1] tracking-[-0.32px]">
+                  {step.title}
+                </h3>
+                <p className="text-[#ACABAB] text-sm leading-[1.43]">
+                  {step.description}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Right - Image */}
+        <div className="hidden lg:block lg:w-[684px] lg:shrink-0">
+          <div className="relative w-full aspect-[684/567] rounded-3xl overflow-hidden border-4 border-[#212121]">
+            {HOW_IT_WORKS_STEPS.map((step, index) => (
+              <Image
+                key={step.id}
+                src={step.image}
+                alt={step.title}
+                fill
+                className={`object-cover transition-opacity duration-500 ${
+                  activeStep === index ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Image - shown below tabs on mobile */}
+      <div className="lg:hidden mt-6">
+        <div className="relative w-full aspect-[684/567] rounded-3xl overflow-hidden border-4 border-[#212121]">
+          <Image
+            src={HOW_IT_WORKS_STEPS[activeStep].image}
+            alt={HOW_IT_WORKS_STEPS[activeStep].title}
+            fill
+            className="object-cover transition-opacity duration-500"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function LandingPage() {
   const router = useRouter();
   const { email } = useUser();
@@ -327,77 +434,8 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section data-fade-reveal className="fade-reveal mt-[180px] max-w-[1400px] mx-auto px-4 md:px-0">
-        <div className="bg-[#101010] rounded-[32px] overflow-hidden flex flex-col lg:flex-row">
-          {/* Left - Content */}
-          <div className="flex flex-col justify-center gap-12 p-8 md:p-12 lg:p-16 lg:w-1/2">
-            {/* Header */}
-            <div className="flex flex-col gap-[15px]">
-              <h2 className="font-alumni-sans font-bold text-[36px] md:text-[52px] leading-[1] uppercase tracking-[-0.52px]">
-                Как это работает
-              </h2>
-              <p className="text-[#717171] text-base md:text-[20px] leading-[1.4] tracking-[-0.2px] max-w-[600px]">
-                Всего три шага — и у вас готовый креатив. Никаких сложных настроек: только действие, модель и результат.
-              </p>
-            </div>
-
-            {/* Steps */}
-            <div className="flex flex-col gap-6">
-              {/* Step 1 */}
-              <div className="flex gap-6 items-start">
-                <Image src="/landing/step-1.svg" alt="1" width={32} height={32} className="shrink-0 mt-1" />
-                <div className="flex flex-col gap-2">
-                  <h3 className="font-alumni-sans font-bold text-[28px] md:text-[32px] uppercase leading-[1] tracking-[-0.32px]">
-                    Выберите действие
-                  </h3>
-                  <p className="text-[#ACABAB] text-sm leading-[1.43]">
-                    Создать, редактировать, апскейл, удаление фона, анализ — переключайтесь между задачами за секунду.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="flex gap-6 items-start">
-                <Image src="/landing/step-2.svg" alt="2" width={32} height={32} className="shrink-0 mt-1" />
-                <div className="flex flex-col gap-2">
-                  <h3 className="font-alumni-sans font-bold text-[28px] md:text-[32px] uppercase leading-[1] tracking-[-0.32px]">
-                    Подберите модель
-                  </h3>
-                  <p className="text-[#ACABAB] text-sm leading-[1.43]">
-                    Для текста на изображении, фотореализма, стилизации или видео — выбирайте оптимальную модель под задачу.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="flex gap-6 items-start">
-                <Image src="/landing/step-3.svg" alt="3" width={32} height={32} className="shrink-0 mt-1" />
-                <div className="flex flex-col gap-2">
-                  <h3 className="font-alumni-sans font-bold text-[28px] md:text-[32px] uppercase leading-[1] tracking-[-0.32px]">
-                    Получите результат
-                  </h3>
-                  <p className="text-[#ACABAB] text-sm leading-[1.43]">
-                    Запускайте генерацию, следите за статусом в реальном времени и скачивайте готовый результат в один клик.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right - Image */}
-          <div className="hidden lg:flex lg:w-1/2 p-4">
-            <div className="relative w-full h-full min-h-[400px] rounded-3xl overflow-hidden">
-              <Image 
-                src="/landing/how-it-works-bg.png" 
-                alt="" 
-                fill 
-                className="object-cover"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* How it works - Tabs */}
+      <HowItWorksSection />
 
       {/* Feature Cards Section - "Никаких стоковых медиа" */}
       <section data-fade-reveal className="fade-reveal mt-[180px] max-w-[1400px] mx-auto px-4 md:px-0">
