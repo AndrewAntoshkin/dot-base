@@ -78,8 +78,15 @@ export function LandingPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const carouselInitialItemRef = useRef<HTMLDivElement>(null);
   const [showCarouselArrows, setShowCarouselArrows] = useState(false);
+  const [showCopyToast, setShowCopyToast] = useState(false);
   
   const isLoggedIn = !!email;
+
+  // Show toast on copy
+  const handleShowCopyToast = () => {
+    setShowCopyToast(true);
+    setTimeout(() => setShowCopyToast(false), 1500);
+  };
 
   // Minimal fade-in on scroll (opacity only; no heavy effects)
   useEffect(() => {
@@ -172,6 +179,19 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white overflow-x-hidden">
+      {/* Copy Toast */}
+      <div 
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-2.5 bg-[#1A1A1A] rounded-2xl transition-all duration-300 ${
+          showCopyToast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
+        }`}
+        style={{ boxShadow: '0px 4px 32px rgba(0, 0, 0, 0.8)', width: '300px' }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 0C3.58 0 0 3.58 0 8C0 12.42 3.58 16 8 16C12.42 16 16 12.42 16 8C16 3.58 12.42 0 8 0ZM6.4 12L2.4 8L3.528 6.872L6.4 9.736L12.472 3.664L13.6 4.8L6.4 12Z" fill="white"/>
+        </svg>
+        <span className="font-inter font-normal text-sm text-white">Промпт скопирован</span>
+      </div>
+
       {/* Header / Navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#050505] px-4 md:px-8 py-3">
         <div className="flex items-center justify-between w-full max-w-[1400px] mx-auto">
@@ -500,7 +520,7 @@ export function LandingPage() {
 
       {/* Examples Section - "Примеры с промптами" */}
       <div data-fade-reveal className="fade-reveal">
-        <ExamplesSection onStartClick={handleStartClick} />
+        <ExamplesSection onStartClick={handleStartClick} onCopy={handleShowCopyToast} />
       </div>
 
       {/* Model Cards Carousel */}
@@ -750,7 +770,7 @@ export function LandingPage() {
 }
 
 // Examples Section with hover interactions
-function ExamplesSection({ onStartClick }: { onStartClick: () => void }) {
+function ExamplesSection({ onStartClick, onCopy }: { onStartClick: () => void; onCopy: () => void }) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   return (
@@ -778,6 +798,7 @@ function ExamplesSection({ onStartClick }: { onStartClick: () => void }) {
                 isAnyHovered={hoveredCard !== null}
                 onHover={() => setHoveredCard(card.id)}
                 onLeave={() => setHoveredCard(null)}
+                onCopy={onCopy}
               />
             ))}
           </div>
@@ -791,6 +812,7 @@ function ExamplesSection({ onStartClick }: { onStartClick: () => void }) {
                 isAnyHovered={hoveredCard !== null}
                 onHover={() => setHoveredCard(card.id)}
                 onLeave={() => setHoveredCard(null)}
+                onCopy={onCopy}
               />
             ))}
           </div>
@@ -804,6 +826,7 @@ function ExamplesSection({ onStartClick }: { onStartClick: () => void }) {
                 isAnyHovered={hoveredCard !== null}
                 onHover={() => setHoveredCard(card.id)}
                 onLeave={() => setHoveredCard(null)}
+                onCopy={onCopy}
               />
             ))}
           </div>
@@ -817,6 +840,7 @@ function ExamplesSection({ onStartClick }: { onStartClick: () => void }) {
                 isAnyHovered={hoveredCard !== null}
                 onHover={() => setHoveredCard(card.id)}
                 onLeave={() => setHoveredCard(null)}
+                onCopy={onCopy}
               />
             ))}
           </div>
@@ -830,6 +854,7 @@ function ExamplesSection({ onStartClick }: { onStartClick: () => void }) {
                 isAnyHovered={hoveredCard !== null}
                 onHover={() => setHoveredCard(card.id)}
                 onLeave={() => setHoveredCard(null)}
+                onCopy={onCopy}
               />
             ))}
           </div>
@@ -863,38 +888,47 @@ interface GalleryCardProps {
   isAnyHovered: boolean;
   onHover: () => void;
   onLeave: () => void;
+  onCopy: () => void;
 }
 
-function GalleryCard({ height, image, model, prompt, isHovered, isAnyHovered, onHover, onLeave }: GalleryCardProps) {
+function GalleryCard({ height, image, model, prompt, isHovered, isAnyHovered, onHover, onLeave, onCopy }: GalleryCardProps) {
   const copyPrompt = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
+    let copied = false;
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(prompt);
-        return;
+        copied = true;
       }
     } catch {
       // Fall back below
     }
 
     // Fallback for environments where Clipboard API is unavailable/blocked
-    try {
-      const el = document.createElement('textarea');
-      el.value = prompt;
-      el.setAttribute('readonly', 'true');
-      el.style.position = 'fixed';
-      el.style.top = '0';
-      el.style.left = '0';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      el.focus();
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    } catch {
-      // noop
+    if (!copied) {
+      try {
+        const el = document.createElement('textarea');
+        el.value = prompt;
+        el.setAttribute('readonly', 'true');
+        el.style.position = 'fixed';
+        el.style.top = '0';
+        el.style.left = '0';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        copied = true;
+      } catch {
+        // noop
+      }
+    }
+
+    if (copied) {
+      onCopy();
     }
   };
 
