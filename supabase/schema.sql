@@ -46,12 +46,13 @@ CREATE TABLE IF NOT EXISTS generations (
   processing_time_ms INTEGER,
   error_message TEXT,
   cost_credits INTEGER DEFAULT 1,
-  viewed BOOLEAN DEFAULT false,
   
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   started_at TIMESTAMP WITH TIME ZONE,
   completed_at TIMESTAMP WITH TIME ZONE,
+  
+  -- Viewed tracking
   viewed BOOLEAN DEFAULT false,
   viewed_at TIMESTAMP WITH TIME ZONE,
   

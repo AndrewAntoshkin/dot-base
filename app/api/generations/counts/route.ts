@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Fast endpoint to get only tab counts
- * Much faster than full list endpoint when only counts are needed
+ * Uses optimized SQL function for single query instead of 4 parallel queries
  */
 export async function GET() {
   try {
@@ -45,27 +45,46 @@ export async function GET() {
 
     const supabase = createServiceRoleClient();
 
-    // Get counts for all tabs (parallel queries for speed)
+    // Try optimized SQL function first (single query instead of 4)
+    const { data: countsData, error: rpcError } = await supabase
+      .rpc('get_generation_counts', { p_user_id: user.id })
+      .single();
+
+    if (!rpcError && countsData) {
+      return NextResponse.json({
+        all: Number(countsData.all_count) || 0,
+        processing: Number(countsData.processing_count) || 0,
+        favorites: Number(countsData.favorites_count) || 0,
+        failed: Number(countsData.failed_count) || 0,
+      });
+    }
+
+    // Fallback to parallel queries if function doesn't exist
+    // IMPORTANT: Filter out keyframe segments to match list endpoint
     const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
+        .eq('user_id', user.id)
+        .not('is_keyframe_segment', 'is', true),
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .in('status', ['pending', 'processing']),
+        .in('status', ['pending', 'processing'])
+        .not('is_keyframe_segment', 'is', true),
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('is_favorite', true),
+        .eq('is_favorite', true)
+        .not('is_keyframe_segment', 'is', true),
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('status', 'failed'),
+        .eq('status', 'failed')
+        .not('is_keyframe_segment', 'is', true),
     ]);
 
     return NextResponse.json({

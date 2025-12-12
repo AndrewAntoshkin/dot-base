@@ -124,7 +124,9 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     abortControllerRef.current = abortController;
     
     try {
-      const response = await fetchWithTimeout('/api/generations/list?limit=20', {
+      // Use skipCounts=true to avoid 4 extra COUNT queries on each poll
+      // Context only needs the list for badge/unviewed count
+      const response = await fetchWithTimeout('/api/generations/list?limit=20&skipCounts=true', {
         timeout: 15000, // 15 секунд timeout
         retries: 1,
         credentials: 'include',

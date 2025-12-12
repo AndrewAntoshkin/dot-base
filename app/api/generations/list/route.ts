@@ -53,12 +53,13 @@ export async function GET(request: NextRequest) {
     const to = from + limit - 1;
 
     // Build query based on tab filter
-    // Hide keyframe segments (only show final merge) - uses indexed boolean column
+    // Hide keyframe segments (only show final merge)
+    // Using .not('is_keyframe_segment', 'is', true) instead of .or() for better index usage
     let query = supabase
       .from('generations')
       .select('id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message')
       .eq('user_id', user.id)
-      .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false')
+      .not('is_keyframe_segment', 'is', true)
       .order('created_at', { ascending: false });
 
     // Apply tab filter
@@ -93,39 +94,54 @@ export async function GET(request: NextRequest) {
     let counts = { all: 0, processing: 0, favorites: 0, failed: 0 };
     
     if (!skipCounts) {
-      // Parallel count queries - all use indexed is_keyframe_segment column
-      const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
-        supabase
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
-        supabase
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .in('status', ['pending', 'processing'])
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
-        supabase
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_favorite', true)
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
-        supabase
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'failed')
-          .or('is_keyframe_segment.is.null,is_keyframe_segment.eq.false'),
-      ]);
-      
-      counts = {
-        all: allCount.count || 0,
-        processing: processingCount.count || 0,
-        favorites: favoritesCount.count || 0,
-        failed: failedCount.count || 0,
-      };
+      // Try optimized SQL function first (single query instead of 4)
+      const { data: countsData, error: rpcError } = await supabase
+        .rpc('get_generation_counts', { p_user_id: user.id })
+        .single();
+
+      if (!rpcError && countsData) {
+        counts = {
+          all: Number(countsData.all_count) || 0,
+          processing: Number(countsData.processing_count) || 0,
+          favorites: Number(countsData.favorites_count) || 0,
+          failed: Number(countsData.failed_count) || 0,
+        };
+      } else {
+        // Fallback: parallel count queries with optimized filter
+        // Using .not('is_keyframe_segment', 'is', true) for better index usage
+        const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
+          supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .not('is_keyframe_segment', 'is', true),
+          supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .in('status', ['pending', 'processing'])
+            .not('is_keyframe_segment', 'is', true),
+          supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('is_favorite', true)
+            .not('is_keyframe_segment', 'is', true),
+          supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('status', 'failed')
+            .not('is_keyframe_segment', 'is', true),
+        ]);
+        
+        counts = {
+          all: allCount.count || 0,
+          processing: processingCount.count || 0,
+          favorites: favoritesCount.count || 0,
+          failed: failedCount.count || 0,
+        };
+      }
     }
 
     // Calculate total pages for current tab

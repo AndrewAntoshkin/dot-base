@@ -192,7 +192,8 @@ export default function HistoryPageClient() {
       if (hasActiveGenerations) {
         await syncProcessingStatuses();
       } else {
-        fetchGenerations(true);
+        // Silent polling - skip counts to reduce DB load
+        fetchGenerations(true, true);
       }
     }, interval);
     
