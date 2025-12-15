@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       generationsQuery = generationsQuery.eq('user_id', dbUser.id);
     }
 
-    const { data: generations } = await generationsQuery;
+    const { data: generations } = await generationsQuery as { data: { user_id: string; model_name: string }[] | null };
 
     if (!generations) {
       return NextResponse.json({ creators: [], models: [] });
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       const { data: users } = await adminClient
         .from('users')
         .select('id, email, telegram_first_name')
-        .in('id', uniqueUserIds);
+        .in('id', uniqueUserIds) as { data: { id: string; email: string; telegram_first_name: string | null }[] | null };
       
       if (users) {
         creators = users.map(u => ({

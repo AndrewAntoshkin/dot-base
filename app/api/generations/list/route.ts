@@ -72,8 +72,8 @@ export async function GET(request: NextRequest) {
     const { data: dbUser } = await supabase
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -206,8 +206,8 @@ export async function GET(request: NextRequest) {
       if (useRpc) {
         // Try optimized SQL function first (single query instead of 4)
         const { data: countsData, error: rpcError } = await supabase
-          .rpc('get_generation_counts', { p_user_id: dbUser.id })
-          .single();
+          .rpc('get_generation_counts', { p_user_id: dbUser.id } as any)
+          .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
 
         if (!rpcError && countsData) {
           counts = {

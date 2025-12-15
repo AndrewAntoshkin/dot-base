@@ -23,8 +23,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -36,7 +36,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', dbUser.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     const canManage = 
       dbUser.role === 'super_admin' || 
@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .from('users')
       .select('id, email')
       .eq('email', email.toLowerCase().trim())
-      .single();
+      .single() as { data: { id: string; email: string } | null };
 
     if (!userToAdd) {
       return NextResponse.json({ error: 'User not found. They must register first.' }, { status: 404 });
@@ -81,7 +81,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .select('id')
       .eq('workspace_id', workspaceId)
       .eq('user_id', userToAdd.id)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (existingMember) {
       return NextResponse.json({ error: 'User is already a member' }, { status: 400 });
@@ -95,9 +95,9 @@ export async function POST(request: Request, { params }: RouteParams) {
         user_id: userToAdd.id,
         role,
         invited_by: dbUser.id,
-      })
+      } as any)
       .select()
-      .single();
+      .single() as { data: { id: string; role: string; joined_at: string } | null; error: any };
 
     if (error) {
       console.error('Error adding member:', error);
@@ -106,11 +106,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({
       member: {
-        id: newMember.id,
+        id: newMember?.id,
         user_id: userToAdd.id,
         email: userToAdd.email,
-        role: newMember.role,
-        joined_at: newMember.joined_at,
+        role: newMember?.role,
+        joined_at: newMember?.joined_at,
       },
     }, { status: 201 });
   } catch (error) {
@@ -137,8 +137,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -158,7 +158,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', dbUser.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     // Можно удалить себя или если есть права
     const isSelf = userId === dbUser.id;
@@ -176,7 +176,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', userId)
-      .single();
+      .single() as { data: { role: string } | null };
 
     if (memberToRemove?.role === 'owner') {
       // Проверяем, есть ли другие owners
@@ -196,9 +196,9 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       .from('workspace_members')
       .select('workspace_id')
       .eq('user_id', userId)
-      .neq('workspace_id', workspaceId);
+      .neq('workspace_id', workspaceId) as { data: { workspace_id: string }[] | null };
 
-    const otherWorkspaceIds = (otherMemberships as { workspace_id: string }[] | null)?.map(m => m.workspace_id) || [];
+    const otherWorkspaceIds = otherMemberships?.map(m => m.workspace_id) || [];
 
     // Определяем куда переносить генерации
     let targetWorkspaceId: string | null = null;
@@ -214,8 +214,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     // Переносим генерации пользователя из этого workspace
     if (targetWorkspaceId) {
-      const { error: migrateError, count: migratedCount } = await adminClient
-        .from('generations')
+      const { error: migrateError } = await (adminClient
+        .from('generations') as any)
         .update({ workspace_id: targetWorkspaceId })
         .eq('workspace_id', workspaceId)
         .eq('user_id', userId);
@@ -228,8 +228,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       }
     } else {
       // Если некуда переносить - обнуляем workspace_id
-      const { error: nullifyError } = await adminClient
-        .from('generations')
+      const { error: nullifyError } = await (adminClient
+        .from('generations') as any)
         .update({ workspace_id: null })
         .eq('workspace_id', workspaceId)
         .eq('user_id', userId);
@@ -278,8 +278,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -291,7 +291,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', dbUser.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     const canChangeRoles = 
       dbUser.role === 'super_admin' || 
@@ -321,7 +321,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         .select('role')
         .eq('workspace_id', workspaceId)
         .eq('user_id', userId)
-        .single();
+        .single() as { data: { role: string } | null };
 
       if (targetMember?.role === 'owner') {
         const { count } = await adminClient
@@ -337,8 +337,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     // Обновляем роль
-    const { data: updatedMember, error } = await adminClient
-      .from('workspace_members')
+    const { data: updatedMember, error } = await (adminClient
+      .from('workspace_members') as any)
       .update({ role })
       .eq('workspace_id', workspaceId)
       .eq('user_id', userId)

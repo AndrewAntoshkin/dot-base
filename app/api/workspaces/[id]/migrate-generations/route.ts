@@ -26,8 +26,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', sourceWorkspaceId)
       .eq('user_id', dbUser.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     const canManage = isAdmin || ['owner', 'admin'].includes(membership?.role || '');
 
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .select('id, name')
       .eq('id', targetWorkspaceId)
       .eq('is_active', true)
-      .single();
+      .single() as { data: { id: string; name: string } | null };
 
     if (!targetWorkspace) {
       return NextResponse.json({ error: 'Target workspace not found' }, { status: 404 });
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .select('id')
       .eq('workspace_id', targetWorkspaceId)
       .eq('user_id', userId)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!targetMembership) {
       return NextResponse.json({ 
@@ -90,8 +90,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('user_id', userId);
 
     // Переносим генерации
-    const { error: migrateError } = await adminClient
-      .from('generations')
+    const { error: migrateError } = await (adminClient
+      .from('generations') as any)
       .update({ workspace_id: targetWorkspaceId })
       .eq('workspace_id', sourceWorkspaceId)
       .eq('user_id', userId);

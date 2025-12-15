@@ -38,66 +38,70 @@ export async function GET(request: NextRequest) {
       return query;
     };
     
-    // Запросы
-    const queries: Promise<any>[] = [];
-    
-    // 1. Пространства (общее количество)
-    queries.push(
-      supabase.from('workspaces').select('id', { count: 'exact', head: true }).eq('is_active', true)
-    );
-    
-    // 2. Пользователи (с учётом фильтра по workspace)
-    if (workspaceId) {
-      queries.push(
-        supabase.from('workspace_members').select('user_id', { count: 'exact', head: true }).eq('workspace_id', workspaceId)
-      );
-    } else {
-      queries.push(
-        supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true)
-      );
-    }
-    
-    // 3. Активные сегодня пользователи
-    queries.push(
-      supabase.from('users').select('id', { count: 'exact', head: true }).gte('last_login', oneDayAgo)
-    );
-    
-    // 4. Всего генераций (с фильтрами)
-    queries.push(baseGenerationsFilter());
-    
-    // 5. Генерации сегодня (с фильтрами)
-    let todayQuery = supabase.from('generations').select('id', { count: 'exact', head: true }).gte('created_at', oneDayAgo);
-    if (workspaceId) todayQuery = todayQuery.eq('workspace_id', workspaceId);
-    if (userId) todayQuery = todayQuery.eq('user_id', userId);
-    queries.push(todayQuery);
-    
-    // 6. Ошибки (с фильтрами) - только для super_admin
-    if (isSuperAdmin) {
-      let failedQuery = supabase.from('generations').select('id', { count: 'exact', head: true }).eq('status', 'failed');
-      if (workspaceId) failedQuery = failedQuery.eq('workspace_id', workspaceId);
-      if (userId) failedQuery = failedQuery.eq('user_id', userId);
-      if (startDate) failedQuery = failedQuery.gte('created_at', startDate);
-      if (endDate) failedQuery = failedQuery.lte('created_at', endDate);
-      queries.push(failedQuery);
+    // Выполняем запросы параллельно
+    const [
+      workspacesResult,
+      usersResult,
+      activeTodayResult,
+      totalGenerationsResult,
+      generationsTodayResult,
+      failedResult,
+      failedTodayResult,
+    ] = await Promise.all([
+      // 1. Пространства (общее количество)
+      supabase.from('workspaces').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      
+      // 2. Пользователи (с учётом фильтра по workspace)
+      workspaceId
+        ? supabase.from('workspace_members').select('user_id', { count: 'exact', head: true }).eq('workspace_id', workspaceId)
+        : supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      
+      // 3. Активные сегодня пользователи
+      supabase.from('users').select('id', { count: 'exact', head: true }).gte('last_login', oneDayAgo),
+      
+      // 4. Всего генераций (с фильтрами)
+      baseGenerationsFilter(),
+      
+      // 5. Генерации сегодня (с фильтрами)
+      (async () => {
+        let query = supabase.from('generations').select('id', { count: 'exact', head: true }).gte('created_at', oneDayAgo);
+        if (workspaceId) query = query.eq('workspace_id', workspaceId);
+        if (userId) query = query.eq('user_id', userId);
+        return query;
+      })(),
+      
+      // 6. Ошибки (с фильтрами) - только для super_admin
+      isSuperAdmin
+        ? (async () => {
+            let query = supabase.from('generations').select('id', { count: 'exact', head: true }).eq('status', 'failed');
+            if (workspaceId) query = query.eq('workspace_id', workspaceId);
+            if (userId) query = query.eq('user_id', userId);
+            if (startDate) query = query.gte('created_at', startDate);
+            if (endDate) query = query.lte('created_at', endDate);
+            return query;
+          })()
+        : Promise.resolve({ count: 0 }),
       
       // 7. Ошибки сегодня
-      let failedTodayQuery = supabase.from('generations').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('created_at', oneDayAgo);
-      if (workspaceId) failedTodayQuery = failedTodayQuery.eq('workspace_id', workspaceId);
-      if (userId) failedTodayQuery = failedTodayQuery.eq('user_id', userId);
-      queries.push(failedTodayQuery);
-    }
-    
-    const results = await Promise.all(queries);
+      isSuperAdmin
+        ? (async () => {
+            let query = supabase.from('generations').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('created_at', oneDayAgo);
+            if (workspaceId) query = query.eq('workspace_id', workspaceId);
+            if (userId) query = query.eq('user_id', userId);
+            return query;
+          })()
+        : Promise.resolve({ count: 0 }),
+    ]);
     
     const stats = {
-      totalWorkspaces: results[0].count || 0,
-      totalUsers: results[1].count || 0,
-      activeToday: results[2].count || 0,
-      totalGenerations: results[3].count || 0,
-      generationsToday: results[4].count || 0,
+      totalWorkspaces: workspacesResult.count || 0,
+      totalUsers: usersResult.count || 0,
+      activeToday: activeTodayResult.count || 0,
+      totalGenerations: totalGenerationsResult.count || 0,
+      generationsToday: generationsTodayResult.count || 0,
       cost: null, // Стоимость пока пустое значение
-      failedGenerations: isSuperAdmin ? (results[5]?.count || 0) : 0,
-      failedToday: isSuperAdmin ? (results[6]?.count || 0) : 0,
+      failedGenerations: isSuperAdmin ? (failedResult?.count || 0) : 0,
+      failedToday: isSuperAdmin ? (failedTodayResult?.count || 0) : 0,
     };
     
     return NextResponse.json({ data: stats });

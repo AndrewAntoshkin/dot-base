@@ -47,8 +47,8 @@ export async function GET() {
 
     // Try optimized SQL function first (single query instead of 4)
     const { data: countsData, error: rpcError } = await supabase
-      .rpc('get_generation_counts', { p_user_id: user.id })
-      .single();
+      .rpc('get_generation_counts', { p_user_id: user.id } as any)
+      .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
 
     if (!rpcError && countsData) {
       return NextResponse.json({

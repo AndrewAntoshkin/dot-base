@@ -18,16 +18,16 @@ export async function GET() {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Для super_admin - все пространства, для остальных - только свои
-    let workspaces;
-    let error;
+    let workspaces: any[] | null = null;
+    let error: any = null;
 
     if (dbUser.role === 'super_admin') {
       // Super admin видит все пространства
@@ -48,7 +48,7 @@ export async function GET() {
         .eq('is_active', true)
         .order('created_at', { ascending: true });
       
-      workspaces = result.data;
+      workspaces = result.data as any[];
       error = result.error;
     } else {
       // Обычный пользователь - только свои пространства через join
@@ -70,7 +70,7 @@ export async function GET() {
       
       // Преобразуем формат данных
       if (result.data) {
-        workspaces = result.data.map((item: any) => ({
+        workspaces = (result.data as any[]).map((item: any) => ({
           ...item.workspaces,
           workspace_members: [{ role: item.role, user_id: dbUser.id }]
         }));
@@ -93,7 +93,7 @@ export async function GET() {
       const { data: allMembers } = await adminClient
         .from('workspace_members')
         .select('workspace_id, user_id')
-        .in('workspace_id', workspaceIds);
+        .in('workspace_id', workspaceIds) as { data: { workspace_id: string; user_id: string }[] | null };
       
       if (allMembers && allMembers.length > 0) {
         // Получаем уникальные user_id
@@ -103,19 +103,19 @@ export async function GET() {
         const { data: users } = await adminClient
           .from('users')
           .select('id, email, telegram_first_name')
-          .in('id', userIds);
+          .in('id', userIds) as { data: { id: string; email: string; telegram_first_name: string | null }[] | null };
         
         const usersMap = new Map(users?.map(u => [u.id, u]) || []);
         
         // Группируем по workspace_id
-        allMembers.forEach((m: any) => {
+        allMembers.forEach((m) => {
           if (!membersMap[m.workspace_id]) {
             membersMap[m.workspace_id] = [];
           }
-          const user = usersMap.get(m.user_id);
+          const userInfo = usersMap.get(m.user_id);
           membersMap[m.workspace_id].push({
             id: m.user_id,
-            name: user?.telegram_first_name || user?.email?.split('@')[0] || 'User',
+            name: userInfo?.telegram_first_name || userInfo?.email?.split('@')[0] || 'User',
           });
         });
       }
@@ -184,8 +184,8 @@ export async function POST(request: Request) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser || !['admin', 'super_admin'].includes(dbUser.role)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
     const slug = name
       .toLowerCase()
       .split('')
-      .map(char => translitMap[char] || char)
+      .map((char: string) => translitMap[char] || char)
       .join('')
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
@@ -222,15 +222,15 @@ export async function POST(request: Request) {
       .from('workspaces')
       .select('id')
       .eq('slug', slug)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (existingWorkspace) {
       return NextResponse.json({ error: 'Workspace with this name already exists' }, { status: 400 });
     }
 
     // Создаём пространство
-    const { data: workspace, error: createError } = await adminClient
-      .from('workspaces')
+    const { data: workspace, error: createError } = await (adminClient
+      .from('workspaces') as any)
       .insert({
         name: name.trim(),
         slug,
@@ -238,16 +238,15 @@ export async function POST(request: Request) {
         created_by: dbUser.id,
       })
       .select()
-      .single();
+      .single() as { data: { id: string; name: string; slug: string; description: string | null; created_at: string } | null; error: any };
 
-    if (createError) {
+    if (createError || !workspace) {
       console.error('Error creating workspace:', createError);
       return NextResponse.json({ error: 'Failed to create workspace' }, { status: 500 });
     }
 
     // Добавляем создателя как owner
-    await adminClient
-      .from('workspace_members')
+    await (adminClient.from('workspace_members') as any)
       .insert({
         workspace_id: workspace.id,
         user_id: dbUser.id,
@@ -261,7 +260,7 @@ export async function POST(request: Request) {
       const { data: usersToAdd } = await adminClient
         .from('users')
         .select('id, email')
-        .in('email', members.filter((m: string) => m !== user.email));
+        .in('email', members.filter((m: string) => m !== user.email)) as { data: { id: string; email: string }[] | null };
 
       if (usersToAdd && usersToAdd.length > 0) {
         const memberInserts = usersToAdd.map(u => ({
@@ -271,7 +270,7 @@ export async function POST(request: Request) {
           invited_by: dbUser.id,
         }));
 
-        await adminClient.from('workspace_members').insert(memberInserts);
+        await (adminClient.from('workspace_members') as any).insert(memberInserts);
       }
     }
 

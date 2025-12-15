@@ -22,7 +22,7 @@ export default async function WorkspaceUsersPage({ params }: PageProps) {
     .select('id')
     .eq('slug', slug)
     .eq('is_active', true)
-    .single();
+    .single() as { data: { id: string } | null };
   
   if (!workspace) {
     notFound();

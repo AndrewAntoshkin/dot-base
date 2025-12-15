@@ -22,8 +22,8 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -34,7 +34,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       .from('workspaces')
       .select('id, name, slug, description, created_at, is_active, created_by')
       .eq('id', id)
-      .single();
+      .single() as { data: { id: string; name: string; slug: string; description: string | null; created_at: string; is_active: boolean; created_by: string } | null; error: any };
 
     if (error || !workspace) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
@@ -44,10 +44,10 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { data: workspaceMembers } = await adminClient
       .from('workspace_members')
       .select('id, user_id, role, joined_at')
-      .eq('workspace_id', id);
+      .eq('workspace_id', id) as { data: { id: string; user_id: string; role: string; joined_at: string }[] | null };
 
     // Проверяем доступ
-    const isMember = workspaceMembers?.some((m: any) => m.user_id === dbUser.id);
+    const isMember = workspaceMembers?.some(m => m.user_id === dbUser.id);
     const isSuperAdmin = dbUser.role === 'super_admin';
 
     if (!isMember && !isSuperAdmin) {
@@ -59,26 +59,26 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { data: users } = await adminClient
       .from('users')
       .select('id, email, telegram_first_name, role')
-      .in('id', userIds);
+      .in('id', userIds) as { data: { id: string; email: string; telegram_first_name: string | null; role: string }[] | null };
     
     const usersMap = new Map(users?.map(u => [u.id, u]) || []);
 
     // Форматируем участников
-    const members = workspaceMembers?.map((m: any) => {
-      const user = usersMap.get(m.user_id);
+    const members = workspaceMembers?.map(m => {
+      const userInfo = usersMap.get(m.user_id);
       return {
         id: m.id,
         user_id: m.user_id,
         role: m.role,
         joined_at: m.joined_at,
-        email: user?.email,
-        name: user?.telegram_first_name || user?.email?.split('@')[0],
-        global_role: user?.role,
+        email: userInfo?.email,
+        name: userInfo?.telegram_first_name || userInfo?.email?.split('@')[0],
+        global_role: userInfo?.role,
       };
     }) || [];
 
     // Определяем роль текущего пользователя
-    const currentMember = workspaceMembers?.find((m: any) => m.user_id === dbUser.id);
+    const currentMember = workspaceMembers?.find(m => m.user_id === dbUser.id);
     const memberRole = currentMember?.role || (isSuperAdmin ? 'owner' : null);
 
     return NextResponse.json({
@@ -96,7 +96,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         id: dbUser.id,
         role: memberRole,
         global_role: dbUser.role,
-        can_manage: ['owner', 'admin'].includes(memberRole) || isSuperAdmin,
+        can_manage: ['owner', 'admin'].includes(memberRole || '') || isSuperAdmin,
       },
     });
   } catch (error) {
@@ -122,8 +122,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -135,7 +135,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', id)
       .eq('user_id', dbUser.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     const canEdit = 
       dbUser.role === 'super_admin' || 
@@ -156,8 +156,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    const { data: workspace, error } = await adminClient
-      .from('workspaces')
+    const { data: workspace, error } = await (adminClient
+      .from('workspaces') as any)
       .update(updates)
       .eq('id', id)
       .select()
@@ -192,8 +192,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -205,7 +205,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       .select('role')
       .eq('workspace_id', id)
       .eq('user_id', dbUser.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     const canDelete = 
       dbUser.role === 'super_admin' || 
@@ -216,8 +216,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     }
 
     // Мягкое удаление - деактивируем
-    const { error } = await adminClient
-      .from('workspaces')
+    const { error } = await (adminClient
+      .from('workspaces') as any)
       .update({ is_active: false })
       .eq('id', id);
 

@@ -25,8 +25,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { data: dbUser } = await adminClient
       .from('users')
       .select('id, role')
-      .eq('email', user.email)
-      .single();
+      .eq('email', user.email as string)
+      .single() as { data: { id: string; role: string } | null };
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { data: memberships } = await adminClient
       .from('workspace_members')
       .select('workspace_id, role')
-      .eq('user_id', userId);
+      .eq('user_id', userId) as { data: { workspace_id: string; role: string }[] | null };
 
     if (!memberships || memberships.length === 0) {
       return NextResponse.json({ workspaces: [] });
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from('workspaces')
       .select('id, name, slug')
       .in('id', workspaceIds)
-      .eq('is_active', true);
+      .eq('is_active', true) as { data: { id: string; name: string; slug: string }[] | null };
 
     // Добавляем роль пользователя в каждом workspace
     const workspacesWithRole = (workspaces || []).map(ws => {
