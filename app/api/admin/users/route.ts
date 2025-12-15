@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const role = searchParams.get('role') as UserRole | undefined;
     const status = searchParams.get('status') as 'active' | 'inactive' | undefined;
+    const workspaceId = searchParams.get('workspaceId') || undefined;
+    const startDate = searchParams.get('startDate') || undefined;
+    const endDate = searchParams.get('endDate') || undefined;
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     
@@ -31,6 +34,9 @@ export async function GET(request: NextRequest) {
       search,
       role: role || undefined,
       status: status || undefined,
+      workspaceId,
+      startDate,
+      endDate,
       limit,
       offset,
     });

@@ -9,6 +9,7 @@ import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType } from '@/lib/models-lite';
 import { useGenerations } from '@/contexts/generations-context';
+import { useUser } from '@/contexts/user-context';
 import type { SettingsFormRef } from '@/components/settings-form';
 
 // Ленивая загрузка тяжёлых компонентов
@@ -39,7 +40,8 @@ function VideoContent() {
   const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
   const [mobileShowForm, setMobileShowForm] = useState(false);
   const { addGeneration } = useGenerations();
-  
+  const { selectedWorkspaceId } = useUser();
+
   // Form ref для управления формой без глобальных переменных
   const formRef = useRef<SettingsFormRef | null>(null);
 
@@ -146,6 +148,7 @@ function VideoContent() {
           model_id: model.id,
           prompt: prompt,
           settings: settings,
+          workspace_id: selectedWorkspaceId,
         }),
       });
 

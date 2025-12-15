@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, WifiOff } from 'lucide-react';
+import { Loader2, WifiOff, Check } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
@@ -75,7 +75,10 @@ export function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { unviewedCount, hasActiveGenerations, isOffline, networkError } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { email: userEmail, setEmail: setUserEmail, isAdmin } = useUser();
+  const { email: userEmail, setEmail: setUserEmail, isAdmin, workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useUser();
+  
+  // Get display workspaces (max 5)
+  const displayWorkspaces = workspaces.slice(0, 5);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -261,10 +264,58 @@ export function Header() {
                           {userEmail || 'Пользователь'}
                         </span>
                         <span className="font-inter font-normal text-xs text-[#959595]">
-                          Персональный аккаунт
+                          Корпоративный аккаунт
                         </span>
                       </div>
+                      {/* Profile button */}
+                      <button className="px-2 py-2.5 bg-[#252525] rounded-lg">
+                        <span className="font-inter font-medium text-xs text-white">
+                          Профиль
+                        </span>
+                      </button>
                     </div>
+
+                    {/* Workspaces Section */}
+                    {workspaces.length > 0 && (
+                      <div className="flex flex-col gap-3">
+                        <span className="font-inter font-normal text-xs text-[#717171]">
+                          Пространства
+                        </span>
+                        <div className="flex flex-col gap-2">
+                          {displayWorkspaces.map((workspace) => (
+                            <button
+                              key={workspace.id}
+                              onClick={() => setSelectedWorkspaceId(workspace.id)}
+                              className={`w-full px-4 py-3 flex items-center justify-between rounded-xl border transition-colors ${
+                                selectedWorkspaceId === workspace.id 
+                                  ? 'border-[#959595]' 
+                                  : 'border-[#2F2F2F] hover:border-[#4f4f4f]'
+                              }`}
+                            >
+                              <span className="font-inter font-normal text-sm text-white">
+                                {workspace.name}
+                              </span>
+                              {selectedWorkspaceId === workspace.id && (
+                                <Check className="w-4 h-4 text-white" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        
+                        {/* All Workspaces Button - show if admin OR more than 5 workspaces */}
+                        {(isAdmin || workspaces.length > 5) && (
+                          <Link
+                            href="/workspaces"
+                            onClick={() => setIsUserMenuOpen(false)}
+                            className="w-full h-10 flex items-center justify-center gap-2 border border-[#535353] rounded-xl hover:border-white/50 transition-colors"
+                          >
+                            <span className="font-inter font-medium text-sm text-white tracking-[-0.084px]">
+                              Все пространства
+                            </span>
+                          </Link>
+                        )}
+                      </div>
+                    )}
 
                     {/* Logout Button */}
                     <button
@@ -389,6 +440,19 @@ export function Header() {
           >
             Галерея
           </Link>
+          
+          {/* Пространства - only for admins */}
+          {isAdmin && (
+            <Link
+              href="/workspaces"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
+                pathname === '/workspaces' || pathname.startsWith('/workspaces/') ? 'bg-black' : ''
+              }`}
+            >
+              Пространства
+            </Link>
+          )}
           
           {/* Dashboard - only for admins */}
           {isAdmin && (

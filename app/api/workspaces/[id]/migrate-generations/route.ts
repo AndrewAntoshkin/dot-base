@@ -1,0 +1,115 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+/**
+ * POST /api/workspaces/[id]/migrate-generations
+ * Перенести генерации пользователя в другой workspace
+ * Body: { userId: string, targetWorkspaceId: string }
+ */
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id: sourceWorkspaceId } = await params;
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const adminClient = createServiceRoleClient();
+
+    // Проверяем права (только admin/super_admin)
+    const { data: dbUser } = await adminClient
+      .from('users')
+      .select('id, role')
+      .eq('email', user.email)
+      .single();
+
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const isAdmin = dbUser.role === 'admin' || dbUser.role === 'super_admin';
+    
+    // Также проверяем workspace-роль
+    const { data: membership } = await adminClient
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', sourceWorkspaceId)
+      .eq('user_id', dbUser.id)
+      .single();
+
+    const canManage = isAdmin || ['owner', 'admin'].includes(membership?.role || '');
+
+    if (!canManage) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { userId, targetWorkspaceId } = body;
+
+    if (!userId || !targetWorkspaceId) {
+      return NextResponse.json({ error: 'userId and targetWorkspaceId are required' }, { status: 400 });
+    }
+
+    // Проверяем что target workspace существует
+    const { data: targetWorkspace } = await adminClient
+      .from('workspaces')
+      .select('id, name')
+      .eq('id', targetWorkspaceId)
+      .eq('is_active', true)
+      .single();
+
+    if (!targetWorkspace) {
+      return NextResponse.json({ error: 'Target workspace not found' }, { status: 404 });
+    }
+
+    // Проверяем что пользователь является членом target workspace
+    const { data: targetMembership } = await adminClient
+      .from('workspace_members')
+      .select('id')
+      .eq('workspace_id', targetWorkspaceId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!targetMembership) {
+      return NextResponse.json({ 
+        error: 'User must be a member of the target workspace' 
+      }, { status: 400 });
+    }
+
+    // Считаем сколько генераций будет перенесено
+    const { count: generationsCount } = await adminClient
+      .from('generations')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', sourceWorkspaceId)
+      .eq('user_id', userId);
+
+    // Переносим генерации
+    const { error: migrateError } = await adminClient
+      .from('generations')
+      .update({ workspace_id: targetWorkspaceId })
+      .eq('workspace_id', sourceWorkspaceId)
+      .eq('user_id', userId);
+
+    if (migrateError) {
+      console.error('Error migrating generations:', migrateError);
+      return NextResponse.json({ error: 'Failed to migrate generations' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      migratedCount: generationsCount || 0,
+      fromWorkspaceId: sourceWorkspaceId,
+      toWorkspaceId: targetWorkspaceId,
+      toWorkspaceName: targetWorkspace.name,
+    });
+  } catch (error) {
+    console.error('Error in POST /api/workspaces/[id]/migrate-generations:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

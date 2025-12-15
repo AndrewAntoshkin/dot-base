@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { AspectRatioSelector } from './aspect-ratio-selector';
 import { DirectionalExpandSelector, ExpandDirection } from './directional-expand-selector';
+import { useUser } from '@/contexts/user-context';
 
 // Helper function to get image dimensions
 function getImageDimensions(imageSrc: string): Promise<{ width: number; height: number }> {
@@ -732,6 +733,7 @@ export function SettingsForm({
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedWorkspaceId } = useUser();
   // Состояние для выбранных индексов изображений в file_array полях
   const [selectedIndices, setSelectedIndices] = useState<Record<string, number>>({});
   // Ref для хранения handleSubmit функции (чтобы использовать в useEffect до определения функции)
@@ -950,6 +952,7 @@ export function SettingsForm({
             input_image_url: processedSettings.image || processedSettings.input_image || processedSettings.start_image || processedSettings.first_frame_image,
             input_video_url: isVideoAction ? processedSettings.video : undefined,
             settings: processedSettings,
+            workspace_id: selectedWorkspaceId,
           }),
           timeout: isSlowConnection() ? 60000 : 30000,
           retries: 2,

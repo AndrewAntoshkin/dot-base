@@ -7,6 +7,7 @@ import { AspectRatioSelector } from '@/components/aspect-ratio-selector';
 import { Textarea } from '@/components/ui/textarea';
 import { TooltipLabel } from '@/components/ui/tooltip-label';
 import { useGenerations } from '@/contexts/generations-context';
+import { useUser } from '@/contexts/user-context';
 import { 
   ImageIcon, 
   RefreshCw, 
@@ -37,7 +38,8 @@ const ASPECT_RATIOS = [
 
 export function ExpandPageClient() {
   const { addGeneration, generations, refreshGenerations } = useGenerations();
-  
+  const { selectedWorkspaceId } = useUser();
+
   // Состояние
   const [selectedModel, setSelectedModel] = useState('bria-expand');
   const [image, setImage] = useState<string | null>(null);
@@ -498,6 +500,9 @@ export function ExpandPageClient() {
           expand: currentExpand,
         });
       }
+      
+      // Добавляем workspace_id
+      requestBody.workspace_id = selectedWorkspaceId;
       
       console.log('[Expand] Sending request:', requestBody);
       

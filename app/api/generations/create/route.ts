@@ -17,6 +17,7 @@ const createGenerationSchema = z.object({
   input_image_url: z.string().nullish(),
   input_video_url: z.string().nullish(),
   settings: z.record(z.any()).optional(),
+  workspace_id: z.string().nullish(), // Выбранный workspace
 });
 
 export async function POST(request: NextRequest) {
@@ -62,6 +63,32 @@ export async function POST(request: NextRequest) {
     console.log('User ID:', userId);
     const supabase = createServiceRoleClient();
 
+    const body = await request.json();
+    const validatedData = createGenerationSchema.parse(body);
+
+    // ========================================
+    // Получаем workspace пользователя для привязки генерации
+    // ========================================
+    let workspaceId: string | null = null;
+    
+    // Получаем все workspaces пользователя
+    const { data: memberships } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', userId);
+    
+    const userWorkspaceIds = (memberships as { workspace_id: string }[] | null)?.map(m => m.workspace_id) || [];
+    
+    // Если передан workspace_id и пользователь в нём состоит - используем его
+    if (validatedData.workspace_id && userWorkspaceIds.includes(validatedData.workspace_id)) {
+      workspaceId = validatedData.workspace_id;
+      console.log('Using selected workspace:', workspaceId);
+    } else if (userWorkspaceIds.length > 0) {
+      // Иначе берём первый доступный
+      workspaceId = userWorkspaceIds[0];
+      console.log('Using first available workspace:', workspaceId);
+    }
+
     // ========================================
     // ЛИМИТ: Максимум 5 одновременных генераций
     // ========================================
@@ -89,9 +116,6 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
-
-    const body = await request.json();
-    const validatedData = createGenerationSchema.parse(body);
 
     // Получить конфигурацию модели
     const model = getModelById(validatedData.model_id);
@@ -203,6 +227,7 @@ export async function POST(request: NextRequest) {
       .from('generations') as any)
       .insert({
         user_id: userId,
+        workspace_id: workspaceId, // Привязка к workspace
         action: validatedData.action,
         model_id: validatedData.model_id,
         model_name: model.name,

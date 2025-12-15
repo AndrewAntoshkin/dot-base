@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from '@/components/header';
 import { 
   ChevronLeft,
@@ -14,18 +14,24 @@ import {
   UserX,
   UserCheck,
   Download,
+  ChevronDown as ChevronDownIcon,
+  Calendar,
+  X,
 } from 'lucide-react';
 import { useUser } from '@/contexts/user-context';
 import { UserRole } from '@/lib/supabase/types';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, isSameDay, isWithinInterval, isBefore, isAfter } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 interface AdminStats {
+  totalWorkspaces: number;
   totalUsers: number;
   activeToday: number;
   totalGenerations: number;
   generationsToday: number;
+  cost: number | null;
   failedGenerations: number;
   failedToday: number;
-  uniqueModelsCount: number;
 }
 
 interface UserWithStats {
@@ -41,6 +47,7 @@ interface UserWithStats {
   role: UserRole;
   generations_count?: number;
   total_credits_spent?: number;
+  workspace_name?: string | null;
 }
 
 interface UserGeneration {
@@ -75,12 +82,189 @@ interface ErrorAnalysis {
   errors: ErrorItem[];
 }
 
+interface FilterOption {
+  id: string;
+  name: string;
+  email?: string;
+  slug?: string;
+}
+
 interface AdminPageClientProps {
   userEmail: string | null;
 }
 
-type SortField = 'name' | 'status' | 'generations' | 'email' | 'role';
+type SortField = 'name' | 'status' | 'generations' | 'email' | 'role' | 'workspace';
 type SortDirection = 'asc' | 'desc';
+
+// Date Range Picker Component
+function DateRangePicker({
+  startDate,
+  endDate,
+  onSelect,
+  onClose,
+}: {
+  startDate: Date | null;
+  endDate: Date | null;
+  onSelect: (start: Date | null, end: Date | null) => void;
+  onClose: () => void;
+}) {
+  const [viewMonth, setViewMonth] = useState(new Date());
+  const [selecting, setSelecting] = useState<'start' | 'end'>('start');
+  const [tempStart, setTempStart] = useState<Date | null>(startDate);
+  const [tempEnd, setTempEnd] = useState<Date | null>(endDate);
+
+  const monthStart = startOfMonth(viewMonth);
+  const monthEnd = endOfMonth(viewMonth);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+  const days: Date[] = [];
+  let day = calendarStart;
+  while (day <= calendarEnd) {
+    days.push(day);
+    day = new Date(day.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  const weeks: Date[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
+
+  const handleDayClick = (date: Date) => {
+    if (selecting === 'start') {
+      setTempStart(date);
+      setTempEnd(null);
+      setSelecting('end');
+    } else {
+      if (tempStart && isBefore(date, tempStart)) {
+        setTempEnd(tempStart);
+        setTempStart(date);
+      } else {
+        setTempEnd(date);
+      }
+      setSelecting('start');
+    }
+  };
+
+  const handleApply = () => {
+    onSelect(tempStart, tempEnd);
+    onClose();
+  };
+
+  const handleClear = () => {
+    setTempStart(null);
+    setTempEnd(null);
+    onSelect(null, null);
+    onClose();
+  };
+
+  const isInRange = (date: Date) => {
+    if (!tempStart || !tempEnd) return false;
+    return isWithinInterval(date, { start: tempStart, end: tempEnd });
+  };
+
+  const quickRanges = [
+    { label: 'Сегодня', start: new Date(), end: new Date() },
+    { label: 'Вчера', start: subDays(new Date(), 1), end: subDays(new Date(), 1) },
+    { label: '7 дней', start: subDays(new Date(), 7), end: new Date() },
+    { label: '30 дней', start: subDays(new Date(), 30), end: new Date() },
+    { label: 'Этот месяц', start: startOfMonth(new Date()), end: new Date() },
+  ];
+
+  return (
+    <div className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl shadow-xl z-50 p-4 min-w-[320px]">
+      {/* Quick ranges */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {quickRanges.map((range) => (
+          <button
+            key={range.label}
+            onClick={() => {
+              setTempStart(range.start);
+              setTempEnd(range.end);
+            }}
+            className="px-2 py-1 text-[12px] text-[#a2a2a2] hover:text-white hover:bg-[#252525] rounded transition-colors"
+          >
+            {range.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => setViewMonth(addMonths(viewMonth, -1))}
+          className="p-1 hover:bg-[#252525] rounded transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4 text-white" />
+        </button>
+        <span className="font-inter font-medium text-[14px] text-white">
+          {format(viewMonth, 'LLLL yyyy', { locale: ru })}
+        </span>
+        <button
+          onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+          className="p-1 hover:bg-[#252525] rounded transition-colors"
+        >
+          <ChevronRight className="w-4 h-4 text-white" />
+        </button>
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1 mb-4">
+        {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
+          <div key={d} className="text-center text-[11px] text-[#6d6d6d] py-1">
+            {d}
+          </div>
+        ))}
+        {weeks.map((week, wi) => (
+          week.map((date, di) => {
+            const isCurrentMonth = date.getMonth() === viewMonth.getMonth();
+            const isSelected = (tempStart && isSameDay(date, tempStart)) || (tempEnd && isSameDay(date, tempEnd));
+            const isRange = isInRange(date);
+
+            return (
+              <button
+                key={`${wi}-${di}`}
+                onClick={() => handleDayClick(date)}
+                className={`
+                  w-8 h-8 text-[12px] rounded transition-colors
+                  ${!isCurrentMonth ? 'text-[#4d4d4d]' : 'text-white'}
+                  ${isSelected ? 'bg-[#6366F1] text-white' : ''}
+                  ${isRange && !isSelected ? 'bg-[#6366F1]/30' : ''}
+                  ${!isSelected && !isRange ? 'hover:bg-[#252525]' : ''}
+                `}
+              >
+                {date.getDate()}
+              </button>
+            );
+          })
+        ))}
+      </div>
+
+      {/* Selected range display */}
+      <div className="flex items-center gap-2 mb-4 text-[13px] text-[#a2a2a2]">
+        <span>{tempStart ? format(tempStart, 'dd.MM.yyyy') : '—'}</span>
+        <span>→</span>
+        <span>{tempEnd ? format(tempEnd, 'dd.MM.yyyy') : '—'}</span>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleClear}
+          className="flex-1 px-3 py-2 text-[13px] text-[#a2a2a2] hover:text-white transition-colors"
+        >
+          Сбросить
+        </button>
+        <button
+          onClick={handleApply}
+          className="flex-1 px-3 py-2 bg-[#6366F1] text-white text-[13px] rounded-lg hover:bg-[#5558E3] transition-colors"
+        >
+          Применить
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -88,11 +272,21 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>('generations');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  
+  // Filters
+  const [filterOptions, setFilterOptions] = useState<{ workspaces: FilterOption[]; users: FilterOption[] }>({ workspaces: [], users: [] });
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [dateStart, setDateStart] = useState<Date | null>(null);
+  const [dateEnd, setDateEnd] = useState<Date | null>(null);
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // Side sheet state
-  const [selectedUser, setSelectedUser] = useState<UserWithStats | null>(null);
+  const [sideSheetUser, setSideSheetUser] = useState<UserWithStats | null>(null);
   const [userGenerations, setUserGenerations] = useState<UserGeneration[]>([]);
   const [isLoadingGenerations, setIsLoadingGenerations] = useState(false);
   const [generationsPage, setGenerationsPage] = useState(1);
@@ -104,17 +298,78 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
   const [errorModalTab, setErrorModalTab] = useState<'overview' | 'table'>('overview');
   
-  // Получаем isSuperAdmin из контекста (роль загружена из БД)
+  // Получаем isSuperAdmin из контекста
   const { isSuperAdmin } = useUser();
   const itemsPerPage = 10;
   const generationsPerPage = 10;
 
+  // Refs for click outside
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (workspaceRef.current && !workspaceRef.current.contains(e.target as Node)) {
+        setShowWorkspaceDropdown(false);
+      }
+      if (userRef.current && !userRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
+      if (dateRef.current && !dateRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch filter options
+  const fetchFilterOptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/filter-options');
+      if (res.ok) {
+        const data = await res.json();
+        setFilterOptions(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch filter options:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, [fetchFilterOptions]);
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Build query params
+      const statsParams = new URLSearchParams();
+      const usersParams = new URLSearchParams();
+      
+      if (selectedWorkspace) {
+        statsParams.set('workspaceId', selectedWorkspace);
+        usersParams.set('workspaceId', selectedWorkspace);
+      }
+      if (selectedUser) {
+        statsParams.set('userId', selectedUser);
+      }
+      if (dateStart) {
+        const startStr = format(dateStart, 'yyyy-MM-dd');
+        statsParams.set('startDate', startStr);
+        usersParams.set('startDate', startStr);
+      }
+      if (dateEnd) {
+        const endStr = format(dateEnd, 'yyyy-MM-dd') + 'T23:59:59';
+        statsParams.set('endDate', endStr);
+        usersParams.set('endDate', endStr);
+      }
+
       const [statsRes, usersRes] = await Promise.all([
-        fetch('/api/admin/stats'),
-        fetch('/api/admin/users'),
+        fetch(`/api/admin/stats?${statsParams}`),
+        fetch(`/api/admin/users?${usersParams}`),
       ]);
       
       if (statsRes.ok) {
@@ -131,7 +386,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedWorkspace, selectedUser, dateStart, dateEnd]);
 
   useEffect(() => {
     fetchData();
@@ -177,7 +432,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
 
   // Open side sheet
   const handleRowClick = (user: UserWithStats) => {
-    setSelectedUser(user);
+    setSideSheetUser(user);
     setGenerationsPage(1);
     fetchUserGenerations(user.id);
   };
@@ -186,10 +441,10 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const closeSideSheet = () => {
     setIsSideSheetClosing(true);
     setTimeout(() => {
-      setSelectedUser(null);
+      setSideSheetUser(null);
       setUserGenerations([]);
       setIsSideSheetClosing(false);
-    }, 300); // Match animation duration
+    }, 300);
   };
 
   // Sort function
@@ -238,6 +493,9 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
         case 'role':
           comparison = getRolePriority(a.role) - getRolePriority(b.role);
           break;
+        case 'workspace':
+          comparison = (a.workspace_name || '').localeCompare(b.workspace_name || '');
+          break;
       }
       
       return sortDirection === 'asc' ? comparison : -comparison;
@@ -276,7 +534,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   };
 
   const handleToggleStatus = async (userId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click
+    e.stopPropagation();
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
@@ -293,18 +551,18 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     setOpenMenuId(null);
   };
 
-  // Export to Excel
+  // Export to Excel with filters
   const handleExportExcel = () => {
-    // Create CSV content
-    const headers = ['Имя', 'Username', 'Email', 'Статус', 'Роль', 'Генерации', 'Кредиты', 'Дата регистрации', 'Последний вход'];
-    const rows = users.map(user => [
+    const headers = ['Имя', 'Username', 'Email', 'Статус', 'Роль', 'Генерации', 'Стоимость', 'Пространство', 'Дата регистрации', 'Последний вход'];
+    const rows = sortedUsers.map(user => [
       user.telegram_first_name || '-',
       user.telegram_username || '-',
       user.email || '-',
       user.is_active ? 'Активный' : 'Неактивен',
       user.role === 'super_admin' ? 'Супер-админ' : user.role === 'admin' ? 'Админ' : 'Пользователь',
       user.generations_count || 0,
-      user.credits || 0,
+      '-', // Стоимость пока пустое
+      user.workspace_name || '-',
       new Date(user.created_at).toLocaleDateString('ru-RU'),
       new Date(user.last_login).toLocaleDateString('ru-RU'),
     ]);
@@ -314,19 +572,25 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
     
-    // Download file
+    // Формируем имя файла с учётом фильтров
+    let filename = 'dashboard_report';
+    if (dateStart && dateEnd) {
+      filename += `_${format(dateStart, 'dd.MM.yyyy')}-${format(dateEnd, 'dd.MM.yyyy')}`;
+    }
+    filename += `_${new Date().toISOString().split('T')[0]}.csv`;
+    
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `users_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  // Export user generations to Excel
+  // Export user generations
   const handleExportUserGenerations = () => {
-    if (!selectedUser) return;
+    if (!sideSheetUser) return;
     
     const headers = ['Модель', 'Кредиты', 'Статус', 'Дата'];
     const rows = userGenerations.map(gen => [
@@ -345,17 +609,18 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${selectedUser.email || selectedUser.telegram_username}_generations_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${sideSheetUser.email || sideSheetUser.telegram_username}_generations_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  // Stats cards data (ошибки только для super_admin)
+  // Stats cards data
   const statsCards = [
+    { label: 'Пространства', value: stats?.totalWorkspaces || 0, change: null },
     { label: 'Пользователи', value: stats?.totalUsers || 0, change: stats?.activeToday ? `+${stats.activeToday} сегодня` : null },
     { label: 'Генерации', value: stats?.totalGenerations || 0, change: stats?.generationsToday ? `+${stats.generationsToday} сегодня` : null },
+    { label: 'Стоимость', value: stats && stats.cost !== null && stats.cost !== undefined ? `${stats.cost.toLocaleString()}₽` : '—', change: null },
     ...(isSuperAdmin ? [{ label: 'Ошибки', value: stats?.failedGenerations || 0, change: stats?.failedToday ? `+${stats.failedToday} сегодня` : null, isError: true }] : []),
-    { label: 'Моделей', value: stats?.uniqueModelsCount || 0, change: null },
   ];
 
   // Pagination numbers
@@ -396,43 +661,52 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     </th>
   );
 
+  // Get selected names
+  const selectedWorkspaceName = filterOptions.workspaces.find(w => w.id === selectedWorkspace)?.name;
+  const selectedUserName = filterOptions.users.find(u => u.id === selectedUser)?.name;
+  const dateRangeLabel = dateStart && dateEnd 
+    ? `${format(dateStart, 'dd.MM.yyyy')} - ${format(dateEnd, 'dd.MM.yyyy')}`
+    : dateStart 
+    ? `с ${format(dateStart, 'dd.MM.yyyy')}`
+    : null;
+
   return (
     <div className="min-h-screen bg-[#101010]">
       <Header />
       
-      <main className="px-[80px] py-8">
+      <main className="px-4 lg:px-[80px] py-8">
         {/* Title */}
         <h1 className="font-inter font-semibold text-[20px] leading-[28px] tracking-[-0.4px] text-white mb-6">
           Dashboard
         </h1>
 
         {/* Stats Cards */}
-        <div className="flex gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           {statsCards.map((card, idx) => (
             <div 
               key={idx}
               onClick={'isError' in card && card.isError ? handleErrorsCardClick : undefined}
-              className={`flex-1 border border-[#2f2f2f] rounded-[20px] p-6 min-w-[200px] ${
+              className={`border border-[#2f2f2f] rounded-[20px] p-5 ${
                 'isError' in card && card.isError ? 'cursor-pointer hover:bg-[#1f1f1f] transition-colors' : ''
               }`}
             >
               <p className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2] mb-2">
                 {card.label}
               </p>
-              <div className="flex items-end justify-between">
+              <div className="flex items-end justify-between gap-2">
                 <p className={`font-inter font-semibold text-[24px] leading-[32px] ${
                   'isError' in card && card.isError && Number(card.value) > 0 ? 'text-red-400' : 'text-white'
                 }`}>
                   {isLoading ? '...' : card.value}
                 </p>
                 {card.change && (
-                  <div className="flex items-center gap-2 py-1">
-                    <span className={`font-inter font-normal text-[12px] leading-[16px] ${
+                  <div className="flex items-center gap-1 py-1">
+                    <span className={`font-inter font-normal text-[12px] leading-[16px] whitespace-nowrap ${
                       'isError' in card && card.isError ? 'text-red-400/70' : 'text-[#a2a2a2]'
                     }`}>
                       {card.change}
                     </span>
-                    <TrendingUp className={`w-4 h-4 ${
+                    <TrendingUp className={`w-4 h-4 shrink-0 ${
                       'isError' in card && card.isError ? 'text-red-400/70' : 'text-[#a2a2a2]'
                     }`} />
                   </div>
@@ -442,29 +716,161 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           ))}
         </div>
 
+        {/* Filters Row */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* Workspace Filter */}
+          <div ref={workspaceRef} className="relative">
+            <button
+              onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] hover:border-[#3a3a3a] transition-colors"
+            >
+              <span className="font-inter text-[13px] text-white">
+                {selectedWorkspaceName || 'Пространство'}
+              </span>
+              <ChevronDownIcon className="w-4 h-4 text-white" />
+            </button>
+            {showWorkspaceDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl shadow-xl z-20 py-1 min-w-[180px] max-h-[300px] overflow-auto">
+                <button
+                  onClick={() => {
+                    setSelectedWorkspace(null);
+                    setShowWorkspaceDropdown(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                    !selectedWorkspace ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
+                  }`}
+                >
+                  Все пространства
+                </button>
+                {filterOptions.workspaces.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() => {
+                      setSelectedWorkspace(w.id);
+                      setShowWorkspaceDropdown(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                      selectedWorkspace === w.id ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
+                    }`}
+                  >
+                    {w.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* User Filter */}
+          <div ref={userRef} className="relative">
+            <button
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] hover:border-[#3a3a3a] transition-colors"
+            >
+              <span className="font-inter text-[13px] text-white">
+                {selectedUserName || 'Пользователь'}
+              </span>
+              <ChevronDownIcon className="w-4 h-4 text-white" />
+            </button>
+            {showUserDropdown && (
+              <div className="absolute top-full left-0 mt-1 bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl shadow-xl z-20 py-1 min-w-[220px] max-h-[300px] overflow-auto">
+                <button
+                  onClick={() => {
+                    setSelectedUser(null);
+                    setShowUserDropdown(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                    !selectedUser ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
+                  }`}
+                >
+                  Все пользователи
+                </button>
+                {filterOptions.users.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => {
+                      setSelectedUser(u.id);
+                      setShowUserDropdown(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                      selectedUser === u.id ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
+                    }`}
+                  >
+                    <span className="block truncate">{u.name}</span>
+                    <span className="block text-[11px] text-[#6d6d6d] truncate">{u.email}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Date Range Filter */}
+          <div ref={dateRef} className="relative">
+            <button
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] hover:border-[#3a3a3a] transition-colors"
+            >
+              <Calendar className="w-4 h-4 text-white" />
+              <span className="font-inter text-[13px] text-white">
+                {dateRangeLabel || 'Период'}
+              </span>
+              <ChevronDownIcon className="w-4 h-4 text-white" />
+            </button>
+            {showDatePicker && (
+              <DateRangePicker
+                startDate={dateStart}
+                endDate={dateEnd}
+                onSelect={(start, end) => {
+                  setDateStart(start);
+                  setDateEnd(end);
+                }}
+                onClose={() => setShowDatePicker(false)}
+              />
+            )}
+          </div>
+
+          {/* Clear filters */}
+          {(selectedWorkspace || selectedUser || dateStart) && (
+            <button
+              onClick={() => {
+                setSelectedWorkspace(null);
+                setSelectedUser(null);
+                setDateStart(null);
+                setDateEnd(null);
+              }}
+              className="flex items-center gap-1 px-2 py-2 text-[13px] text-[#a2a2a2] hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Сбросить
+            </button>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Export Button */}
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] rounded-lg text-white hover:bg-[#5558E3] transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span className="font-inter font-medium text-[13px]">
+              Скачать отчет
+            </span>
+          </button>
+        </div>
+
         {/* Table */}
         <div className="bg-[#151515] border border-[#252525] rounded-[12px] overflow-hidden">
           {/* Table Header */}
-          <div className="px-6 py-5 border-b border-[#252525] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="font-inter font-semibold text-[18px] leading-[28px] text-[#e9eaeb]">
-                Пользователи
-              </h2>
-              <div className="bg-[#2c2c2c] rounded-[6px] px-1.5 min-w-[20px] h-5 flex items-center justify-center">
-                <span className="font-inter font-medium text-[10px] text-white">
-                  {users.length}
-                </span>
-              </div>
-            </div>
-            <button 
-              onClick={handleExportExcel}
-              className="flex items-center gap-2 px-3 py-2 bg-[#252525] rounded-lg text-white hover:bg-[#303030] transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span className="font-inter font-semibold text-[14px] leading-[20px]">
-                Скачать отчет
+          <div className="px-6 py-5 border-b border-[#252525] flex items-center gap-2">
+            <h2 className="font-inter font-semibold text-[18px] leading-[28px] text-[#e9eaeb]">
+              Пользователи
+            </h2>
+            <div className="bg-[#2c2c2c] rounded-[6px] px-1.5 min-w-[20px] h-5 flex items-center justify-center">
+              <span className="font-inter font-medium text-[10px] text-white">
+                {sortedUsers.length}
               </span>
-            </button>
+            </div>
           </div>
 
           {/* Table Content */}
@@ -486,7 +892,12 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                   </th>
                   <SortableHeader field="status">Статус</SortableHeader>
                   <SortableHeader field="generations">Генерации</SortableHeader>
-                  <SortableHeader field="email">Email</SortableHeader>
+                  <th className="h-11 px-6 text-left">
+                    <span className="font-inter font-semibold text-[12px] leading-[18px] text-[#a2a2a2]">
+                      Стоимость
+                    </span>
+                  </th>
+                  <SortableHeader field="workspace">Пространство</SortableHeader>
                   <SortableHeader field="role">Роль</SortableHeader>
                   <th className="h-11 px-4"></th>
                 </tr>
@@ -494,13 +905,13 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="h-[72px] text-center text-[#a2a2a2]">
+                    <td colSpan={7} className="h-[72px] text-center text-[#a2a2a2]">
                       Загрузка...
                     </td>
                   </tr>
                 ) : paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="h-[72px] text-center text-[#a2a2a2]">
+                    <td colSpan={7} className="h-[72px] text-center text-[#a2a2a2]">
                       Пользователи не найдены
                     </td>
                   </tr>
@@ -549,10 +960,17 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                         </span>
                       </td>
                       
-                      {/* Email */}
+                      {/* Cost */}
                       <td className="h-[72px] px-6">
                         <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
-                          {user.email || '-'}
+                          —
+                        </span>
+                      </td>
+                      
+                      {/* Workspace */}
+                      <td className="h-[72px] px-6">
+                        <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
+                          {user.workspace_name || '—'}
                         </span>
                       </td>
                       
@@ -687,7 +1105,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
       </main>
 
       {/* Side Sheet Overlay */}
-      {selectedUser && (
+      {sideSheetUser && (
         <div 
           className={`fixed inset-0 z-[9999] flex items-center justify-end overflow-hidden transition-colors duration-300 ${
             isSideSheetClosing ? 'bg-black/0' : 'bg-black/60'
@@ -699,7 +1117,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
               isSideSheetClosing ? 'translate-x-full' : 'translate-x-0 animate-slide-in-right'
             }`}
           >
-            {/* Close Button - Outside the panel */}
+            {/* Close Button */}
             <button 
               onClick={closeSideSheet}
               className={`mt-3 p-0 hover:opacity-80 transition-opacity shrink-0 ${
@@ -720,7 +1138,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
               {/* Header */}
               <div className="flex items-center">
                 <h3 className="font-inter font-medium text-[18px] leading-[28px] text-white truncate">
-                  {selectedUser.email || selectedUser.telegram_username || 'Пользователь'}
+                  {sideSheetUser.email || sideSheetUser.telegram_username || 'Пользователь'}
                 </h3>
               </div>
 

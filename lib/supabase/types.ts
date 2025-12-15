@@ -11,6 +11,9 @@ export type Json =
 // User roles
 export type UserRole = 'user' | 'admin' | 'super_admin';
 
+// Workspace member roles
+export type WorkspaceMemberRole = 'owner' | 'admin' | 'member';
+
 // Admin stats view
 export interface AdminStats {
   total_users: number;
@@ -75,6 +78,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          workspace_id: string | null;
           action: ActionType;
           model_id: string;
           model_name: string;
@@ -101,6 +105,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          workspace_id?: string | null;
           action: ActionType;
           model_id: string;
           model_name: string;
@@ -124,6 +129,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          workspace_id?: string | null;
           action?: ActionType;
           model_id?: string;
           model_name?: string;
@@ -180,6 +186,61 @@ export interface Database {
           created_at?: string;
         };
       };
+      workspaces: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          created_at: string;
+          created_by: string | null;
+          is_active: boolean;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          is_active?: boolean;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          description?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          is_active?: boolean;
+        };
+      };
+      workspace_members: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          user_id: string;
+          role: WorkspaceMemberRole;
+          joined_at: string;
+          invited_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          user_id: string;
+          role?: WorkspaceMemberRole;
+          joined_at?: string;
+          invited_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          user_id?: string;
+          role?: WorkspaceMemberRole;
+          joined_at?: string;
+          invited_by?: string | null;
+        };
+      };
     };
     Views: {
       admin_stats: {
@@ -206,6 +267,24 @@ export interface Database {
         Args: { user_email: string };
         Returns: string;
       };
+      is_workspace_member: {
+        Args: { p_workspace_id: string; p_user_id: string };
+        Returns: boolean;
+      };
+      get_workspace_role: {
+        Args: { p_workspace_id: string; p_user_id: string };
+        Returns: string | null;
+      };
+      get_user_workspaces: {
+        Args: { p_user_id: string };
+        Returns: Array<{
+          workspace_id: string;
+          workspace_name: string;
+          workspace_slug: string;
+          member_role: WorkspaceMemberRole;
+          member_count: number;
+        }>;
+      };
     };
     Enums: {};
   };
@@ -225,5 +304,53 @@ export interface UserWithStats {
   role: UserRole;
   generations_count?: number;
   total_credits_spent?: number;
+}
+
+// Workspace types
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  created_at: string;
+  created_by: string | null;
+  is_active: boolean;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  role: WorkspaceMemberRole;
+  joined_at: string;
+  invited_by: string | null;
+}
+
+// Workspace with member info
+export interface WorkspaceWithRole extends Workspace {
+  member_role: WorkspaceMemberRole;
+  member_count: number;
+}
+
+// Generation with user info (for workspace view)
+export interface GenerationWithUser {
+  id: string;
+  user_id: string;
+  workspace_id: string | null;
+  action: ActionType;
+  model_id: string;
+  model_name: string;
+  prompt: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  output_urls: string[] | null;
+  created_at: string;
+  viewed: boolean;
+  is_favorite: boolean;
+  error_message: string | null;
+  // User info
+  user?: {
+    email: string | null;
+    telegram_first_name: string | null;
+  };
 }
 

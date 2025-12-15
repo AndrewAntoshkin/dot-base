@@ -2,13 +2,53 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
-import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon } from 'lucide-react';
+import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { OnlyMineToggle } from '@/components/only-mine-toggle';
+
+// Типы фильтров
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+// Опции для фильтра "Тип"
+const TYPE_OPTIONS: FilterOption[] = [
+  { value: '', label: 'Все типы' },
+  { value: 'create', label: 'Создание' },
+  { value: 'edit', label: 'Редактирование' },
+  { value: 'upscale', label: 'Увеличение' },
+  { value: 'remove_bg', label: 'Удаление фона' },
+  { value: 'video_create', label: 'Видео' },
+  { value: 'video_i2v', label: 'Image to Video' },
+  { value: 'analyze_describe', label: 'Анализ' },
+  { value: 'inpaint', label: 'Inpaint' },
+  { value: 'outpaint', label: 'Outpaint' },
+];
+
+// Опции для фильтра "Статус"
+const STATUS_OPTIONS: FilterOption[] = [
+  { value: '', label: 'Все статусы' },
+  { value: 'succeeded', label: 'Успешные' },
+  { value: 'processing', label: 'В процессе' },
+  { value: 'pending', label: 'Ожидание' },
+  { value: 'failed', label: 'Ошибка' },
+];
+
+// Опции для фильтра "Дата"
+const DATE_OPTIONS: FilterOption[] = [
+  { value: '', label: 'Все время' },
+  { value: 'today', label: 'Сегодня' },
+  { value: 'yesterday', label: 'Вчера' },
+  { value: 'week', label: 'Последняя неделя' },
+  { value: 'month', label: 'Последний месяц' },
+];
 
 interface Generation {
   id: string;
+  user_id: string;
   action: string;
   model_name: string;
   status: string;
@@ -17,6 +57,18 @@ interface Generation {
   created_at: string;
   is_favorite: boolean;
   error_message?: string | null;
+  // Creator info (для workspace view)
+  creator?: {
+    email: string | null;
+    name: string;
+  };
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  member_role: string;
 }
 
 interface TabCounts {
@@ -87,8 +139,70 @@ const BrokenLinkIcon = () => (
   </svg>
 );
 
+// Компонент dropdown фильтра
+interface FilterDropdownProps {
+  label: string;
+  value: string;
+  options: FilterOption[];
+  onChange: (value: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+function FilterDropdown({ label, value, options, onChange, isOpen, onToggle }: FilterDropdownProps) {
+  const selectedOption = options.find(o => o.value === value);
+  const displayLabel = value ? selectedOption?.label : label;
+  const hasValue = !!value;
+  
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className={`
+          flex items-center gap-2 px-3 py-2 rounded-[10px] text-[13px] font-medium transition-colors
+          ${hasValue 
+            ? 'bg-[#2c2c2c] text-white border border-[#3a3a3a]' 
+            : 'bg-[#1a1a1a] text-[#959595] border border-transparent hover:bg-[#252525]'
+          }
+        `}
+      >
+        <span className="whitespace-nowrap">{displayLabel}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] shadow-lg z-50 py-1 max-h-[300px] overflow-y-auto">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange(option.value);
+                onToggle();
+              }}
+              className={`
+                w-full text-left px-3 py-2 text-[13px] transition-colors
+                ${option.value === value 
+                  ? 'bg-[#2c2c2c] text-white' 
+                  : 'text-[#959595] hover:bg-[#252525] hover:text-white'
+                }
+              `}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HistoryPageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -98,19 +212,111 @@ export default function HistoryPageClient() {
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const supabaseRef = useRef(createClient());
+  
+  // Workspace state
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [onlyMine, setOnlyMine] = useState(searchParams.get('onlyMine') !== 'false'); // По умолчанию включён
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
+
+  // Filter states
+  const [filterCreator, setFilterCreator] = useState<string>('');
+  const [filterDate, setFilterDate] = useState<string>('');
+  const [filterModel, setFilterModel] = useState<string>('');
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  
+  // Available options for dynamic filters
+  const [availableCreators, setAvailableCreators] = useState<FilterOption[]>([]);
+  const [availableModels, setAvailableModels] = useState<FilterOption[]>([]);
+  
+  // Dropdown open states
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   // Проверяем есть ли активные генерации (processing/pending)
   const hasActiveGenerations = generations.some(
     g => g.status === 'processing' || g.status === 'pending'
   );
 
+  // URL параметры
+  const urlWorkspaceId = searchParams.get('workspaceId');
+  const urlCreatorId = searchParams.get('creatorId');
+  const urlOnlyMine = searchParams.get('onlyMine');
+
+  // Инициализируем фильтр по создателю из URL
+  useEffect(() => {
+    if (urlCreatorId) {
+      setFilterCreator(urlCreatorId);
+    }
+  }, [urlCreatorId]);
+
+  // Инициализируем onlyMine из URL
+  useEffect(() => {
+    if (urlOnlyMine !== null) {
+      setOnlyMine(urlOnlyMine !== 'false');
+    }
+  }, [urlOnlyMine]);
+
+  // Загрузка workspace пользователя
+  useEffect(() => {
+    const fetchWorkspace = async () => {
+      try {
+        const response = await fetch('/api/workspaces');
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.workspaces && data.workspaces.length > 0) {
+            // Если есть workspaceId в URL - ищем его
+            if (urlWorkspaceId) {
+              const targetWorkspace = data.workspaces.find((ws: Workspace) => ws.id === urlWorkspaceId);
+              if (targetWorkspace) {
+                setWorkspace(targetWorkspace);
+                // При переходе из списка пространств - выключаем "Только мои"
+                setOnlyMine(false);
+              } else {
+                // Если не нашли - берём первый
+                setWorkspace(data.workspaces[0]);
+              }
+            } else {
+              // Без workspaceId - берём первый
+              setWorkspace(data.workspaces[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Fetch workspace error:', error);
+      } finally {
+        setWorkspaceLoading(false);
+      }
+    };
+    fetchWorkspace();
+  }, [urlWorkspaceId]);
+
   const fetchGenerations = useCallback(async (silent = false, skipCounts = false) => {
     if (!silent) {
       setIsLoading(true);
     }
     try {
-      const url = `/api/generations/list?page=${page}&limit=20&tab=${activeTab}${skipCounts ? '&skipCounts=true' : ''}`
-      const response = await fetch(url);
+      // Добавляем workspace фильтры
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        tab: activeTab,
+      });
+      
+      if (skipCounts) params.set('skipCounts', 'true');
+      if (workspace?.id) {
+        params.set('workspaceId', workspace.id);
+        params.set('onlyMine', onlyMine.toString());
+      }
+      
+      // Добавляем фильтры
+      if (filterCreator) params.set('creatorId', filterCreator);
+      if (filterDate) params.set('dateRange', filterDate);
+      if (filterModel) params.set('modelName', filterModel);
+      if (filterType) params.set('actionType', filterType);
+      if (filterStatus) params.set('status', filterStatus);
+      
+      const response = await fetch(`/api/generations/list?${params}`);
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
@@ -127,7 +333,46 @@ export default function HistoryPageClient() {
         setIsLoading(false);
       }
     }
-  }, [page, activeTab]);
+  }, [page, activeTab, workspace?.id, onlyMine, filterCreator, filterDate, filterModel, filterType, filterStatus]);
+  
+  // Загрузка доступных создателей и моделей для фильтров
+  const fetchFilterOptions = useCallback(async () => {
+    if (!workspace?.id) return;
+    
+    try {
+      const response = await fetch(`/api/generations/filter-options?workspaceId=${workspace.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.creators) {
+          setAvailableCreators([
+            { value: '', label: 'Все создатели' },
+            ...data.creators.map((c: { id: string; name: string }) => ({
+              value: c.id,
+              label: c.name
+            }))
+          ]);
+        }
+        
+        if (data.models) {
+          setAvailableModels([
+            { value: '', label: 'Все модели' },
+            ...data.models.map((m: string) => ({
+              value: m,
+              label: m
+            }))
+          ]);
+        }
+      }
+    } catch (error) {
+      console.error('Fetch filter options error:', error);
+    }
+  }, [workspace?.id]);
+  
+  // Загружаем опции фильтров при смене workspace
+  useEffect(() => {
+    fetchFilterOptions();
+  }, [fetchFilterOptions]);
 
   // Быстрое обновление только счётчиков (отдельный легковесный эндпоинт)
   const updateCounts = useCallback(async () => {
@@ -159,10 +404,31 @@ export default function HistoryPageClient() {
     }
   }, [fetchGenerations]);
 
-  // Сброс страницы при смене таба
+  // Сброс страницы при смене таба, onlyMine или фильтров
   useEffect(() => {
     setPage(1);
-  }, [activeTab]);
+  }, [activeTab, onlyMine, filterCreator, filterDate, filterModel, filterType, filterStatus]);
+  
+  // Закрытие dropdown при клике вне
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    if (openDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openDropdown]);
+  
+  // Функция сброса всех фильтров
+  const resetFilters = () => {
+    setFilterCreator('');
+    setFilterDate('');
+    setFilterModel('');
+    setFilterType('');
+    setFilterStatus('');
+  };
+  
+  // Проверка есть ли активные фильтры
+  const hasActiveFilters = filterCreator || filterDate || filterModel || filterType || filterStatus;
 
   // Начальная загрузка + синхронизация
   useEffect(() => {
@@ -357,45 +623,136 @@ export default function HistoryPageClient() {
       <Header />
 
       <main className="flex-1 px-4 lg:px-[80px] py-6">
-        {/* Заголовок и табы */}
+        {/* Заголовок с workspace */}
         <div className="flex flex-col gap-1 mb-4">
-          <h1 className="font-inter font-semibold text-[20px] text-white tracking-[-0.4px] leading-[28px]">
-            История генераций
-          </h1>
+          {/* Название workspace + заголовок */}
+          <div className="flex flex-col gap-0">
+            {workspace && (
+              <span className="font-inter font-medium text-[14px] text-[#717171] tracking-[-0.3px] leading-[20px]">
+                {workspace.name}
+              </span>
+            )}
+            <h1 className="font-inter font-semibold text-[20px] text-white tracking-[-0.4px] leading-[28px]">
+              История генераций
+            </h1>
+          </div>
           
-          {/* Tabs - горизонтальный скролл на мобильных */}
-          <div className="flex gap-3 border-b border-[#2e2e2e] overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-            {TABS.map(tab => {
-              const isActive = activeTab === tab.id;
-              const count = counts[tab.id];
-              
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex items-center gap-2 py-[10px] px-0 shrink-0
-                    ${isActive ? 'border-b-2 border-white' : 'border-b-2 border-transparent'}
-                  `}
-                >
-                  <div className="flex items-center gap-2 py-1">
-                    <span 
-                      className={`
-                        font-inter text-[14px] leading-[20px] whitespace-nowrap
-                        ${isActive ? 'font-medium text-white' : 'font-normal text-[#959595]'}
-                      `}
-                    >
-                      {tab.label}
-                    </span>
-                    <div className="bg-[#2c2c2c] min-w-[20px] h-[20px] rounded-[6px] flex items-center justify-center px-1.5">
-                      <span className="font-inter font-medium text-[10px] text-white leading-[20px]">
-                        {count}
+          {/* Tabs и свитч "Только мои" */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#2e2e2e] pb-0">
+            {/* Tabs - горизонтальный скролл на мобильных */}
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+              {TABS.map(tab => {
+                const isActive = activeTab === tab.id;
+                const count = counts[tab.id];
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`
+                      flex items-center gap-2 py-[10px] px-0 shrink-0
+                      ${isActive ? 'border-b-2 border-white' : 'border-b-2 border-transparent'}
+                    `}
+                  >
+                    <div className="flex items-center gap-2 py-1">
+                      <span 
+                        className={`
+                          font-inter text-[14px] leading-[20px] whitespace-nowrap
+                          ${isActive ? 'font-medium text-white' : 'font-normal text-[#959595]'}
+                        `}
+                      >
+                        {tab.label}
                       </span>
+                      <div className="bg-[#2c2c2c] min-w-[20px] h-[20px] rounded-[6px] flex items-center justify-center px-1.5">
+                        <span className="font-inter font-medium text-[10px] text-white leading-[20px]">
+                          {count}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
+            
+          </div>
+          
+          {/* Фильтры */}
+          <div className="flex flex-wrap items-center gap-2 py-3">
+            {/* Фильтр по создателю - только если не "Только мои" */}
+            {!onlyMine && availableCreators.length > 1 && (
+              <FilterDropdown
+                label="Создатель"
+                value={filterCreator}
+                options={availableCreators}
+                onChange={setFilterCreator}
+                isOpen={openDropdown === 'creator'}
+                onToggle={() => setOpenDropdown(openDropdown === 'creator' ? null : 'creator')}
+              />
+            )}
+            
+            {/* Фильтр по дате */}
+            <FilterDropdown
+              label="Дата создания"
+              value={filterDate}
+              options={DATE_OPTIONS}
+              onChange={setFilterDate}
+              isOpen={openDropdown === 'date'}
+              onToggle={() => setOpenDropdown(openDropdown === 'date' ? null : 'date')}
+            />
+            
+            {/* Фильтр по модели */}
+            {availableModels.length > 1 && (
+              <FilterDropdown
+                label="Модель"
+                value={filterModel}
+                options={availableModels}
+                onChange={setFilterModel}
+                isOpen={openDropdown === 'model'}
+                onToggle={() => setOpenDropdown(openDropdown === 'model' ? null : 'model')}
+              />
+            )}
+            
+            {/* Фильтр по типу */}
+            <FilterDropdown
+              label="Тип"
+              value={filterType}
+              options={TYPE_OPTIONS}
+              onChange={setFilterType}
+              isOpen={openDropdown === 'type'}
+              onToggle={() => setOpenDropdown(openDropdown === 'type' ? null : 'type')}
+            />
+            
+            {/* Фильтр по статусу */}
+            <FilterDropdown
+              label="Статус"
+              value={filterStatus}
+              options={STATUS_OPTIONS}
+              onChange={setFilterStatus}
+              isOpen={openDropdown === 'status'}
+              onToggle={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
+            />
+            
+            {/* Свитч "Только мои" */}
+            {workspace && (
+              <div className="ml-auto">
+                <OnlyMineToggle
+                  checked={onlyMine}
+                  onChange={setOnlyMine}
+                  disabled={workspaceLoading}
+                />
+              </div>
+            )}
+            
+            {/* Кнопка сброса фильтров */}
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1 px-3 py-2 text-[13px] text-[#959595] hover:text-white transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Сбросить
+              </button>
+            )}
           </div>
         </div>
 
@@ -487,6 +844,21 @@ export default function HistoryPageClient() {
                             {generation.model_name}
                           </span>
                         </div>
+                        
+                        {/* Avatar создателя - показываем когда смотрим все генерации workspace */}
+                        {!onlyMine && generation.creator && (
+                          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-[#181818]/80 backdrop-blur-sm px-2 py-1 rounded-[8px]">
+                            {/* Avatar circle with initials */}
+                            <div className="w-5 h-5 rounded-full bg-[#6366F1] flex items-center justify-center">
+                              <span className="font-inter font-medium text-[10px] text-white uppercase">
+                                {generation.creator.name?.substring(0, 2) || '??'}
+                              </span>
+                            </div>
+                            <span className="font-inter font-medium text-[10px] text-[#bbbbbb] max-w-[80px] truncate">
+                              {generation.creator.name}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Кнопка избранного (только для не-ошибок) */}
                         {!isFailed && (

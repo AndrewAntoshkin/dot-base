@@ -13,6 +13,12 @@ interface OutputPanelProps {
   isMobile?: boolean;
 }
 
+interface Creator {
+  id: string;
+  email: string;
+  name: string;
+}
+
 interface Generation {
   id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
@@ -25,6 +31,8 @@ interface Generation {
   created_at: string;
   processing_time_ms: number | null;
   settings: Record<string, any>;
+  is_owner?: boolean;
+  creator?: Creator | null;
 }
 
 function isVideoUrl(url: string): boolean {
@@ -53,6 +61,24 @@ function isAbortError(error: any): boolean {
 // Интервалы polling с адаптацией под качество сети
 const POLLING_INTERVAL = 5000; // 5 секунд обычно
 const POLLING_INTERVAL_SLOW = 10000; // 10 секунд для медленного соединения
+
+// Компонент badge создателя
+function CreatorBadge({ creator }: { creator: Creator }) {
+  const initials = creator.name?.substring(0, 2).toUpperCase() || '??';
+  
+  return (
+    <div className="inline-flex items-center gap-2 bg-[#1a1a1a] rounded-full px-3 py-1.5">
+      <div className="w-6 h-6 rounded-full bg-[#6366F1] flex items-center justify-center">
+        <span className="font-inter font-semibold text-[10px] text-white">
+          {initials}
+        </span>
+      </div>
+      <span className="font-inter text-[13px] text-white">
+        {creator.email || creator.name}
+      </span>
+    </div>
+  );
+}
 
 export function OutputPanel({ generationId, onRegenerate, isMobile = false }: OutputPanelProps) {
   const [generation, setGeneration] = useState<Generation | null>(null);
@@ -408,6 +434,13 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
           </button>
         </div>
 
+        {/* Creator badge - показываем для чужих генераций */}
+        {!generation.is_owner && generation.creator && (
+          <div className="mb-3">
+            <CreatorBadge creator={generation.creator} />
+          </div>
+        )}
+
         {/* Info */}
         <div className="flex flex-col gap-3">
           <p className="font-inter text-sm text-[#656565]">{formatDate(generation.created_at)}</p>
@@ -491,6 +524,13 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Creator badge - показываем для чужих генераций */}
+      {!generation.is_owner && generation.creator && (
+        <div className="mb-4">
+          <CreatorBadge creator={generation.creator} />
         </div>
       )}
 

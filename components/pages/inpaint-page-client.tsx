@@ -6,6 +6,7 @@ import { MaskEditor } from '@/components/mask-editor';
 import { INPAINT_MODELS } from '@/lib/models-config';
 import { INPAINT_MODELS_LITE } from '@/lib/models-lite';
 import { useGenerations } from '@/contexts/generations-context';
+import { useUser } from '@/contexts/user-context';
 import { MobileSelect, SelectOption } from '@/components/ui/mobile-select';
 import { 
   Upload, 
@@ -23,6 +24,7 @@ interface GenerationResult {
 
 export default function InpaintPageClient() {
   const { addGeneration, refreshGenerations } = useGenerations();
+  const { selectedWorkspaceId } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // State
@@ -268,6 +270,7 @@ export default function InpaintPageClient() {
           model_id: selectedModel.id,
           prompt: settings.prompt || '',
           settings: settings,
+          workspace_id: selectedWorkspaceId,
         }),
       });
 

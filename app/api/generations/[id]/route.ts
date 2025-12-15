@@ -78,13 +78,33 @@ export async function GET(
 
     const supabase = createServiceRoleClient();
 
+    // Получаем пользователя из нашей таблицы
+    const { data: dbUser } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('email', user.email || '')
+      .single();
+
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const typedDbUser = dbUser as { id: string; role: string };
+
+    // Получаем workspaces пользователя
+    const { data: userWorkspaces } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', typedDbUser.id);
+    
+    const userWorkspaceIds = (userWorkspaces as { workspace_id: string }[] | null)?.map(w => w.workspace_id) || [];
+
     // Получить генерацию с ретраями на случай проблем с БД
     const fetchGeneration = async () => {
       const { data, error } = await supabase
         .from('generations')
         .select('*')
         .eq('id', id)
-        .eq('user_id', user.id)
         .single();
       
       if (error) throw error;
@@ -104,6 +124,37 @@ export async function GET(
         { error: 'Generation not found' },
         { status: 404 }
       );
+    }
+
+    // Проверяем доступ: своя генерация ИЛИ в том же workspace ИЛИ super_admin
+    const isOwner = generation.user_id === typedDbUser.id;
+    const isInSameWorkspace = generation.workspace_id && userWorkspaceIds.includes(generation.workspace_id as string);
+    const isSuperAdmin = typedDbUser.role === 'super_admin';
+
+    if (!isOwner && !isInSameWorkspace && !isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+
+    // Получаем данные создателя если это не своя генерация
+    let creator: { id: string; email: string; name: string } | null = null;
+    if (!isOwner) {
+      const { data: creatorUser } = await supabase
+        .from('users')
+        .select('id, email, telegram_first_name')
+        .eq('id', generation.user_id)
+        .single();
+      
+      if (creatorUser) {
+        const typedCreator = creatorUser as { id: string; email: string; telegram_first_name: string | null };
+        creator = {
+          id: typedCreator.id,
+          email: typedCreator.email,
+          name: typedCreator.telegram_first_name || typedCreator.email?.split('@')[0] || 'User',
+        };
+      }
     }
 
     // Если генерация еще в процессе, проверить статус на Replicate
@@ -229,7 +280,11 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(generation);
+    return NextResponse.json({
+      ...generation,
+      is_owner: isOwner,
+      creator: creator,
+    });
   } catch (error: any) {
     console.error('Get generation error:', error);
     return NextResponse.json(

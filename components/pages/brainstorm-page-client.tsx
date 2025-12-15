@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { useGenerations } from '@/contexts/generations-context';
+import { useUser } from '@/contexts/user-context';
 import { CREATE_MODELS_LITE } from '@/lib/models-lite';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
 import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut, Download, Copy, Maximize2 } from 'lucide-react';
@@ -135,7 +136,8 @@ export default function BrainstormPageClient() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { addGeneration } = useGenerations();
-  
+  const { selectedWorkspaceId } = useUser();
+
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
@@ -528,6 +530,7 @@ export default function BrainstormPageClient() {
             model_id: modelId,
             prompt: prompt.trim(),
             settings: {},
+            workspace_id: selectedWorkspaceId,
           }),
         });
         
