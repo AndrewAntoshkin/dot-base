@@ -75,8 +75,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Get TOTAL generation counts using RPC (all generations, all workspaces)
     type UserStats = { user_id: string; generations_count: number; total_cost_usd: number };
     
-    const { data: rpcStats, error: rpcError } = await adminClient
-      .rpc('get_user_generation_stats', { p_user_ids: memberUserIds }) as unknown as { data: UserStats[] | null; error: Error | null };
+    const { data: rpcStats, error: rpcError } = await (adminClient
+      .rpc as any)('get_user_generation_stats', { p_user_ids: memberUserIds }) as { data: UserStats[] | null; error: Error | null };
     
     // Create a map for quick lookup
     const statsMap: Record<string, number> = {};

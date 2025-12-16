@@ -225,8 +225,8 @@ export async function getAdminUsers(options?: {
     let hasFilteredGenerations: Record<string, boolean> = {};
     
     // Try RPC function
-    const { data: rpcStats, error: rpcError } = await supabase
-      .rpc('get_user_generation_stats', { p_user_ids: fetchUserIds }) as unknown as { data: UserStats[] | null; error: Error | null };
+    const { data: rpcStats, error: rpcError } = await (supabase
+      .rpc as any)('get_user_generation_stats', { p_user_ids: fetchUserIds }) as { data: UserStats[] | null; error: Error | null };
     
     if (!rpcError && rpcStats) {
       // Use RPC results

@@ -46,16 +46,16 @@ export async function GET(request: NextRequest) {
         : supabase.from('users').select('id', { count: 'exact', head: true }),
       
       // 3. Total stats via RPC
-      supabase.rpc('get_dashboard_totals', {
+      (supabase.rpc as any)('get_dashboard_totals', {
         p_workspace_id: workspaceId || null,
         p_user_id: userId || null
-      }) as unknown as Promise<{ data: DashboardTotals[] | null; error: Error | null }>,
+      }) as Promise<{ data: DashboardTotals[] | null; error: Error | null }>,
       
       // 4. Today stats via RPC
-      supabase.rpc('get_dashboard_today_stats', {
+      (supabase.rpc as any)('get_dashboard_today_stats', {
         p_workspace_id: workspaceId || null,
         p_user_id: userId || null
-      }) as unknown as Promise<{ data: TodayStats[] | null; error: Error | null }>,
+      }) as Promise<{ data: TodayStats[] | null; error: Error | null }>,
     ]);
     
     // Extract RPC results
