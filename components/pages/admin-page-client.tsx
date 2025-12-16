@@ -3,17 +3,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from '@/components/header';
 import { 
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   ChevronDown,
   Pencil,
-  TrendingUp,
   Shield,
   User,
   UserX,
   UserCheck,
-  Download,
   ChevronDown as ChevronDownIcon,
   Calendar,
   X,
@@ -30,6 +26,7 @@ interface AdminStats {
   totalGenerations: number;
   generationsToday: number;
   cost: number | null;
+  costToday: number | null;
   failedGenerations: number;
   failedToday: number;
 }
@@ -47,6 +44,7 @@ interface UserWithStats {
   role: UserRole;
   generations_count?: number;
   total_credits_spent?: number;
+  cost_rub?: number | null;
   workspace_name?: string | null;
 }
 
@@ -93,7 +91,7 @@ interface AdminPageClientProps {
   userEmail: string | null;
 }
 
-type SortField = 'name' | 'status' | 'generations' | 'email' | 'role' | 'workspace';
+type SortField = 'name' | 'status' | 'created' | 'generations' | 'cost' | 'role';
 type SortDirection = 'asc' | 'desc';
 
 // Date Range Picker Component
@@ -484,17 +482,17 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
         case 'status':
           comparison = (a.is_active === b.is_active) ? 0 : a.is_active ? -1 : 1;
           break;
+        case 'created':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
         case 'generations':
           comparison = (a.generations_count || 0) - (b.generations_count || 0);
           break;
-        case 'email':
-          comparison = (a.email || '').localeCompare(b.email || '');
+        case 'cost':
+          comparison = (a.cost_rub || 0) - (b.cost_rub || 0);
           break;
         case 'role':
           comparison = getRolePriority(a.role) - getRolePriority(b.role);
-          break;
-        case 'workspace':
-          comparison = (a.workspace_name || '').localeCompare(b.workspace_name || '');
           break;
       }
       
@@ -553,19 +551,30 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
 
   // Export to Excel with filters
   const handleExportExcel = () => {
-    const headers = ['Имя', 'Username', 'Email', 'Статус', 'Роль', 'Генерации', 'Стоимость', 'Пространство', 'Дата регистрации', 'Последний вход'];
-    const rows = sortedUsers.map(user => [
-      user.telegram_first_name || '-',
-      user.telegram_username || '-',
-      user.email || '-',
-      user.is_active ? 'Активный' : 'Неактивен',
-      user.role === 'super_admin' ? 'Супер-админ' : user.role === 'admin' ? 'Админ' : 'Пользователь',
-      user.generations_count || 0,
-      '-', // Стоимость пока пустое
-      user.workspace_name || '-',
-      new Date(user.created_at).toLocaleDateString('ru-RU'),
-      new Date(user.last_login).toLocaleDateString('ru-RU'),
-    ]);
+    const headers = isSuperAdmin 
+      ? ['Имя', 'Username', 'Email', 'Статус', 'Создан', 'Генерации', 'Стоимость (₽)', 'Роль']
+      : ['Имя', 'Username', 'Email', 'Статус', 'Создан', 'Генерации', 'Роль'];
+    
+    const rows = sortedUsers.map(user => {
+      const baseRow = [
+        user.telegram_first_name || '-',
+        user.telegram_username || '-',
+        user.email || '-',
+        user.is_active ? 'Активный' : 'Неактивен',
+        new Date(user.created_at).toLocaleDateString('ru-RU'),
+        user.generations_count || 0,
+      ];
+      
+      if (isSuperAdmin) {
+        baseRow.push(user.cost_rub ? user.cost_rub.toLocaleString('ru-RU') : '-');
+      }
+      
+      baseRow.push(
+        user.role === 'super_admin' ? 'Супер-админ' : user.role === 'admin' ? 'Админ' : 'Пользователь',
+      );
+      
+      return baseRow;
+    });
     
     const csvContent = [
       headers.join(','),
@@ -617,9 +626,10 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   // Stats cards data
   const statsCards = [
     { label: 'Пространства', value: stats?.totalWorkspaces || 0, change: null },
-    { label: 'Пользователи', value: stats?.totalUsers || 0, change: stats?.activeToday ? `+${stats.activeToday} сегодня` : null },
+    { label: 'Пользователи', value: stats?.totalUsers || 0, change: null },
     { label: 'Генерации', value: stats?.totalGenerations || 0, change: stats?.generationsToday ? `+${stats.generationsToday} сегодня` : null },
-    { label: 'Стоимость', value: stats && stats.cost !== null && stats.cost !== undefined ? `${stats.cost.toLocaleString()}₽` : '—', change: null },
+    // Стоимость только для super_admin
+    ...(isSuperAdmin ? [{ label: 'Стоимость', value: stats && stats.cost !== null && stats.cost !== undefined ? `${stats.cost.toLocaleString('ru-RU')}₽` : '—', change: stats?.costToday ? `+${stats.costToday.toLocaleString('ru-RU')}₽` : null }] : []),
     ...(isSuperAdmin ? [{ label: 'Ошибки', value: stats?.failedGenerations || 0, change: stats?.failedToday ? `+${stats.failedToday} сегодня` : null, isError: true }] : []),
   ];
 
@@ -681,52 +691,68 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
         </h1>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-          {statsCards.map((card, idx) => (
-            <div 
-              key={idx}
-              onClick={'isError' in card && card.isError ? handleErrorsCardClick : undefined}
-              className={`border border-[#2f2f2f] rounded-[20px] p-5 ${
-                'isError' in card && card.isError ? 'cursor-pointer hover:bg-[#1f1f1f] transition-colors' : ''
-              }`}
-            >
-              <p className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2] mb-2">
-                {card.label}
-              </p>
-              <div className="flex items-end justify-between gap-2">
-                <p className={`font-inter font-semibold text-[24px] leading-[32px] ${
-                  'isError' in card && card.isError && Number(card.value) > 0 ? 'text-red-400' : 'text-white'
-                }`}>
-                  {isLoading ? '...' : card.value}
-                </p>
-                {card.change && (
-                  <div className="flex items-center gap-1 py-1">
-                    <span className={`font-inter font-normal text-[12px] leading-[16px] whitespace-nowrap ${
-                      'isError' in card && card.isError ? 'text-red-400/70' : 'text-[#a2a2a2]'
-                    }`}>
-                      {card.change}
-                    </span>
-                    <TrendingUp className={`w-4 h-4 shrink-0 ${
-                      'isError' in card && card.isError ? 'text-red-400/70' : 'text-[#a2a2a2]'
-                    }`} />
-                  </div>
-                )}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+          {isLoading ? (
+            // Skeleton cards
+            Array.from({ length: isSuperAdmin ? 5 : 3 }).map((_, idx) => (
+              <div key={idx} className="border border-[#303030] rounded-[20px] p-6">
+                <div className="h-5 w-24 bg-[#252525] rounded mb-3 relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                <div className="flex items-end justify-between gap-2">
+                  <div className="h-8 w-16 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                  <div className="h-4 w-20 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            statsCards.map((card, idx) => (
+              <div 
+                key={idx}
+                onClick={'isError' in card && card.isError ? handleErrorsCardClick : undefined}
+                className={`border border-[#303030] rounded-[20px] p-6 ${
+                  'isError' in card && card.isError ? 'cursor-pointer hover:bg-[#1a1a1a] transition-colors' : ''
+                }`}
+              >
+                <p className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2] mb-2">
+                  {card.label}
+                </p>
+                <div className="flex items-end justify-between gap-2">
+                  <p className={`font-inter font-semibold text-[24px] leading-[32px] ${
+                    'isError' in card && card.isError && Number(card.value) > 0 ? 'text-red-400' : 'text-white'
+                  }`}>
+                    {card.value}
+                  </p>
+                  {card.change && (
+                    <div className="flex items-center gap-2 py-1">
+                      <span className={`font-inter font-normal text-[12px] leading-[16px] whitespace-nowrap ${
+                        'isError' in card && card.isError ? 'text-red-400/70' : 'text-[#a2a2a2]'
+                      }`}>
+                        {card.change}
+                      </span>
+                      {/* Arrow up icon */}
+                      <svg className={`w-4 h-4 shrink-0 ${
+                        'isError' in card && card.isError ? 'text-red-400/70' : 'text-[#a2a2a2]'
+                      }`} viewBox="0 0 16 16" fill="none">
+                        <path d="M8 12V4M8 4L4 8M8 4L12 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Filters Row */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-1 mb-4">
           {/* Workspace Filter */}
           <div ref={workspaceRef} className="relative">
             <button
               onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
-              className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] hover:border-[#3a3a3a] transition-colors"
+              className="flex items-center gap-2 h-9 px-3 bg-[#212121] rounded-[10px] hover:bg-[#2a2a2a] transition-colors"
             >
-              <span className="font-inter text-[13px] text-white">
-                {selectedWorkspaceName || 'Пространство'}
-                </span>
+              <span className="font-inter font-medium text-[14px] text-white">
+                {selectedWorkspaceName || 'Все пространства'}
+              </span>
               <ChevronDownIcon className="w-4 h-4 text-white" />
             </button>
             {showWorkspaceDropdown && (
@@ -736,7 +762,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                     setSelectedWorkspace(null);
                     setShowWorkspaceDropdown(false);
                   }}
-                  className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                  className={`w-full text-left px-3 py-2 text-[14px] hover:bg-[#252525] transition-colors ${
                     !selectedWorkspace ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
                   }`}
                 >
@@ -749,7 +775,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                       setSelectedWorkspace(w.id);
                       setShowWorkspaceDropdown(false);
                     }}
-                    className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                    className={`w-full text-left px-3 py-2 text-[14px] hover:bg-[#252525] transition-colors ${
                       selectedWorkspace === w.id ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
                     }`}
                   >
@@ -758,16 +784,16 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                 ))}
               </div>
             )}
-            </div>
+          </div>
 
           {/* User Filter */}
           <div ref={userRef} className="relative">
             <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] hover:border-[#3a3a3a] transition-colors"
+              className="flex items-center gap-2 h-9 px-3 bg-[#212121] rounded-[10px] hover:bg-[#2a2a2a] transition-colors"
             >
-              <span className="font-inter text-[13px] text-white">
-                {selectedUserName || 'Пользователь'}
+              <span className="font-inter font-medium text-[14px] text-white">
+                {selectedUserName || 'Все пользователи'}
               </span>
               <ChevronDownIcon className="w-4 h-4 text-white" />
             </button>
@@ -778,7 +804,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                     setSelectedUser(null);
                     setShowUserDropdown(false);
                   }}
-                  className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                  className={`w-full text-left px-3 py-2 text-[14px] hover:bg-[#252525] transition-colors ${
                     !selectedUser ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
                   }`}
                 >
@@ -791,7 +817,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                       setSelectedUser(u.id);
                       setShowUserDropdown(false);
                     }}
-                    className={`w-full text-left px-3 py-2 text-[13px] hover:bg-[#252525] transition-colors ${
+                    className={`w-full text-left px-3 py-2 text-[14px] hover:bg-[#252525] transition-colors ${
                       selectedUser === u.id ? 'text-white bg-[#252525]' : 'text-[#a2a2a2]'
                     }`}
                   >
@@ -807,13 +833,12 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           <div ref={dateRef} className="relative">
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] hover:border-[#3a3a3a] transition-colors"
+              className="flex items-center gap-2 h-9 px-3 bg-[#212121] rounded-[10px] hover:bg-[#2a2a2a] transition-colors"
             >
-              <Calendar className="w-4 h-4 text-white" />
-              <span className="font-inter text-[13px] text-white">
-                {dateRangeLabel || 'Период'}
+              <span className="font-inter font-medium text-[14px] text-white">
+                {dateRangeLabel || 'Выберите период'}
               </span>
-              <ChevronDownIcon className="w-4 h-4 text-white" />
+              <Calendar className="w-4 h-4 text-white" />
             </button>
             {showDatePicker && (
               <DateRangePicker
@@ -837,10 +862,9 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                 setDateStart(null);
                 setDateEnd(null);
               }}
-              className="flex items-center gap-1 px-2 py-2 text-[13px] text-[#a2a2a2] hover:text-white transition-colors"
+              className="flex items-center gap-1 px-2 py-2 text-[14px] text-[#a2a2a2] hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
-              Сбросить
             </button>
           )}
 
@@ -848,31 +872,18 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           <div className="flex-1" />
 
           {/* Export Button */}
-            <button 
-              onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] rounded-lg text-white hover:bg-[#5558E3] transition-colors"
-            >
-              <Download className="w-4 h-4" />
-            <span className="font-inter font-medium text-[13px]">
-                Скачать отчет
-              </span>
-            </button>
+          <button 
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 h-9 px-3 bg-[#252525] rounded-lg text-white hover:bg-[#303030] transition-colors"
+          >
+            <span className="font-inter font-medium text-[14px]">
+              Скачать отчет
+            </span>
+          </button>
         </div>
 
         {/* Table */}
-        <div className="bg-[#151515] border border-[#252525] rounded-[12px] overflow-hidden">
-          {/* Table Header */}
-          <div className="px-6 py-5 border-b border-[#252525] flex items-center gap-2">
-            <h2 className="font-inter font-semibold text-[18px] leading-[28px] text-[#e9eaeb]">
-              Пользователи
-            </h2>
-            <div className="bg-[#2c2c2c] rounded-[6px] px-1.5 min-w-[20px] h-5 flex items-center justify-center">
-              <span className="font-inter font-medium text-[10px] text-white">
-                {sortedUsers.length}
-              </span>
-            </div>
-          </div>
-
+        <div className="border border-[#252525] rounded-[12px] overflow-hidden shadow-sm">
           {/* Table Content */}
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -880,7 +891,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                 <tr className="border-b border-[#252525]">
                   <th className="h-11 px-6 text-left">
                     <div className="flex items-center gap-3">
-                      <div className="w-5 h-5 border border-neutral-700 rounded-[6px]" />
+                      <div className="w-5 h-5 border border-[#404040] rounded-[6px]" />
                       <button
                         onClick={() => handleSort('name')}
                         className="group flex items-center gap-1 font-inter font-semibold text-[12px] leading-[18px] text-[#a2a2a2] hover:text-white transition-colors"
@@ -891,27 +902,55 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                     </div>
                   </th>
                   <SortableHeader field="status">Статус</SortableHeader>
+                  <SortableHeader field="created">Создан</SortableHeader>
                   <SortableHeader field="generations">Генерации</SortableHeader>
-                  <th className="h-11 px-6 text-left">
-                    <span className="font-inter font-semibold text-[12px] leading-[18px] text-[#a2a2a2]">
-                      Стоимость
-                    </span>
-                  </th>
-                  <SortableHeader field="workspace">Пространство</SortableHeader>
+                  {isSuperAdmin && <SortableHeader field="cost">Стоимость</SortableHeader>}
                   <SortableHeader field="role">Роль</SortableHeader>
                   <th className="h-11 px-4"></th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="h-[72px] text-center text-[#a2a2a2]">
-                      Загрузка...
-                    </td>
-                  </tr>
+                  // Skeleton rows
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <tr key={i} className="border-b border-[#252525]">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-5 h-5 bg-[#252525] rounded-[6px] animate-pulse" />
+                          <div className="space-y-2">
+                            <div className="h-5 w-32 bg-[#252525] rounded animate-pulse" />
+                            <div className="h-4 w-24 bg-[#252525] rounded animate-pulse" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-6 w-20 bg-[#252525] rounded-[6px] animate-pulse" />
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-5 w-20 bg-[#252525] rounded animate-pulse" />
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-5 w-12 bg-[#252525] rounded animate-pulse" />
+                      </td>
+                      {isSuperAdmin && (
+                        <td className="py-4 px-6">
+                          <div className="h-5 w-16 bg-[#252525] rounded animate-pulse" />
+                        </td>
+                      )}
+                      <td className="py-4 px-6">
+                        <div className="h-6 w-24 bg-[#252525] rounded-full animate-pulse" />
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-1">
+                          <div className="w-10 h-10 bg-[#252525] rounded-lg animate-pulse" />
+                          <div className="w-10 h-10 bg-[#252525] rounded-lg animate-pulse" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 ) : paginatedUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="h-[72px] text-center text-[#a2a2a2]">
+                    <td colSpan={isSuperAdmin ? 7 : 6} className="h-[72px] text-center text-[#a2a2a2]">
                       Пользователи не найдены
                     </td>
                   </tr>
@@ -923,9 +962,9 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                       className="border-b border-[#252525] hover:bg-[#1a1a1a] cursor-pointer transition-colors"
                     >
                       {/* Name */}
-                      <td className="h-[72px] px-6">
+                      <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-5 h-5 border border-neutral-700 rounded-[6px]" />
+                          <div className="w-5 h-5 border border-[#404040] rounded-[6px]" />
                           <div>
                             <p className="font-inter font-medium text-[14px] leading-[20px] text-white">
                               {user.telegram_first_name || user.telegram_username || user.email?.split('@')[0] || 'Пользователь'}
@@ -938,14 +977,14 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                       </td>
                       
                       {/* Status */}
-                      <td className="h-[72px] px-6">
-                        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[6px] border ${
+                      <td className="py-4 px-6">
+                        <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[6px] border shadow-sm ${
                           user.is_active 
                             ? 'border-[#636363]' 
                             : 'border-red-500/50'
                         }`}>
                           <div className={`w-2 h-2 rounded-full ${
-                            user.is_active ? 'bg-green-500' : 'bg-red-500'
+                            user.is_active ? 'bg-[#21D581]' : 'bg-red-500'
                           }`} />
                           <span className="font-inter font-medium text-[12px] leading-[18px] text-[#d7d7d7]">
                             {user.is_active ? 'Активный' : 'Неактивен'}
@@ -953,30 +992,32 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                         </div>
                       </td>
                       
+                      {/* Created */}
+                      <td className="py-4 px-6">
+                        <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
+                          {new Date(user.created_at).toLocaleDateString('ru-RU')}
+                        </span>
+                      </td>
+                      
                       {/* Generations */}
-                      <td className="h-[72px] px-6">
+                      <td className="py-4 px-6">
                         <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
                           {user.generations_count || 0}
                         </span>
                       </td>
                       
-                      {/* Cost */}
-                      <td className="h-[72px] px-6">
-                        <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
-                          —
-                        </span>
-                      </td>
-                      
-                      {/* Workspace */}
-                      <td className="h-[72px] px-6">
-                        <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
-                          {user.workspace_name || '—'}
-                        </span>
-                      </td>
+                      {/* Cost - only for super_admin */}
+                      {isSuperAdmin && (
+                        <td className="py-4 px-6">
+                          <span className="font-inter font-normal text-[14px] leading-[20px] text-[#a2a2a2]">
+                            {user.cost_rub ? `${user.cost_rub.toLocaleString('ru-RU')}₽` : '—'}
+                          </span>
+                        </td>
+                      )}
                       
                       {/* Role */}
-                      <td className="h-[72px] px-6">
-                        <div className="inline-flex items-center h-6 px-2 py-0.5 bg-neutral-700 rounded-full">
+                      <td className="py-4 px-6">
+                        <div className="inline-flex items-center h-6 px-2 py-0.5 bg-[#404040] rounded-full">
                           <span className="font-inter font-medium text-[12px] leading-[18px] text-white">
                             {user.role === 'super_admin' ? 'Супер-админ' : user.role === 'admin' ? 'Админ' : 'Пользователь'}
                           </span>
@@ -984,7 +1025,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                       </td>
                       
                       {/* Actions */}
-                      <td className="h-[72px] px-4">
+                      <td className="py-4 px-4">
                         {user.role !== 'super_admin' && (
                           <div className="relative flex items-center gap-1">
                             <button 
@@ -1062,13 +1103,15 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-[#252525] flex items-center justify-between bg-[#151515]">
+            <div className="px-6 py-3 border-t border-[#252525] flex items-center justify-center gap-3 bg-[#101010]">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center gap-1 px-3 py-2 bg-[#252525] rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#303030] transition-colors"
+                className="flex items-center gap-1 h-9 px-3 bg-[#252525] rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#303030] transition-colors"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+                  <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 <span className="font-inter font-semibold text-[14px] leading-[20px]">Назад</span>
               </button>
 
@@ -1083,7 +1126,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                         ? 'bg-[#252525] text-white'
                         : page === '...'
                         ? 'text-[#686868] cursor-default'
-                        : 'text-[#686868] hover:bg-[#1f1f1f]'
+                        : 'text-[#686868] hover:bg-[#1f1f1f] hover:text-white'
                     }`}
                   >
                     {page}
@@ -1094,10 +1137,12 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-1 px-3 py-2 bg-[#252525] rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#303030] transition-colors"
+                className="flex items-center gap-1 h-9 px-3 bg-[#252525] rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#303030] transition-colors"
               >
                 <span className="font-inter font-semibold text-[14px] leading-[20px]">Вперед</span>
-                <ChevronRight className="w-5 h-5" />
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+                  <path d="M7.5 15L12.5 10L7.5 5" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </button>
             </div>
           )}
@@ -1172,11 +1217,20 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                     </thead>
                     <tbody>
                       {isLoadingGenerations ? (
-                        <tr>
-                          <td colSpan={3} className="h-[72px] text-center text-[#a2a2a2]">
-                            Загрузка...
-                          </td>
-                        </tr>
+                        // Skeleton rows for generations
+                        Array.from({ length: 8 }).map((_, i) => (
+                          <tr key={i} className="border-b border-[#252525]">
+                            <td className="h-[56px] px-6">
+                              <div className="h-5 w-28 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                            </td>
+                            <td className="h-[56px] px-6">
+                              <div className="h-5 w-8 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                            </td>
+                            <td className="h-[56px] px-6">
+                              <div className="h-5 w-24 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                            </td>
+                          </tr>
+                        ))
                       ) : paginatedGenerations.length === 0 ? (
                         <tr>
                           <td colSpan={3} className="h-[72px] text-center text-[#a2a2a2]">

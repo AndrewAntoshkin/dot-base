@@ -222,6 +222,16 @@
   animation: slideInRight 0.3s ease-out forwards;
 }
 
+/* Shimmer animation for skeletons */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 /* Marquee animation for landing page */
 @keyframes marquee {
   0% {

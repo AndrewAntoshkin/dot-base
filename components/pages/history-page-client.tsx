@@ -757,8 +757,17 @@ export default function HistoryPageClient() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-white" />
+          // Skeleton grid
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {Array.from({ length: 15 }).map((_, i) => (
+              <div key={i} className="border border-[#252525] rounded-[16px] p-1">
+                <div className="relative aspect-square rounded-[12px] overflow-hidden bg-[#252525] before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                <div className="p-3 space-y-2">
+                  <div className="h-4 w-3/4 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                  <div className="h-3 w-1/2 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : generations.length === 0 ? (
           <div className="flex items-center justify-center min-h-[400px]">

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { Loader2, Download, RotateCcw, Copy, WifiOff, Maximize2 } from 'lucide-react';
+import { ErrorState } from '@/components/error-state';
 import { formatDate } from '@/lib/utils';
 import { fetchWithTimeout, isOnline, isSlowConnection } from '@/lib/network-utils';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
@@ -30,7 +31,7 @@ interface Generation {
   action: string;
   created_at: string;
   processing_time_ms: number | null;
-  settings: Record<string, any>;
+  settings: Record<string, any> & { auto_retry_count?: number };
   is_owner?: boolean;
   creator?: Creator | null;
 }
@@ -324,14 +325,22 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
 
   // Processing
   if (generation.status === 'processing' || generation.status === 'pending') {
+    const retryCount = generation.settings?.auto_retry_count || 0;
+    const maxRetries = 3;
+    
     return (
       <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
         <div className={isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full' : ''}>
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-8 w-8 lg:h-12 lg:w-12 animate-spin text-white" />
             <div className="text-center">
-              <p className="font-inter font-medium text-base text-white mb-1">Генерация...</p>
+              <p className="font-inter font-medium text-base text-white mb-1">
+                {retryCount > 0 ? `Повторная попытка ${retryCount}/${maxRetries}...` : 'Генерация...'}
+              </p>
               <p className="font-inter text-sm text-[#959595]">{generation.model_name}</p>
+              {retryCount > 0 && (
+                <p className="font-inter text-xs text-[#6366F1] mt-1">Автоматическая повторная попытка</p>
+              )}
             </div>
             {/* Индикатор сетевых проблем */}
             {networkError && (
@@ -346,15 +355,17 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     );
   }
 
-  // Failed
+  // Failed - используем красивый ErrorState компонент
   if (generation.status === 'failed') {
+    const retryCount = generation.settings?.auto_retry_count || 0;
+    
     return (
-      <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
-        <div className={`text-center max-w-md px-4 ${isMobile ? 'bg-[#131313] rounded-2xl p-6' : ''}`}>
-          <p className="font-inter font-medium text-base text-red-500 mb-2">Ошибка</p>
-          <p className="font-inter text-sm text-[#959595]">{generation.error_message || 'Неизвестная ошибка'}</p>
-        </div>
-      </div>
+      <ErrorState
+        errorMessage={generation.error_message || 'Неизвестная ошибка'}
+        retryCount={retryCount}
+        onRetry={onRegenerate ? handleRegenerate : undefined}
+        isMobile={isMobile}
+      />
     );
   }
 
@@ -371,7 +382,15 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
         {isValidUrl && (
           <div className="relative w-full bg-[#131313] rounded-[12px] overflow-hidden group">
             {isVideo ? (
-              <video src={currentMediaUrl} controls autoPlay loop muted playsInline className="w-full h-auto" />
+              <video 
+                src={currentMediaUrl} 
+                controls 
+                loop 
+                muted 
+                playsInline 
+                preload="metadata"
+                className="w-full h-auto"
+              />
             ) : isSvgMobile ? (
               <object
                 data={currentMediaUrl}
@@ -468,7 +487,14 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       {isValidUrl && (
         <div className="relative w-full h-[660px] bg-[#0a0a0a] rounded-2xl overflow-hidden mb-4 flex items-center justify-center group">
           {isVideo ? (
-            <video src={currentMediaUrl} controls autoPlay loop muted className="max-w-full max-h-[660px]" />
+            <video 
+              src={currentMediaUrl} 
+              controls 
+              loop 
+              muted 
+              preload="metadata"
+              className="max-w-full max-h-[660px]"
+            />
           ) : isSvg ? (
             <object
               data={currentMediaUrl}

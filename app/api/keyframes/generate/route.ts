@@ -6,6 +6,8 @@ import { saveMediaToStorage } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const partSchema = z.object({
   id: z.string(),
   model: z.enum(['hailuo-02', 'seedance-1-pro']),

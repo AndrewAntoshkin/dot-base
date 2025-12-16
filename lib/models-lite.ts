@@ -108,8 +108,8 @@ export const VIDEO_EDIT_MODELS_LITE: ModelLite[] = [
   { id: 'luma-reframe-video', displayName: 'Luma Reframe Video', description: 'Luma - изменение соотношения сторон', action: 'video_edit' },
   { id: 'mmaudio', displayName: 'MMAudio', description: 'Добавить звук к видео с помощью AI', action: 'video_edit' },
   { id: 'video-merge', displayName: 'Video Merge', description: 'Объединить несколько видео', action: 'video_edit' },
-  { id: 'autocaption', displayName: 'Autocaption', description: 'Добавить субтитры к видео', action: 'video_edit' },
-  { id: 'gen4-aleph', displayName: 'Runway Gen4 Aleph', description: 'Runway - продвинутое редактирование', action: 'video_edit' },
+  { id: 'autocaption', displayName: 'Autocaption', description: 'AI субтитры с караоке-эффектом', action: 'video_edit' },
+  { id: 'gen4-aleph', displayName: 'Runway Gen4 Aleph', description: 'Runway - редактирование, эффекты, стили', action: 'video_edit' },
 ];
 
 export const VIDEO_UPSCALE_MODELS_LITE: ModelLite[] = [

@@ -32,13 +32,12 @@ export async function GET(
     
     const supabase = createServiceRoleClient();
     
-    // Get user generations
+    // Get ALL user generations (no limit)
     const { data: generations, error: genError } = await supabase
       .from('generations')
       .select('id, model_name, cost_credits, created_at, status')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(100);
+      .order('created_at', { ascending: false });
     
     if (genError) {
       console.error('Error fetching user generations:', genError);

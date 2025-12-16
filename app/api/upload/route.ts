@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 
+export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;

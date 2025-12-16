@@ -10,6 +10,7 @@ interface ToastItem {
   modelName: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   createdAt: string;
+  retryCount?: number;
 }
 
 // Custom loading spinner matching Figma design
@@ -188,6 +189,9 @@ function GenerationToast({
     switch (toast.status) {
       case 'pending':
       case 'processing':
+        if (toast.retryCount && toast.retryCount > 0) {
+          return `Попытка ${toast.retryCount}/3...`;
+        }
         return 'В обработке';
       case 'completed':
         return 'Готово';
@@ -378,6 +382,7 @@ export function GenerationToastContainer() {
       modelName: g.model_name,
       status: g.status,
       createdAt: g.created_at,
+      retryCount: g.settings?.auto_retry_count || 0,
     }));
 
   // Initialize timers for new toasts

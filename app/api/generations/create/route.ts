@@ -6,6 +6,8 @@ import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const createGenerationSchema = z.object({
   action: z.enum([
     'create', 'edit', 'upscale', 'remove_bg', 'inpaint', 'expand',

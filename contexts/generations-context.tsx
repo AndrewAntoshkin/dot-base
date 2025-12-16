@@ -10,6 +10,7 @@ interface Generation {
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   created_at: string;
   viewed: boolean;
+  settings?: Record<string, any> & { auto_retry_count?: number };
 }
 
 interface GenerationsContextType {

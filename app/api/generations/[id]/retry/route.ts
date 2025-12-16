@@ -5,6 +5,8 @@ import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 // Type for generation from DB
 interface GenerationRecord {
   id: string;

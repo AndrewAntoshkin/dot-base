@@ -84,9 +84,10 @@ export async function GET(request: NextRequest) {
     // Using .not('is_keyframe_segment', 'is', true) instead of .or() for better index usage
     
     // Определяем какие поля выбирать - добавляем user info для workspace view
+    // settings нужен для отображения retry count
     const selectFields = workspaceId && !onlyMine
-      ? 'id, user_id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message, users!inner(email, telegram_first_name)'
-      : 'id, user_id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message';
+      ? 'id, user_id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message, settings, users!inner(email, telegram_first_name)'
+      : 'id, user_id, status, output_urls, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message, settings';
     
     let query = supabase
       .from('generations')

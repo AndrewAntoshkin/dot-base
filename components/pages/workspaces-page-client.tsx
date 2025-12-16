@@ -139,8 +139,24 @@ export default function WorkspacesPageClient() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-white" />
+          // Skeleton cards
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-[#101010] border border-[#2e2e2e] rounded-[20px] p-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="space-y-2">
+                    <div className="h-5 w-32 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                    <div className="h-4 w-24 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                  </div>
+                  <div className="h-8 w-8 bg-[#252525] rounded-lg relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                </div>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <div key={j} className="w-8 h-8 bg-[#252525] rounded-full relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : workspaces.length === 0 ? (
           // Пустое состояние для админов

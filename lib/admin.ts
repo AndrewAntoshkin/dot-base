@@ -8,6 +8,7 @@
 import { createServiceRoleClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { UserRole } from '@/lib/supabase/types';
 import { isAdminRole, isSuperAdminRole } from './admin-client';
+import { convertToRubWithMarkup } from './pricing';
 
 // Re-export helper functions
 export { isAdminRole, isSuperAdminRole };
@@ -212,73 +213,130 @@ export async function getAdminUsers(options?: {
     throw new Error(error.message);
   }
   
-  // Get generation counts for each user (with date filters if provided)
+  // Get generation counts for each user (TOTAL - without date filters)
+  // Using RPC function to avoid Supabase 1000 row limit
   const fetchUserIds = users?.map(u => u.id) || [];
   
   if (fetchUserIds.length > 0) {
-    type GenerationCount = { user_id: string; cost_credits: number | null; workspace_id: string | null };
+    // Try RPC function first, fallback to manual count
+    type UserStats = { user_id: string; generations_count: number; total_cost_usd: number };
     
-    let genQuery = supabase
-      .from('generations')
-      .select('user_id, cost_credits, workspace_id')
-      .in('user_id', fetchUserIds);
+    let countsByUser: Record<string, { count: number; credits: number; costUsd: number }> = {};
+    let hasFilteredGenerations: Record<string, boolean> = {};
     
-    // Применяем фильтры к генерациям
-    if (options?.workspaceId) {
-      genQuery = genQuery.eq('workspace_id', options.workspaceId);
-    }
-    if (options?.startDate) {
-      genQuery = genQuery.gte('created_at', options.startDate);
-    }
-    if (options?.endDate) {
-      genQuery = genQuery.lte('created_at', options.endDate);
-    }
+    // Try RPC function
+    const { data: rpcStats, error: rpcError } = await supabase
+      .rpc('get_user_generation_stats', { p_user_ids: fetchUserIds }) as unknown as { data: UserStats[] | null; error: Error | null };
     
-    const { data: generationCounts } = await genQuery as unknown as { data: GenerationCount[] | null };
-    
-    // Group by user
-    const countsByUser: Record<string, { count: number; credits: number }> = {};
-    generationCounts?.forEach(g => {
-      if (!countsByUser[g.user_id]) {
-        countsByUser[g.user_id] = { count: 0, credits: 0 };
-      }
-      countsByUser[g.user_id].count++;
-      countsByUser[g.user_id].credits += g.cost_credits || 0;
-    });
-    
-    // Get workspace names for users
-    const workspaceIds = new Set<string>();
-    generationCounts?.forEach(g => {
-      if (g.workspace_id) workspaceIds.add(g.workspace_id);
-    });
-    
-    let workspaceNames: Record<string, string> = {};
-    if (workspaceIds.size > 0) {
-      const { data: workspaces } = await supabase
-        .from('workspaces')
-        .select('id, name')
-        .in('id', Array.from(workspaceIds));
-      
-      workspaces?.forEach((w: any) => {
-        workspaceNames[w.id] = w.name;
+    if (!rpcError && rpcStats) {
+      // Use RPC results
+      rpcStats.forEach(stat => {
+        countsByUser[stat.user_id] = {
+          count: stat.generations_count || 0,
+          credits: 0,
+          costUsd: stat.total_cost_usd || 0
+        };
       });
-    }
-    
-    // Get primary workspace for each user
-    const userWorkspaces: Record<string, string> = {};
-    generationCounts?.forEach(g => {
-      if (g.workspace_id && !userWorkspaces[g.user_id]) {
-        userWorkspaces[g.user_id] = workspaceNames[g.workspace_id] || '';
+      
+      // For date filtering, we still need to check which users have generations in the date range
+      if (options?.startDate || options?.endDate) {
+        // Query just to check date range (minimal data)
+        let dateQuery = supabase
+          .from('generations')
+          .select('user_id, created_at')
+          .in('user_id', fetchUserIds);
+        
+        if (options.workspaceId) {
+          dateQuery = dateQuery.eq('workspace_id', options.workspaceId);
+        }
+        if (options.startDate) {
+          dateQuery = dateQuery.gte('created_at', options.startDate);
+        }
+        if (options.endDate) {
+          dateQuery = dateQuery.lte('created_at', options.endDate);
+        }
+        
+        const { data: filteredGens } = await dateQuery;
+        filteredGens?.forEach((g: { user_id: string }) => {
+          hasFilteredGenerations[g.user_id] = true;
+        });
       }
-    });
+    } else {
+      // Fallback: count individually for each user (slower but works without RPC)
+      console.warn('RPC function not available, using fallback count method');
+      
+      for (const userId of fetchUserIds) {
+        let countQuery = supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        
+        if (options?.workspaceId) {
+          countQuery = countQuery.eq('workspace_id', options.workspaceId);
+        }
+        
+        const { count } = await countQuery;
+        
+        // Get cost sum
+        let costQuery = supabase
+          .from('generations')
+          .select('cost_usd')
+          .eq('user_id', userId)
+          .not('cost_usd', 'is', null);
+        
+        if (options?.workspaceId) {
+          costQuery = costQuery.eq('workspace_id', options.workspaceId);
+        }
+        
+        const { data: costData } = await costQuery;
+        const totalCost = (costData || []).reduce((sum: number, row: { cost_usd: number }) => sum + (row.cost_usd || 0), 0);
+        
+        countsByUser[userId] = {
+          count: count || 0,
+          credits: 0,
+          costUsd: totalCost
+        };
+      }
+      
+      // Date filtering for fallback
+      if (options?.startDate || options?.endDate) {
+        for (const userId of fetchUserIds) {
+          let dateQuery = supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          
+          if (options.workspaceId) dateQuery = dateQuery.eq('workspace_id', options.workspaceId);
+          if (options.startDate) dateQuery = dateQuery.gte('created_at', options.startDate);
+          if (options.endDate) dateQuery = dateQuery.lte('created_at', options.endDate);
+          
+          const { count } = await dateQuery;
+          if (count && count > 0) {
+            hasFilteredGenerations[userId] = true;
+          }
+        }
+      }
+    }
     
     // Merge with users
-    return users?.map(user => ({
-      ...user,
-      generations_count: countsByUser[user.id]?.count || 0,
-      total_credits_spent: countsByUser[user.id]?.credits || 0,
-      workspace_name: userWorkspaces[user.id] || null,
-    })) || [];
+    const usersWithStats = users?.map(user => {
+      const userStats = countsByUser[user.id];
+      const costRub = userStats?.costUsd ? Math.round(convertToRubWithMarkup(userStats.costUsd)) : null;
+      
+      return {
+        ...user,
+        generations_count: userStats?.count || 0,
+        total_credits_spent: userStats?.credits || 0,
+        cost_rub: costRub,
+      };
+    }) || [];
+    
+    // Если есть фильтр по датам - показываем только пользователей с генерациями В ЭТОТ ПЕРИОД
+    if (options?.startDate || options?.endDate) {
+      return usersWithStats.filter(u => hasFilteredGenerations[u.id]);
+    }
+    
+    return usersWithStats;
   }
   
   return users || [];

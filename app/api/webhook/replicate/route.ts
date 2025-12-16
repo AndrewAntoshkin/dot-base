@@ -3,6 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
+import { calculateCostUsd } from '@/lib/pricing';
 
 // Type for generation from DB
 interface GenerationRecord {
@@ -15,8 +16,10 @@ interface GenerationRecord {
   error_message?: string;
   action: string;
   model_id: string;
+  replicate_model: string;
   settings?: Record<string, any>;
   cost_credits?: number;
+  cost_usd?: number;
   replicate_input?: Record<string, any>;
   [key: string]: any;
 }
@@ -49,32 +52,86 @@ async function withRetry<T>(
   throw lastError;
 }
 
-// Максимальное количество автоматических ретраев для нестабильных моделей
-const MAX_AUTO_RETRIES = 2;
-
-// Модели, которые могут быть нестабильными и заслуживают автоматического ретрая
-const UNSTABLE_MODELS = ['nano-banana', 'gemini'];
+// Максимальное количество автоматических ретраев (для ВСЕХ моделей)
+const MAX_AUTO_RETRIES = 3;
 
 /**
- * Проверяет, является ли модель нестабильной и заслуживает автоматического ретрая
+ * Проверяет, является ли ошибка временной и можно сделать retry
  */
-function isUnstableModel(modelId: string): boolean {
-  const modelLower = (modelId || '').toLowerCase();
-  return UNSTABLE_MODELS.some(m => modelLower.includes(m));
+function isRetryableError(error: string | null | undefined, body?: any): boolean {
+  // Пустая ошибка - часто временный сбой
+  if (!error || error === '' || error === 'null' || error === 'undefined') {
+    return true;
+  }
+  
+  const errorLower = error.toLowerCase();
+  const logs = (body?.logs || '').toLowerCase();
+  
+  // Ошибки сети и сервера - retry
+  const retryablePatterns = [
+    'timeout', 'timed out', 'deadline exceeded',
+    'overloaded', 'overload', 'too many requests',
+    'temporarily', 'temporary', 'try again',
+    'rate limit', 'rate_limit', 'ratelimit',
+    '503', '502', '500', '504',
+    'service unavailable', 'bad gateway',
+    'connection', 'network', 'socket',
+    'internal error', 'internal server',
+    'worker', 'cold boot', 'starting',
+    'model is warming', 'warming up',
+    'resource exhausted', 'out of memory',
+  ];
+  
+  if (retryablePatterns.some(p => errorLower.includes(p) || logs.includes(p))) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Проверяет, является ли ошибка НЕ-retry (точно не надо повторять)
+ */
+function isNonRetryableError(error: string | null | undefined, body?: any): boolean {
+  if (!error) return false;
+  
+  const errorLower = error.toLowerCase();
+  const logs = (body?.logs || '').toLowerCase();
+  
+  // Эти ошибки НЕ нужно retry - они не исчезнут
+  const nonRetryablePatterns = [
+    'nsfw', 'safety', 'content policy', 'harmful',
+    'invalid input', 'invalid parameter', 'validation',
+    'not found', '404',
+    'unauthorized', 'forbidden', '401', '403',
+    'billing', 'payment', 'credits',
+    'invalid api', 'api key',
+  ];
+  
+  if (nonRetryablePatterns.some(p => errorLower.includes(p) || logs.includes(p))) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
  * Проверяет, можно ли сделать автоматический ретрай
  */
-function canAutoRetry(generation: any): boolean {
-  // Проверяем, что это нестабильная модель
-  if (!isUnstableModel(generation.model_id)) {
+function canAutoRetry(generation: any, error: string | null | undefined, body?: any): boolean {
+  // Если это ошибка, которую точно не нужно повторять
+  if (isNonRetryableError(error, body)) {
     return false;
   }
   
   // Проверяем количество предыдущих ретраев
   const currentRetryCount = generation.settings?.auto_retry_count || 0;
-  return currentRetryCount < MAX_AUTO_RETRIES;
+  if (currentRetryCount >= MAX_AUTO_RETRIES) {
+    return false;
+  }
+  
+  // Проверяем что ошибка retryable
+  return isRetryableError(error, body);
 }
 
 /**
@@ -148,6 +205,58 @@ async function performAutoRetry(
     console.error('Auto retry failed:', error.message);
     return { success: false };
   }
+}
+
+/**
+ * Создаёт понятное пользователю сообщение об ошибке
+ */
+function getUserFriendlyErrorMessage(error: string | null | undefined, body: any, modelId: string): string {
+  const errorLower = (error || '').toLowerCase();
+  const logs = (body?.logs || '').toLowerCase();
+  
+  // NSFW / Safety
+  if (errorLower.includes('nsfw') || errorLower.includes('safety') || 
+      logs.includes('nsfw') || logs.includes('safety') ||
+      errorLower.includes('content policy') || logs.includes('content policy')) {
+    return 'Контент заблокирован фильтром безопасности. Попробуйте изменить промпт';
+  }
+  
+  // Timeout
+  if (errorLower.includes('timeout') || errorLower.includes('timed out') ||
+      logs.includes('timeout') || logs.includes('exceeded')) {
+    return 'Превышено время генерации. Попробуйте уменьшить разрешение или длительность';
+  }
+  
+  // Memory / Resources
+  if (errorLower.includes('memory') || errorLower.includes('oom') ||
+      logs.includes('memory') || logs.includes('out of memory') ||
+      errorLower.includes('resource')) {
+    return 'Недостаточно ресурсов. Попробуйте уменьшить разрешение или использовать другую модель';
+  }
+  
+  // Overload / Rate limit
+  if (errorLower.includes('overload') || errorLower.includes('rate limit') ||
+      errorLower.includes('too many') || logs.includes('overload')) {
+    return 'Сервер перегружен. Попробуйте через несколько минут';
+  }
+  
+  // Invalid input
+  if (errorLower.includes('invalid') || errorLower.includes('validation')) {
+    return 'Некорректные параметры. Проверьте настройки и попробуйте снова';
+  }
+  
+  // Empty or unknown error - generic message with suggestions
+  if (!error || error === '' || error === 'null') {
+    return 'Генерация не удалась. Попробуйте другую модель или измените параметры';
+  }
+  
+  // Sanitize technical errors - не показываем пользователю технические детали
+  if (error.length > 150 || error.includes('stack') || error.includes('Error:') ||
+      error.includes('Exception') || error.includes('Traceback')) {
+    return 'Произошла ошибка при генерации. Попробуйте снова или используйте другую модель';
+  }
+  
+  return error;
 }
 
 // Проверяем, является ли action текстовым (analyze)
@@ -321,6 +430,18 @@ export async function POST(request: NextRequest) {
 
       // Вычесть кредиты у пользователя (если функция существует)
       if (updateData.status === 'completed') {
+        // Calculate actual cost from predict_time
+        const predictTime = body.metrics?.predict_time;
+        if (predictTime && generation.replicate_model) {
+          const costUsd = calculateCostUsd(predictTime, generation.replicate_model);
+          updateData.cost_usd = costUsd;
+          console.log('Cost calculated:', {
+            predictTime,
+            model: generation.replicate_model,
+            costUsd: costUsd.toFixed(6),
+          });
+        }
+        
         try {
           await (supabase.rpc as any)('decrement_credits', {
             user_id_param: generation.user_id,
@@ -333,6 +454,7 @@ export async function POST(request: NextRequest) {
     } else if (status === 'failed') {
       // Детальный разбор ошибки
       let errorMessage = error || 'Unknown error';
+      const currentRetryCount = generation.settings?.auto_retry_count || 0;
       
       // Логируем полный ответ для отладки
       console.error('=== REPLICATE PREDICTION FAILED ===');
@@ -340,17 +462,12 @@ export async function POST(request: NextRequest) {
       console.error('Generation ID:', generation.id);
       console.error('Model:', generation.model_id);
       console.error('Error field:', error);
+      console.error('Current retry count:', currentRetryCount);
       console.error('Full body:', JSON.stringify(body, null, 2));
       
-      // Определяем, является ли это ошибкой, которую можно повторить
-      const isRetryableError = !error || error === '' || 
-        error.includes('timeout') || 
-        error.includes('overloaded') ||
-        error.includes('temporarily');
-      
-      // Пробуем автоматический ретрай для нестабильных моделей
-      if (isRetryableError && canAutoRetry(generation)) {
-        console.log('Attempting auto-retry for unstable model...');
+      // Пробуем автоматический ретрай для ВСЕХ моделей
+      if (canAutoRetry(generation, error, body)) {
+        console.log(`Attempting auto-retry ${currentRetryCount + 1}/${MAX_AUTO_RETRIES}...`);
         const retryResult = await performAutoRetry(generation, supabase);
         
         if (retryResult.success) {
@@ -359,30 +476,27 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ 
             success: true, 
             retried: true,
+            retryCount: currentRetryCount + 1,
             newPredictionId: retryResult.newPredictionId 
           });
         }
-        console.log('Auto-retry failed, proceeding with failure status');
+        console.log('Auto-retry failed to start, proceeding with failure status');
+      } else {
+        console.log('Auto-retry not applicable:', {
+          isNonRetryable: isNonRetryableError(error, body),
+          currentRetryCount,
+          maxRetries: MAX_AUTO_RETRIES,
+        });
       }
       
       updateData.status = 'failed';
       
-      // Улучшенные сообщения об ошибках
-      if (!error || error === '') {
-        // Replicate часто не даёт причину - проверяем типичные случаи
-        const modelName = (generation.model_id || '').toLowerCase();
-        
-        if (modelName.includes('nano-banana') || modelName.includes('gemini')) {
-          errorMessage = 'Генерация не удалась. Попробуйте изменить параметры';
-        } else if (body.logs?.includes('NSFW') || body.logs?.includes('safety')) {
-          errorMessage = 'Контент заблокирован фильтром безопасности';
-        } else if (body.logs?.includes('timeout') || body.logs?.includes('exceeded')) {
-          errorMessage = 'Превышено время генерации. Попробуйте снова';
-        } else if (body.logs?.includes('memory') || body.logs?.includes('OOM')) {
-          errorMessage = 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
-        } else {
-          errorMessage = 'Генерация не удалась. Попробуйте изменить параметры';
-        }
+      // Улучшенные сообщения об ошибках для пользователей
+      errorMessage = getUserFriendlyErrorMessage(error, body, generation.model_id);
+      
+      // Если были ретраи - добавляем информацию
+      if (currentRetryCount > 0) {
+        errorMessage = `${errorMessage} (после ${currentRetryCount} попыток)`;
       }
       
       updateData.error_message = errorMessage;

@@ -26,10 +26,7 @@ export async function GET(request: NextRequest) {
     const workspaceId = searchParams.get('workspaceId') || undefined;
     const startDate = searchParams.get('startDate') || undefined;
     const endDate = searchParams.get('endDate') || undefined;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
-    
-    // Get users
+    // Get users - no limit by default to show all users
     const users = await getAdminUsers({
       search,
       role: role || undefined,
@@ -37,8 +34,6 @@ export async function GET(request: NextRequest) {
       workspaceId,
       startDate,
       endDate,
-      limit,
-      offset,
     });
     
     return NextResponse.json({ data: users });

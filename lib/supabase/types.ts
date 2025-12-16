@@ -93,6 +93,7 @@ export interface Database {
           processing_time_ms: number | null;
           error_message: string | null;
           cost_credits: number;
+          cost_usd: number | null;
           created_at: string;
           started_at: string | null;
           completed_at: string | null;
@@ -120,6 +121,7 @@ export interface Database {
           processing_time_ms?: number | null;
           error_message?: string | null;
           cost_credits?: number;
+          cost_usd?: number | null;
           created_at?: string;
           started_at?: string | null;
           completed_at?: string | null;
@@ -144,6 +146,7 @@ export interface Database {
           processing_time_ms?: number | null;
           error_message?: string | null;
           cost_credits?: number;
+          cost_usd?: number | null;
           created_at?: string;
           started_at?: string | null;
           completed_at?: string | null;

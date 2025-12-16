@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

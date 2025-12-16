@@ -369,6 +369,7 @@ function VideoPlayer({ videoUrl }: { videoUrl: string }) {
         ref={videoRef}
         src={videoUrl}
         className="w-full h-full object-contain"
+        preload="metadata"
         onEnded={() => setIsPlaying(false)}
       />
       {!isPlaying && (

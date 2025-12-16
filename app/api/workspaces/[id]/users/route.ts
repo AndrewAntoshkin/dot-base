@@ -72,18 +72,35 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .select('id, email, telegram_first_name')
       .in('id', memberUserIds);
 
-    // Получаем количество генераций и последние 4 превью для каждого пользователя
+    // Get TOTAL generation counts using RPC (all generations, all workspaces)
+    type UserStats = { user_id: string; generations_count: number; total_cost_usd: number };
+    
+    const { data: rpcStats, error: rpcError } = await adminClient
+      .rpc('get_user_generation_stats', { p_user_ids: memberUserIds }) as unknown as { data: UserStats[] | null; error: Error | null };
+    
+    // Create a map for quick lookup
+    const statsMap: Record<string, number> = {};
+    if (rpcStats) {
+      rpcStats.forEach(stat => {
+        statsMap[stat.user_id] = stat.generations_count || 0;
+      });
+    }
+
+    // Получаем последние 4 превью для каждого пользователя (из этого workspace)
     const usersWithGenerations = await Promise.all(
       (users || []).map(async (u: any) => {
-        // Количество генераций
-        const { count } = await adminClient
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', workspaceId)
-          .eq('user_id', u.id)
-          .eq('status', 'completed');
+        // Если RPC не работает - fallback на count
+        let genCount = statsMap[u.id];
+        if (genCount === undefined) {
+          const { count } = await adminClient
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', u.id);
+          genCount = count || 0;
+        }
 
-        // Последние 4 генерации с картинками
+        // Последние 3 генерации с картинками (из этого workspace для превью)
+        // Дизайн: 1 большое слева + 2 маленьких справа = 3 превью
         const { data: recentGenerations } = await adminClient
           .from('generations')
           .select('id, output_urls')
@@ -92,19 +109,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           .eq('status', 'completed')
           .not('output_urls', 'is', null)
           .order('created_at', { ascending: false })
-          .limit(4);
+          .limit(3);
 
-        // Извлекаем URL превью
+        // Извлекаем URL превью (3 штуки для нового дизайна)
         const previews = (recentGenerations || [])
           .filter((g: any) => g.output_urls && g.output_urls.length > 0)
           .map((g: any) => g.output_urls[0])
-          .slice(0, 4);
+          .slice(0, 3);
 
         return {
           id: u.id,
           email: u.email,
           name: u.telegram_first_name || u.email?.split('@')[0] || 'User',
-          generations_count: count || 0,
+          generations_count: genCount,
           previews,
         };
       })
