@@ -5,6 +5,8 @@ import { Header } from '@/components/header';
 import { 
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   Shield,
   User,
