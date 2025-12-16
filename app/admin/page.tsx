@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getUserRoleFromDb, isAdminRole } from '@/lib/admin';
 import AdminPageClient from '@/components/pages/admin-page-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminPage() {
   // Check authentication and admin access
   const supabase = await createServerSupabaseClient();

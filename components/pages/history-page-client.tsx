@@ -632,46 +632,46 @@ export default function HistoryPageClient() {
                 {workspace.name}
               </span>
             )}
-            <h1 className="font-inter font-semibold text-[20px] text-white tracking-[-0.4px] leading-[28px]">
-              История генераций
-            </h1>
+          <h1 className="font-inter font-semibold text-[20px] text-white tracking-[-0.4px] leading-[28px]">
+            История генераций
+          </h1>
           </div>
           
           {/* Tabs и свитч "Только мои" */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#2e2e2e] pb-0">
-            {/* Tabs - горизонтальный скролл на мобильных */}
+          {/* Tabs - горизонтальный скролл на мобильных */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-              {TABS.map(tab => {
-                const isActive = activeTab === tab.id;
-                const count = counts[tab.id];
-                
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      flex items-center gap-2 py-[10px] px-0 shrink-0
-                      ${isActive ? 'border-b-2 border-white' : 'border-b-2 border-transparent'}
-                    `}
-                  >
-                    <div className="flex items-center gap-2 py-1">
-                      <span 
-                        className={`
-                          font-inter text-[14px] leading-[20px] whitespace-nowrap
-                          ${isActive ? 'font-medium text-white' : 'font-normal text-[#959595]'}
-                        `}
-                      >
-                        {tab.label}
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              const count = counts[tab.id];
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-2 py-[10px] px-0 shrink-0
+                    ${isActive ? 'border-b-2 border-white' : 'border-b-2 border-transparent'}
+                  `}
+                >
+                  <div className="flex items-center gap-2 py-1">
+                    <span 
+                      className={`
+                        font-inter text-[14px] leading-[20px] whitespace-nowrap
+                        ${isActive ? 'font-medium text-white' : 'font-normal text-[#959595]'}
+                      `}
+                    >
+                      {tab.label}
+                    </span>
+                    <div className="bg-[#2c2c2c] min-w-[20px] h-[20px] rounded-[6px] flex items-center justify-center px-1.5">
+                      <span className="font-inter font-medium text-[10px] text-white leading-[20px]">
+                        {count}
                       </span>
-                      <div className="bg-[#2c2c2c] min-w-[20px] h-[20px] rounded-[6px] flex items-center justify-center px-1.5">
-                        <span className="font-inter font-medium text-[10px] text-white leading-[20px]">
-                          {count}
-                        </span>
-                      </div>
                     </div>
-                  </button>
-                );
-              })}
+                  </div>
+                </button>
+              );
+            })}
             </div>
             
           </div>

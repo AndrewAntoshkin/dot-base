@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
     const action = searchParams.get('action');
     const tab = (searchParams.get('tab') || 'all') as TabFilter;
-    
+
     // Workspace filters
     const workspaceId = searchParams.get('workspaceId');
     const onlyMine = searchParams.get('onlyMine') !== 'false'; // По умолчанию true
@@ -224,8 +224,8 @@ export async function GET(request: NextRequest) {
         // Build base filter function with all active filters
         const buildCountQuery = () => {
           let q = supabase
-            .from('generations')
-            .select('id', { count: 'exact', head: true })
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
             .not('is_keyframe_segment', 'is', true);
           
           // Workspace/user filter
@@ -296,14 +296,14 @@ export async function GET(request: NextRequest) {
           buildCountQuery().in('status', ['pending', 'processing']),
           buildCountQuery().eq('is_favorite', true),
           buildCountQuery().eq('status', 'failed'),
-        ]);
-        
-        counts = {
-          all: allCount.count || 0,
-          processing: processingCount.count || 0,
-          favorites: favoritesCount.count || 0,
-          failed: failedCount.count || 0,
-        };
+      ]);
+      
+      counts = {
+        all: allCount.count || 0,
+        processing: processingCount.count || 0,
+        favorites: favoritesCount.count || 0,
+        failed: failedCount.count || 0,
+      };
       }
     }
 

@@ -726,7 +726,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
             >
               <span className="font-inter text-[13px] text-white">
                 {selectedWorkspaceName || 'Пространство'}
-              </span>
+                </span>
               <ChevronDownIcon className="w-4 h-4 text-white" />
             </button>
             {showWorkspaceDropdown && (
@@ -758,7 +758,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                 ))}
               </div>
             )}
-          </div>
+            </div>
 
           {/* User Filter */}
           <div ref={userRef} className="relative">
@@ -848,15 +848,15 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           <div className="flex-1" />
 
           {/* Export Button */}
-          <button 
-            onClick={handleExportExcel}
+            <button 
+              onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] rounded-lg text-white hover:bg-[#5558E3] transition-colors"
-          >
-            <Download className="w-4 h-4" />
+            >
+              <Download className="w-4 h-4" />
             <span className="font-inter font-medium text-[13px]">
-              Скачать отчет
-            </span>
-          </button>
+                Скачать отчет
+              </span>
+            </button>
         </div>
 
         {/* Table */}

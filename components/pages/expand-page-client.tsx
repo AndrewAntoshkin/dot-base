@@ -39,7 +39,7 @@ const ASPECT_RATIOS = [
 export function ExpandPageClient() {
   const { addGeneration, generations, refreshGenerations } = useGenerations();
   const { selectedWorkspaceId } = useUser();
-
+  
   // Состояние
   const [selectedModel, setSelectedModel] = useState('bria-expand');
   const [image, setImage] = useState<string | null>(null);

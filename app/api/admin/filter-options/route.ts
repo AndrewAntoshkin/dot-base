@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { checkAdminAccess } from '@/lib/admin';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/filter-options
  * Get options for dashboard filters (workspaces, users)

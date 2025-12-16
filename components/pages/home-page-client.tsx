@@ -40,7 +40,7 @@ function HomeContent() {
   const [mobileShowForm, setMobileShowForm] = useState(false);
   const { addGeneration } = useGenerations();
   const { selectedWorkspaceId } = useUser();
-
+  
   // Form ref для управления формой без глобальных переменных
   const formRef = useRef<SettingsFormRef | null>(null);
 

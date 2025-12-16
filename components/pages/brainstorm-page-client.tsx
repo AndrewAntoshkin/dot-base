@@ -137,7 +137,7 @@ export default function BrainstormPageClient() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { addGeneration } = useGenerations();
   const { selectedWorkspaceId } = useUser();
-
+  
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
