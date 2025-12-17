@@ -6,25 +6,6 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { UserRole } from '@/contexts/user-context';
 
-// Локальный шрифт Inter - работает без VPN, не зависит от Google
-const inter = localFont({
-  src: [
-    {
-      path: '../public/fonts/Inter-Variable.woff2',
-      weight: '100 900',
-      style: 'normal',
-    },
-    {
-      path: '../public/fonts/Inter-Cyrillic.woff2',
-      weight: '100 900',
-      style: 'normal',
-    },
-  ],
-  variable: '--font-inter',
-  display: 'swap',
-  preload: true,
-});
-
 // Alumni Sans для заголовков на лендинге — локальный, не зависит от Google
 const alumniSans = localFont({
   src: [
@@ -121,7 +102,7 @@ export default async function RootLayout({
 
   return (
     <html lang="ru">
-      <body className={`${inter.variable} ${alumniSans.variable} font-inter`}>
+      <body className={`${alumniSans.variable} font-inter`}>
         <ErrorBoundary>
           <AppProviders 
             initialUserEmail={userEmail} 

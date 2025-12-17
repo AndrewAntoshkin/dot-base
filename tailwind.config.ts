@@ -12,7 +12,8 @@ const config: Config = {
       fontFamily: {
         'ibm-mono': ['var(--font-ibm-plex-mono)', 'monospace'],
         'gloock': ['var(--font-gloock)', 'serif'],
-        'inter': ['var(--font-inter)', 'sans-serif'],
+        // Keep using `font-inter` class across the app, but map it to Google Sans
+        'inter': ['Google Sans', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
