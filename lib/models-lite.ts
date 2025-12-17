@@ -20,10 +20,11 @@ export interface ModelLite {
 
 // Лёгкие данные для селектора моделей - только id, название и описание
 export const CREATE_MODELS_LITE: ModelLite[] = [
+  { id: 'flux-2-max', displayName: 'FLUX 2 Max', description: 'Максимальное качество, лучшее следование промпту, до 8 референсов', action: 'create' },
   { id: 'flux-2-pro', displayName: 'FLUX 2 Pro', description: 'Генерация и редактирование с поддержкой до 8 референсных изображений', action: 'create' },
   { id: 'seedream-4', displayName: 'SeeDream 4', description: 'ByteDance - генерация и редактирование до 4K разрешения', action: 'create' },
   { id: 'seedream-4.5', displayName: 'SeeDream 4.5', description: 'ByteDance - улучшенная модель с лучшим пониманием пространства и знаний', action: 'create' },
-  { id: 'nano-banana-pro', displayName: 'Nano Banana Pro', description: 'Google Gemini 3 Pro - генерация с текстом. ⏱️ 1-2 мин', action: 'create' },
+  { id: 'nano-banana-pro', displayName: 'Nano Banana Pro', description: 'Генерация с текстом и до 14 референсов. ⏱️ 1-2 мин', action: 'create' },
   { id: 'ideogram-v3-turbo', displayName: 'Ideogram V3 Turbo', description: 'Быстрая генерация с поддержкой стилей и inpainting', action: 'create' },
   { id: 'flux-1.1-pro', displayName: 'FLUX 1.1 Pro', description: 'Быстрая генерация с отличным качеством', action: 'create' },
   { id: 'imagen-4-ultra', displayName: 'Imagen 4 Ultra', description: 'Google - максимальное качество', action: 'create' },
@@ -38,7 +39,7 @@ export const CREATE_MODELS_LITE: ModelLite[] = [
 ];
 
 export const EDIT_MODELS_LITE: ModelLite[] = [
-  { id: 'nano-banana-pro-edit', displayName: 'Nano Banana Pro', description: 'Google Gemini 3 Pro - редактирование с текстом. ⏱️ 1-2 мин', action: 'edit' },
+  { id: 'nano-banana-pro-edit', displayName: 'Nano Banana Pro', description: 'Редактирование с текстом на изображении. ⏱️ 1-2 мин', action: 'edit' },
   { id: 'flux-kontext-max-edit', displayName: 'FLUX Kontext Max', description: 'Премиум редактирование с текстом', action: 'edit' },
   { id: 'seedream-4-edit', displayName: 'SeeDream 4', description: 'ByteDance - точное редактирование до 4K', action: 'edit' },
   { id: 'seedream-4.5-edit', displayName: 'SeeDream 4.5', description: 'ByteDance - улучшенное редактирование с лучшим пониманием пространства', action: 'edit' },
