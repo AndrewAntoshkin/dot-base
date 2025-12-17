@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
-import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
+// NOTE: getReplicateClient используется только для отмены в DELETE
+// Статус генерации обновляется через webhook, не при GET запросах
 
 export const dynamic = 'force-dynamic';
 
@@ -159,130 +160,9 @@ export async function GET(
       }
     }
 
-    // Если генерация еще в процессе, проверить статус на Replicate
-    if (
-      generation.status === 'processing' &&
-      generation.replicate_prediction_id
-    ) {
-      try {
-        const replicateClient = getReplicateClient();
-        const prediction = await replicateClient.getPrediction(
-          generation.replicate_prediction_id
-        );
-
-        // Обновить статус если изменился
-        if (prediction.status === 'succeeded') {
-          const output = prediction.output;
-          const isAnalyze = generation.action?.startsWith('analyze_');
-          
-          if (isAnalyze) {
-            // Обработка текстового вывода для analyze моделей
-            let textOutput: string | null = null;
-            
-            if (typeof output === 'string') {
-              textOutput = output;
-            } else if (Array.isArray(output)) {
-              textOutput = output.filter(item => typeof item === 'string').join('\n');
-            } else if (output && typeof output === 'object') {
-              const textFields = ['text', 'caption', 'description', 'prompt', 'output', 'result', 'content', 'answer'];
-              for (const field of textFields) {
-                if ((output as any)[field] && typeof (output as any)[field] === 'string') {
-                  textOutput = (output as any)[field];
-                  break;
-                }
-              }
-            }
-            
-            if (textOutput) {
-              await (supabase
-                .from('generations') as any)
-                .update({
-                  status: 'completed',
-                  output_text: textOutput,
-                  output_urls: [textOutput], // Для совместимости
-                  replicate_output: prediction,
-                })
-                .eq('id', id);
-
-              generation.status = 'completed';
-              generation.output_text = textOutput;
-              generation.output_urls = [textOutput];
-            }
-          } else {
-            // Обработка медиа вывода
-            let replicateUrls: string[] = [];
-            
-            if (typeof output === 'string') {
-              replicateUrls = [output];
-            } else if (Array.isArray(output)) {
-              replicateUrls = output.filter(url => typeof url === 'string');
-            } else if (output && typeof output === 'object') {
-              const possibleUrlFields = ['url', 'video', 'output', 'result'];
-              for (const field of possibleUrlFields) {
-                if ((output as any)[field] && typeof (output as any)[field] === 'string') {
-                  replicateUrls = [(output as any)[field]];
-                  break;
-                }
-              }
-            }
-
-            // Сохранить медиа в storage
-            let outputUrls = replicateUrls;
-            let outputThumbs: string[] | null = null;
-            if (replicateUrls.length > 0) {
-              const { urls, thumbs } = await saveGenerationMedia(replicateUrls, generation.id);
-              if (urls.length > 0) outputUrls = urls;
-              if (thumbs.length > 0) outputThumbs = thumbs;
-            }
-
-            await (supabase
-              .from('generations') as any)
-              .update({
-                status: 'completed',
-                output_urls: outputUrls,
-                output_thumbs: outputThumbs,
-                replicate_output: prediction,
-              })
-              .eq('id', id);
-
-            generation.status = 'completed';
-            generation.output_urls = outputUrls;
-            (generation as any).output_thumbs = outputThumbs;
-          }
-        } else if (prediction.status === 'failed') {
-          // Логируем оригинальную ошибку для отладки
-          console.error('=== REPLICATE PREDICTION FAILED ===');
-          console.error('Prediction ID:', generation.replicate_prediction_id);
-          console.error('Error:', prediction.error);
-          console.error('Full prediction:', JSON.stringify(prediction, null, 2));
-          
-          // Очищаем ошибку от технических деталей
-          let cleanError = 'Генерация не удалась. Попробуйте изменить параметры';
-          if (prediction.error) {
-            const errorLower = prediction.error.toLowerCase();
-            if (errorLower.includes('nsfw') || errorLower.includes('safety') || errorLower.includes('blocked')) {
-              cleanError = 'Контент заблокирован фильтром безопасности';
-            } else if (errorLower.includes('timeout')) {
-              cleanError = 'Превышено время генерации';
-            }
-          }
-          
-          await (supabase
-            .from('generations') as any)
-            .update({
-              status: 'failed',
-              error_message: cleanError,
-              replicate_output: prediction,
-            })
-            .eq('id', id);
-
-          generation.status = 'failed';
-          generation.error_message = cleanError;
-        }
-      } catch (replicateError: any) {
-        console.error('Error checking prediction status:', replicateError);
-      }
-    }
+    // NOTE: Статус обновляется через webhook (/api/webhook/replicate)
+    // НЕ проверяем статус на Replicate при каждом GET запросе - это замедляет ответ
+    // Webhook надёжно обрабатывает завершение генерации
 
     return NextResponse.json({
       ...generation,

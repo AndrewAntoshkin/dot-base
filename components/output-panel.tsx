@@ -60,8 +60,9 @@ function isAbortError(error: any): boolean {
 }
 
 // Интервалы polling с адаптацией под качество сети
-const POLLING_INTERVAL = 5000; // 5 секунд обычно
-const POLLING_INTERVAL_SLOW = 10000; // 10 секунд для медленного соединения
+// NOTE: Статус обновляется через webhook, polling - резервный механизм
+const POLLING_INTERVAL = 6000; // 6 секунд обычно (webhook придёт раньше)
+const POLLING_INTERVAL_SLOW = 12000; // 12 секунд для медленного соединения
 
 // Компонент badge создателя
 function CreatorBadge({ creator }: { creator: Creator }) {
