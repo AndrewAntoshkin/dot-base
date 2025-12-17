@@ -37,8 +37,8 @@ function NavLinkWithTooltip({ href, label, description, isActive }: {
     >
       <Link
         href={href}
-        className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-          isActive ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
+        className={`h-9 px-3 py-2 rounded-xl flex items-center justify-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-all duration-150 ${
+          isActive ? 'bg-[#1f1f1f] text-white' : 'bg-transparent text-white hover:text-white/80 hover:bg-[#1f1f1f]/50'
         }`}
       >
         {label}
