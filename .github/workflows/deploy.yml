@@ -26,11 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
-
       - name: Pull Vercel env (production)
         run: npx vercel@latest pull --yes --environment=production
+
+      - name: Build (Vercel prebuilt output)
+        run: npx vercel@latest build --prod --yes
 
       - name: Deploy to Vercel (production)
         run: npx vercel@latest deploy --prebuilt --prod --yes

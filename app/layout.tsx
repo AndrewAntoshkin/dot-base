@@ -6,6 +6,10 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { UserRole } from '@/contexts/user-context';
 
+// This layout reads auth cookies (Supabase SSR), so it must always be dynamic.
+// Otherwise Next.js will try to statically prerender pages and fail with DYNAMIC_SERVER_USAGE.
+export const dynamic = 'force-dynamic';
+
 // Alumni Sans для заголовков на лендинге — локальный, не зависит от Google
 const alumniSans = localFont({
   src: [
