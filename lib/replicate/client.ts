@@ -38,17 +38,27 @@ export class ReplicateClient {
   private validateAndCleanInput(input: Record<string, any>, modelName?: string): Record<string, any> {
     const cleaned = { ...input };
     
+    // Модели, которые НЕ поддерживают match_input_image
     const modelsWithoutMatchInput = ['flux-2-pro', 'black-forest-labs/flux-2-pro'];
-    const modelDoesntSupportMatchInput = modelName && 
-      modelsWithoutMatchInput.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
+    // Модели, которые ЯВНО поддерживают match_input_image (не удаляем его)
+    const modelsWithMatchInputSupport = ['nano-banana-pro', 'google/nano-banana-pro'];
+    
+    const modelLowerName = (modelName || '').toLowerCase();
+    const modelDoesntSupportMatchInput = modelsWithoutMatchInput.some(m => modelLowerName.includes(m.toLowerCase()));
+    const modelSupportsMatchInput = modelsWithMatchInputSupport.some(m => modelLowerName.includes(m.toLowerCase()));
     
     if (cleaned.aspect_ratio === 'match_input_image') {
       const hasImage = cleaned.image || cleaned.input_image || cleaned.image_input || 
                        cleaned.start_image || cleaned.first_frame_image;
       
       if (!hasImage || modelDoesntSupportMatchInput) {
+        // Нет изображения или модель не поддерживает - заменяем на 1:1
         cleaned.aspect_ratio = '1:1';
+      } else if (modelSupportsMatchInput) {
+        // Модель явно поддерживает match_input_image - оставляем как есть
+        // (не удаляем cleaned.aspect_ratio)
       } else {
+        // Для остальных моделей удаляем, чтобы использовался дефолт
         delete cleaned.aspect_ratio;
       }
     }

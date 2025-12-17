@@ -52,7 +52,124 @@ export interface Model {
  * СОЗДАТЬ ИЗОБРАЖЕНИЕ - 14 моделей
  */
 export const CREATE_MODELS: Model[] = [
-  // 1. FLUX 2 Pro
+  // 1. FLUX 2 Max - Максимальное качество и консистентность
+  {
+    id: 'flux-2-max',
+    name: 'flux-2-max',
+    displayName: 'FLUX 2 Max',
+    replicateModel: 'black-forest-labs/flux-2-max',
+    action: 'create',
+    runs: '2.8K runs',
+    price: 'Priced by multiple properties',
+    description: 'Максимальное качество от Black Forest Labs. Лучшее следование промпту, до 8 референсов.',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изображение...',
+        description: 'Текстовое описание для генерации. FLUX 2 Max лучше понимает сложные промпты.',
+      },
+      {
+        name: 'input_images',
+        label: 'Референсные изображения',
+        type: 'file_array',
+        description: 'До 8 референсных изображений для сохранения персонажей, продуктов и стилей.',
+        maxFiles: 8,
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Формат (Aspect Ratio)',
+        type: 'select',
+        default: '1:1',
+        options: [
+          { value: 'match_input_image', label: 'Как входное изображение' },
+          { value: '1:1', label: '1:1' },
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '21:9', label: '21:9' },
+          { value: '9:21', label: '9:21' },
+          { value: 'custom', label: 'Свой размер' },
+        ],
+        description: 'Выберите пропорции: 1:1 для аватаров, 16:9 для баннеров, 9:16 для сторис.',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1 MP',
+        options: [
+          { value: '0.5 MP', label: '0.5 MP' },
+          { value: '1 MP', label: '1 MP' },
+          { value: '2 MP', label: '2 MP' },
+          { value: '4 MP', label: '4 MP' },
+          { value: 'match_input_image', label: 'Как входное' },
+        ],
+        description: 'Выходное разрешение в мегапикселях. Не используется при aspect_ratio=custom.',
+      },
+      {
+        name: 'width',
+        label: 'Ширина',
+        type: 'slider',
+        default: 1024,
+        min: 256,
+        max: 2048,
+        step: 32,
+        description: 'Точная ширина в пикселях. Работает только при выборе "Свой размер".',
+      },
+      {
+        name: 'height',
+        label: 'Высота',
+        type: 'slider',
+        default: 1024,
+        min: 256,
+        max: 2048,
+        step: 32,
+        description: 'Точная высота в пикселях. Работает только при выборе "Свой размер".',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Запомните это число, чтобы получить точно такой же результат снова.',
+      },
+      {
+        name: 'output_format',
+        label: 'Формат выходного файла',
+        type: 'select',
+        default: 'webp',
+        options: [
+          { value: 'webp', label: 'WebP' },
+          { value: 'jpg', label: 'JPG' },
+          { value: 'png', label: 'PNG' },
+        ],
+        description: 'WebP — лёгкий для веба, PNG — для прозрачности, JPG — универсальный.',
+      },
+      {
+        name: 'output_quality',
+        label: 'Качество',
+        type: 'slider',
+        default: 80,
+        min: 0,
+        max: 100,
+        description: 'Чем выше — тем чётче картинка, но больше размер файла.',
+      },
+      {
+        name: 'safety_tolerance',
+        label: 'Уровень безопасности',
+        type: 'slider',
+        default: 2,
+        min: 1,
+        max: 5,
+        description: 'Фильтр контента. Увеличьте, если генерация блокируется.',
+      },
+    ],
+  },
+
+  // 2. FLUX 2 Pro
   {
     id: 'flux-2-pro',
     name: 'flux-2-pro',
@@ -376,16 +493,16 @@ export const CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 3. Nano Banana Pro (Google Gemini 2.5)
+  // 3. Nano Banana Pro (Google Gemini 3 Pro)
   {
     id: 'nano-banana-pro',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
     replicateModel: 'google/nano-banana-pro',
     action: 'create',
-    runs: '725.6K runs',
+    runs: '4.8M runs',
     price: 'Priced by multiple properties',
-    description: 'Google Gemini 2.5 - генерация и редактирование',
+    description: 'Google Gemini 3 Pro - генерация с текстом и до 14 референсов. ⏱️ 1-2 мин',
     settings: [
       {
         name: 'prompt',
@@ -393,12 +510,13 @@ export const CREATE_MODELS: Model[] = [
         type: 'textarea',
         required: true,
         placeholder: 'Опишите изображение...',
+        description: 'Детальное описание. Поддерживает текст на картинке и multilingual.',
       },
       {
         name: 'image_input',
         label: 'Референсные изображения',
         type: 'file_array',
-        description: 'До 14 изображений для трансформации',
+        description: 'До 14 изображений для трансформации или объединения',
         maxFiles: 14,
       },
       {
@@ -407,10 +525,11 @@ export const CREATE_MODELS: Model[] = [
         type: 'select',
         default: '2K',
         options: [
-          { value: '1K', label: '1K' },
-          { value: '2K', label: '2K' },
-          { value: '4K', label: '4K' },
+          { value: '1K', label: '1K (быстрее)' },
+          { value: '2K', label: '2K (рекомендуется)' },
+          { value: '4K', label: '4K (медленнее)' },
         ],
+        description: 'Выше разрешение = дольше генерация',
       },
       {
         name: 'aspect_ratio',
@@ -419,11 +538,16 @@ export const CREATE_MODELS: Model[] = [
         default: 'match_input_image',
         options: [
           { value: 'match_input_image', label: 'Как входное изображение' },
-          { value: '1:1', label: '1:1' },
-          { value: '16:9', label: '16:9' },
-          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1 (квадрат)' },
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
           { value: '4:3', label: '4:3' },
           { value: '3:4', label: '3:4' },
+          { value: '3:2', label: '3:2' },
+          { value: '2:3', label: '2:3' },
+          { value: '4:5', label: '4:5' },
+          { value: '5:4', label: '5:4' },
+          { value: '21:9', label: '21:9 (ультраширокий)' },
         ],
       },
       {
@@ -443,10 +567,11 @@ export const CREATE_MODELS: Model[] = [
         type: 'select',
         default: 'block_only_high',
         options: [
-          { value: 'block_low_and_above', label: 'Строгий' },
+          { value: 'block_only_high', label: 'Минимальный (рекомендуется)' },
           { value: 'block_medium_and_above', label: 'Средний' },
-          { value: 'block_only_high', label: 'Свободный' },
+          { value: 'block_low_and_above', label: 'Строгий' },
         ],
+        description: 'При ошибках safety попробуйте Минимальный уровень',
       },
     ],
   },
@@ -1317,8 +1442,8 @@ export const EDIT_MODELS: Model[] = [
     displayName: 'Nano Banana Pro',
     replicateModel: 'google/nano-banana-pro',
     action: 'edit',
-    runs: '936K runs',
-    description: 'Google Gemini 3 Pro - редактирование и генерация с текстом',
+    runs: '4.8M runs',
+    description: 'Google Gemini 3 Pro - редактирование с текстом. ⏱️ 1-2 мин',
     settings: [
       {
         name: 'prompt',
@@ -1342,10 +1467,11 @@ export const EDIT_MODELS: Model[] = [
         type: 'select',
         default: '2K',
         options: [
-          { value: '1K', label: '1K' },
-          { value: '2K', label: '2K' },
+          { value: '1K', label: '1K (быстрее)' },
+          { value: '2K', label: '2K (рекомендуется)' },
           { value: '4K', label: '4K (медленнее)' },
         ],
+        description: 'Выше разрешение = дольше генерация',
       },
       {
         name: 'aspect_ratio',
@@ -1353,7 +1479,7 @@ export const EDIT_MODELS: Model[] = [
         type: 'select',
         default: 'match_input_image',
         options: [
-          { value: 'match_input_image', label: 'Как входное' },
+          { value: 'match_input_image', label: 'Как входное изображение' },
           { value: '1:1', label: '1:1 (квадрат)' },
           { value: '16:9', label: '16:9 (горизонталь)' },
           { value: '9:16', label: '9:16 (вертикаль)' },
@@ -1361,6 +1487,9 @@ export const EDIT_MODELS: Model[] = [
           { value: '3:4', label: '3:4' },
           { value: '3:2', label: '3:2' },
           { value: '2:3', label: '2:3' },
+          { value: '4:5', label: '4:5' },
+          { value: '5:4', label: '5:4' },
+          { value: '21:9', label: '21:9 (ультраширокий)' },
         ],
       },
       {
@@ -1384,7 +1513,7 @@ export const EDIT_MODELS: Model[] = [
           { value: 'block_medium_and_above', label: 'Средний' },
           { value: 'block_low_and_above', label: 'Строгий' },
         ],
-        description: 'Фильтр безопасности Google. При ошибках попробуйте Минимальный.',
+        description: 'При ошибках safety попробуйте Минимальный уровень',
       },
     ],
   },
