@@ -1,0 +1,30 @@
+name: Vercel Auto Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if hook URL is missing
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL secret is not set" >&2
+            exit 1
+          fi
+      - name: Trigger Vercel Deploy Hook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl -s -o /tmp/resp -w "%{http_code}" -X POST "$DEPLOY_HOOK_URL")
+          echo "HTTP status: $http_code"
+          echo "Response: $(cat /tmp/resp)"
+          if [ "$http_code" -ge 400 ]; then
+            exit 1
+          fi
