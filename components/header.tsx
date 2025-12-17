@@ -222,21 +222,26 @@ export function Header() {
               </Link>
             )}
             
-            {/* Generation count indicator */}
-            <button
-              onClick={() => setIsQueueOpen(!isQueueOpen)}
-              className={`w-8 h-8 rounded-full border-2 border-[#434343] flex items-center justify-center transition-colors ${
-                unviewedCount > 0 ? 'hover:border-white/50' : ''
-              }`}
-            >
-              {hasActiveGenerations ? (
-                <Loader2 className="w-4 h-4 text-white animate-spin" />
-              ) : (
-                <span className="font-inter font-medium text-base text-white tracking-[-0.32px]">
-                  {unviewedCount}
-                </span>
-              )}
-            </button>
+            {/* Generation count indicator with dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsQueueOpen(!isQueueOpen)}
+                className={`w-8 h-8 rounded-full border-2 border-[#434343] flex items-center justify-center transition-colors ${
+                  unviewedCount > 0 ? 'hover:border-white/50' : ''
+                }`}
+              >
+                {hasActiveGenerations ? (
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <span className="font-inter font-medium text-base text-white tracking-[-0.32px]">
+                    {unviewedCount}
+                  </span>
+                )}
+              </button>
+              
+              {/* Generations Queue Dropdown */}
+              <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+            </div>
 
             {/* User Avatar - Click to go to profile */}
             <Link
@@ -250,9 +255,6 @@ export function Header() {
                 </span>
               </div>
             </Link>
-
-            {/* Generations Queue Dropdown */}
-            <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
           </div>
         </div>
       </header>
