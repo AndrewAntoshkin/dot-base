@@ -228,11 +228,11 @@ export async function GET(
 
             // Сохранить медиа в storage
             let outputUrls = replicateUrls;
+            let outputThumbs: string[] | null = null;
             if (replicateUrls.length > 0) {
-              const savedUrls = await saveGenerationMedia(replicateUrls, generation.id);
-              if (savedUrls.length > 0) {
-                outputUrls = savedUrls;
-              }
+              const { urls, thumbs } = await saveGenerationMedia(replicateUrls, generation.id);
+              if (urls.length > 0) outputUrls = urls;
+              if (thumbs.length > 0) outputThumbs = thumbs;
             }
 
             await (supabase
@@ -240,12 +240,14 @@ export async function GET(
               .update({
                 status: 'completed',
                 output_urls: outputUrls,
+                output_thumbs: outputThumbs,
                 replicate_output: prediction,
               })
               .eq('id', id);
 
             generation.status = 'completed';
             generation.output_urls = outputUrls;
+            (generation as any).output_thumbs = outputThumbs;
           }
         } else if (prediction.status === 'failed') {
           // Логируем оригинальную ошибку для отладки

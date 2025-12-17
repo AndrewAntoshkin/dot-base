@@ -1,4 +1,6 @@
 import { createServiceRoleClient } from './server';
+import sharp from 'sharp';
+import logger from '@/lib/logger';
 
 /**
  * Выполнить операцию с ретраями
@@ -16,12 +18,12 @@ async function withRetry<T>(
       return await operation();
     } catch (error: any) {
       lastError = error;
-      console.warn(`${operationName} attempt ${attempt}/${maxRetries} failed:`, error.message);
+      logger.warn(`${operationName} attempt ${attempt}/${maxRetries} failed:`, error.message);
       
       if (attempt < maxRetries) {
         // Экспоненциальная задержка
         const delay = delayMs * Math.pow(2, attempt - 1);
-        console.log(`Waiting ${delay}ms before retry...`);
+        logger.debug(`Waiting ${delay}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -75,6 +77,15 @@ function getMediaTypeInfo(url: string, contentType?: string): { extension: strin
   return { extension: 'png', mimeType: 'image/png', isVideo: false };
 }
 
+async function createThumbnailWebp(buffer: Buffer): Promise<Buffer> {
+  // 512px bounding box — достаточно для карточек/превью
+  return await sharp(buffer)
+    .rotate()
+    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 72 })
+    .toBuffer();
+}
+
 /**
  * Сохранить медиа файл с Replicate в Supabase Storage
  * Поддерживает изображения и видео, включает ретраи
@@ -83,7 +94,7 @@ export async function saveMediaToStorage(
   mediaUrl: string,
   generationId: string,
   index: number = 0
-): Promise<string | null> {
+): Promise<{ url: string; thumbUrl?: string } | null> {
   try {
     const supabase = createServiceRoleClient();
 
@@ -108,22 +119,17 @@ export async function saveMediaToStorage(
     const contentType = response.headers.get('content-type') || '';
     const mediaInfo = getMediaTypeInfo(mediaUrl, contentType);
     
-    console.log('Saving media:', { 
-      url: mediaUrl.substring(0, 100), 
-      contentType, 
-      mediaInfo 
-    });
-
     const blob = await response.blob();
-    const buffer = await blob.arrayBuffer();
     const fileName = `${generationId}-${index}.${mediaInfo.extension}`;
+    const buf = Buffer.from(await blob.arrayBuffer());
 
     // Загрузить в Supabase Storage с ретраями
     const uploadToStorage = async () => {
       const { data, error } = await supabase.storage
         .from('generations')
-        .upload(fileName, buffer, {
+        .upload(fileName, buf, {
           contentType: mediaInfo.mimeType,
+          cacheControl: '31536000',
           upsert: true,
         });
       
@@ -140,10 +146,33 @@ export async function saveMediaToStorage(
       .from('generations')
       .getPublicUrl(fileName);
 
-    console.log('Media saved successfully:', publicUrlData.publicUrl);
-    return publicUrlData.publicUrl;
+    let thumbUrl: string | undefined;
+    if (!mediaInfo.isVideo) {
+      try {
+        const thumbBuffer = await createThumbnailWebp(buf);
+        const thumbFileName = `${generationId}-${index}-thumb.webp`;
+
+        const uploadThumb = async () => {
+          const { error } = await supabase.storage
+            .from('generations')
+            .upload(thumbFileName, thumbBuffer, {
+              contentType: 'image/webp',
+              cacheControl: '31536000',
+              upsert: true,
+            });
+          if (error) throw new Error(`Thumb upload: ${error.message}`);
+        };
+
+        await withRetry(uploadThumb, 2, 500, `Upload ${thumbFileName}`);
+        thumbUrl = supabase.storage.from('generations').getPublicUrl(thumbFileName).data.publicUrl;
+      } catch (e: any) {
+        logger.warn('Thumbnail generation failed:', generationId, index, e?.message);
+      }
+    }
+
+    return { url: publicUrlData.publicUrl, thumbUrl };
   } catch (error: any) {
-    console.error('Error saving media to storage after retries:', error.message);
+    logger.error('Error saving media to storage after retries:', error.message);
     return null;
   }
 }
@@ -157,7 +186,8 @@ export async function saveImageToStorage(
   generationId: string,
   index: number = 0
 ): Promise<string | null> {
-  return saveMediaToStorage(imageUrl, generationId, index);
+  const result = await saveMediaToStorage(imageUrl, generationId, index);
+  return result?.url || null;
 }
 
 /**
@@ -166,13 +196,21 @@ export async function saveImageToStorage(
 export async function saveGenerationMedia(
   mediaUrls: string[],
   generationId: string
-): Promise<string[]> {
-  const savedUrls = await Promise.all(
+): Promise<{ urls: string[]; thumbs: string[] }> {
+  const saved = await Promise.all(
     mediaUrls.map((url, index) => saveMediaToStorage(url, generationId, index))
   );
 
-  // Фильтруем null значения
-  return savedUrls.filter((url): url is string => url !== null);
+  const urls: string[] = [];
+  const thumbs: string[] = [];
+
+  for (const item of saved) {
+    if (!item) continue;
+    urls.push(item.url);
+    if (item.thumbUrl) thumbs.push(item.thumbUrl);
+  }
+
+  return { urls, thumbs };
 }
 
 /**
@@ -183,6 +221,7 @@ export async function saveGenerationImages(
   imageUrls: string[],
   generationId: string
 ): Promise<string[]> {
-  return saveGenerationMedia(imageUrls, generationId);
+  const { urls } = await saveGenerationMedia(imageUrls, generationId);
+  return urls;
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +82,7 @@ export async function GET() {
     }
 
     if (error) {
-      console.error('Error fetching workspaces:', error);
+      logger.error('Error fetching workspaces:', error);
       return NextResponse.json({ error: 'Failed to fetch workspaces' }, { status: 500 });
     }
 
@@ -165,7 +166,7 @@ export async function GET() {
       user_role: dbUser.role,
     });
   } catch (error) {
-    console.error('Error in GET /api/workspaces:', error);
+    logger.error('Error in GET /api/workspaces:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -243,7 +244,7 @@ export async function POST(request: Request) {
       .single() as { data: { id: string; name: string; slug: string; description: string | null; created_at: string } | null; error: any };
 
     if (createError || !workspace) {
-      console.error('Error creating workspace:', createError);
+      logger.error('Error creating workspace:', createError);
       return NextResponse.json({ error: 'Failed to create workspace' }, { status: 500 });
     }
 
@@ -286,7 +287,7 @@ export async function POST(request: Request) {
       },
     }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/workspaces:', error);
+    logger.error('Error in POST /api/workspaces:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

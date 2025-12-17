@@ -52,7 +52,6 @@ export function createServiceRoleClient(): SupabaseClient<Database> {
         },
       }
     );
-    console.log('[Supabase] Service role client initialized (singleton)');
   }
   return serviceRoleClientInstance;
 }

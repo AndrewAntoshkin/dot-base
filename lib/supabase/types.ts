@@ -44,6 +44,9 @@ export interface Database {
           is_active: boolean;
           credits: number;
           role: UserRole;
+          display_name: string | null;
+          avatar_url: string | null;
+          cover_url: string | null;
         };
         Insert: {
           id?: string;
@@ -58,6 +61,9 @@ export interface Database {
           is_active?: boolean;
           credits?: number;
           role?: UserRole;
+          display_name?: string | null;
+          avatar_url?: string | null;
+          cover_url?: string | null;
         };
         Update: {
           id?: string;
@@ -72,6 +78,9 @@ export interface Database {
           is_active?: boolean;
           credits?: number;
           role?: UserRole;
+          display_name?: string | null;
+          avatar_url?: string | null;
+          cover_url?: string | null;
         };
       };
       generations: {
@@ -88,6 +97,7 @@ export interface Database {
           settings: Json;
           status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
           output_urls: string[] | null;
+          output_thumbs: string[] | null;
           replicate_prediction_id: string | null;
           replicate_token_index: number | null;
           processing_time_ms: number | null;
@@ -116,6 +126,7 @@ export interface Database {
           settings?: Json;
           status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
           output_urls?: string[] | null;
+          output_thumbs?: string[] | null;
           replicate_prediction_id?: string | null;
           replicate_token_index?: number | null;
           processing_time_ms?: number | null;
@@ -141,6 +152,7 @@ export interface Database {
           settings?: Json;
           status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
           output_urls?: string[] | null;
+          output_thumbs?: string[] | null;
           replicate_prediction_id?: string | null;
           replicate_token_index?: number | null;
           processing_time_ms?: number | null;

@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fix incorrect monorepo/workspace root inference (multiple lockfiles)
+  turbopack: {
+    root: __dirname,
+  },
   images: {
     remotePatterns: [
       {

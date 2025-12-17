@@ -125,10 +125,14 @@ export async function POST() {
             }
 
             let outputUrls = replicateUrls;
+            let outputThumbs: string[] | null = null;
             if (replicateUrls.length > 0) {
-              const savedUrls = await saveGenerationMedia(replicateUrls, gen.id);
-              if (savedUrls.length > 0) {
-                outputUrls = savedUrls;
+              const { urls, thumbs } = await saveGenerationMedia(replicateUrls, gen.id);
+              if (urls.length > 0) {
+                outputUrls = urls;
+              }
+              if (thumbs.length > 0) {
+                outputThumbs = thumbs;
               }
             }
 
@@ -136,6 +140,7 @@ export async function POST() {
               .update({
                 status: 'completed',
                 output_urls: outputUrls,
+                output_thumbs: outputThumbs,
                 replicate_output: prediction,
                 completed_at: new Date().toISOString(),
               })

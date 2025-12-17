@@ -86,46 +86,38 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Получаем последние 4 превью для каждого пользователя (из этого workspace)
-    const usersWithGenerations = await Promise.all(
-      (users || []).map(async (u: any) => {
-        // Если RPC не работает - fallback на count
-        let genCount = statsMap[u.id];
-        if (genCount === undefined) {
-          const { count } = await adminClient
-            .from('generations')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', u.id);
-          genCount = count || 0;
-        }
+    // Забираем последние N генераций по workspace одним запросом и группируем (убираем N+1)
+    const { data: recentWorkspaceGens } = await adminClient
+      .from('generations')
+      .select('user_id, output_urls, output_thumbs, created_at')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'completed')
+      .not('output_urls', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1000);
 
-        // Последние 3 генерации с картинками (из этого workspace для превью)
-        // Дизайн: 1 большое слева + 2 маленьких справа = 3 превью
-        const { data: recentGenerations } = await adminClient
-          .from('generations')
-          .select('id, output_urls')
-          .eq('workspace_id', workspaceId)
-          .eq('user_id', u.id)
-          .eq('status', 'completed')
-          .not('output_urls', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(3);
+    const previewsByUser: Record<string, string[]> = {};
+    for (const g of (recentWorkspaceGens || []) as any[]) {
+      const uid = g.user_id as string;
+      if (!uid) continue;
+      if (!previewsByUser[uid]) previewsByUser[uid] = [];
+      if (previewsByUser[uid].length >= 3) continue;
+      const thumb = g.output_thumbs?.[0];
+      const full = g.output_urls?.[0];
+      const url = thumb || full;
+      if (url) previewsByUser[uid].push(url);
+    }
 
-        // Извлекаем URL превью (3 штуки для нового дизайна)
-        const previews = (recentGenerations || [])
-          .filter((g: any) => g.output_urls && g.output_urls.length > 0)
-          .map((g: any) => g.output_urls[0])
-          .slice(0, 3);
-
-        return {
-          id: u.id,
-          email: u.email,
-          name: u.telegram_first_name || u.email?.split('@')[0] || 'User',
-          generations_count: genCount,
-          previews,
-        };
-      })
-    );
+    const usersWithGenerations = (users || []).map((u: any) => {
+      const genCount = statsMap[u.id] ?? 0;
+      return {
+        id: u.id,
+        email: u.email,
+        name: u.telegram_first_name || u.email?.split('@')[0] || 'User',
+        generations_count: genCount,
+        previews: previewsByUser[u.id] || [],
+      };
+    });
 
     // Сортируем по количеству генераций (больше сверху)
     usersWithGenerations.sort((a, b) => b.generations_count - a.generations_count);

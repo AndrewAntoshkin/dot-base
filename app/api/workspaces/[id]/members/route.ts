@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { WorkspaceMemberRole } from '@/lib/supabase/types';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,7 +103,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .single() as { data: { id: string; role: string; joined_at: string } | null; error: any };
 
     if (error) {
-      console.error('Error adding member:', error);
+      logger.error('Error adding member:', error);
       return NextResponse.json({ error: 'Failed to add member' }, { status: 500 });
     }
 
@@ -116,7 +117,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       },
     }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/workspaces/[id]/members:', error);
+    logger.error('Error in POST /api/workspaces/[id]/members:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -223,10 +224,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         .eq('user_id', userId);
 
       if (migrateError) {
-        console.error('Error migrating generations:', migrateError);
+        logger.error('Error migrating generations:', migrateError);
         // Продолжаем удаление даже при ошибке миграции
       } else {
-        console.log(`Migrated generations for user ${userId} from workspace ${workspaceId} to ${targetWorkspaceId}`);
+        logger.debug(`Migrated generations for user ${userId} from workspace ${workspaceId} to ${targetWorkspaceId}`);
       }
     } else {
       // Если некуда переносить - обнуляем workspace_id
@@ -237,7 +238,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         .eq('user_id', userId);
 
       if (nullifyError) {
-        console.error('Error nullifying workspace_id:', nullifyError);
+        logger.error('Error nullifying workspace_id:', nullifyError);
       }
     }
 
@@ -249,7 +250,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error removing member:', error);
+      logger.error('Error removing member:', error);
       return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 });
     }
 
@@ -258,7 +259,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       generationsMigratedTo: targetWorkspaceId,
     });
   } catch (error) {
-    console.error('Error in DELETE /api/workspaces/[id]/members:', error);
+    logger.error('Error in DELETE /api/workspaces/[id]/members:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -348,7 +349,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error('Error updating member role:', error);
+      logger.error('Error updating member role:', error);
       return NextResponse.json({ error: 'Failed to update role' }, { status: 500 });
     }
 
@@ -356,7 +357,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       member: updatedMember,
     });
   } catch (error) {
-    console.error('Error in PATCH /api/workspaces/[id]/members:', error);
+    logger.error('Error in PATCH /api/workspaces/[id]/members:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

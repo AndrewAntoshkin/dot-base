@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -148,9 +149,7 @@ async function uploadBuffers(
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    console.log(
-      `Upload: Processing file ${i}, type: ${file.mimeType}, size: ${file.size} bytes`
-    );
+    logger.debug(`Upload: Processing file ${i}, type: ${file.mimeType}, size: ${file.size} bytes`);
 
     const extension = EXTENSION_MAP[file.mimeType] || 'bin';
     const filename = file.originalName
@@ -166,7 +165,7 @@ async function uploadBuffers(
       });
 
     if (uploadError) {
-      console.error(`Upload error for file ${i}:`, uploadError);
+      logger.error(`Upload error for file ${i}:`, uploadError);
       let friendlyError = `Файл ${i + 1}: `;
       if (uploadError.message.includes('Bucket not found')) {
         friendlyError += 'хранилище не настроено. Обратитесь к администратору';
@@ -189,7 +188,7 @@ async function uploadBuffers(
       try {
         new URL(urlData.publicUrl);
         uploadedUrls.push(urlData.publicUrl);
-        console.log(`Upload: File ${i} uploaded successfully:`, urlData.publicUrl);
+        logger.debug(`Upload: File ${i} uploaded successfully:`, urlData.publicUrl);
       } catch {
         errors.push(`Файл ${i + 1}: ошибка получения URL`);
       }
@@ -201,7 +200,7 @@ async function uploadBuffers(
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== UPLOAD API START ===');
+    logger.debug('=== UPLOAD API START ===');
 
     const cookieStore = await cookies();
     const supabaseAuth = createServerClient(
@@ -230,7 +229,7 @@ export async function POST(request: NextRequest) {
     } = await supabaseAuth.auth.getUser();
 
     if (!user) {
-      console.log('Upload: Unauthorized');
+      logger.debug('Upload: Unauthorized');
       return NextResponse.json(
         {
           error: 'Требуется авторизация',
@@ -240,7 +239,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Upload: User authenticated:', user.id);
+    logger.debug('Upload: User authenticated:', user.id);
 
     const contentType = request.headers.get('content-type') || '';
     let parsedFiles: ParsedFile[];
@@ -253,7 +252,7 @@ export async function POST(request: NextRequest) {
 
     const { uploaded, errors } = await uploadBuffers(user.id, parsedFiles);
 
-    console.log('Upload: Complete. Uploaded:', uploaded.length, 'Errors:', errors.length);
+    logger.debug('Upload: Complete. Uploaded:', uploaded.length, 'Errors:', errors.length);
 
     if (uploaded.length === 0 && errors.length > 0) {
       return NextResponse.json(
@@ -273,7 +272,7 @@ export async function POST(request: NextRequest) {
       failed: errors.length,
     });
   } catch (error: any) {
-    console.error('=== UPLOAD API ERROR ===', error);
+    logger.error('=== UPLOAD API ERROR ===', error);
 
     let friendlyMessage = 'Ошибка загрузки файлов';
     let code = 'INTERNAL_ERROR';

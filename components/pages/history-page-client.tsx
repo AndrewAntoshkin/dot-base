@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
-import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, X } from 'lucide-react';
+import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, X, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { OnlyMineToggle } from '@/components/only-mine-toggle';
 
@@ -53,6 +53,7 @@ interface Generation {
   model_name: string;
   status: string;
   output_urls: string[] | null;
+  output_thumbs?: string[] | null;
   prompt: string | null;
   created_at: string;
   is_favorite: boolean;
@@ -215,6 +216,7 @@ export default function HistoryPageClient() {
   
   // Workspace state
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
   const [onlyMine, setOnlyMine] = useState(searchParams.get('onlyMine') !== 'false'); // По умолчанию включён
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
 
@@ -265,6 +267,8 @@ export default function HistoryPageClient() {
           const data = await response.json();
           
           if (data.workspaces && data.workspaces.length > 0) {
+            setAllWorkspaces(data.workspaces);
+            
             // Если есть workspaceId в URL - ищем его
             if (urlWorkspaceId) {
               const targetWorkspace = data.workspaces.find((ws: Workspace) => ws.id === urlWorkspaceId);
@@ -678,6 +682,47 @@ export default function HistoryPageClient() {
           
           {/* Фильтры */}
           <div className="flex flex-wrap items-center gap-2 py-3">
+            {/* Переключатель пространства - только если больше одного */}
+            {allWorkspaces.length > 1 && (
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdown(openDropdown === 'workspace' ? null : 'workspace');
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-[13px] font-medium bg-[#2c2c2c] text-white border border-[#3a3a3a] transition-colors hover:bg-[#3a3a3a]"
+                >
+                  <span className="whitespace-nowrap max-w-[150px] truncate">{workspace?.name || 'Пространство'}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${openDropdown === 'workspace' ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {openDropdown === 'workspace' && (
+                  <div className="absolute top-full left-0 mt-1 min-w-[200px] bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] shadow-lg z-50 py-1 max-h-[300px] overflow-y-auto">
+                    {allWorkspaces.map((ws) => (
+                      <button
+                        key={ws.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setWorkspace(ws);
+                          setOpenDropdown(null);
+                        }}
+                        className={`
+                          w-full text-left px-3 py-2 text-[13px] transition-colors flex items-center justify-between
+                          ${ws.id === workspace?.id 
+                            ? 'bg-[#2c2c2c] text-white' 
+                            : 'text-[#959595] hover:bg-[#252525] hover:text-white'
+                          }
+                        `}
+                      >
+                        <span className="truncate">{ws.name}</span>
+                        {ws.id === workspace?.id && <Check className="w-4 h-4 shrink-0 ml-2" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* Фильтр по создателю - только если не "Только мои" */}
             {!onlyMine && availableCreators.length > 1 && (
               <FilterDropdown
@@ -820,17 +865,22 @@ export default function HistoryPageClient() {
                           <div className="absolute inset-0 flex items-center justify-center">
                             <BrokenLinkIcon />
                           </div>
-                        ) : generation.output_urls?.[0] && isValidMediaUrl(generation.output_urls[0]) ? (
-                          isVideoUrl(generation.output_urls[0]) ? (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <Play className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
-                            </div>
+                        ) : (generation.output_thumbs?.[0] || generation.output_urls?.[0]) && isValidMediaUrl((generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string) ? (
+                          isVideoUrl((generation.output_urls?.[0] || '') as string) ? (
+                            <video
+                              className="absolute inset-0 w-full h-full object-cover rounded-[12px]"
+                              src={(generation.output_urls?.[0] || '') as string}
+                              preload="metadata"
+                              muted
+                              playsInline
+                            />
                           ) : (
                             <img
-                              src={generation.output_urls[0]}
+                              src={(generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string}
                               alt={generation.prompt || 'Generated'}
                               className="absolute inset-0 w-full h-full object-cover rounded-[12px]"
                               loading="lazy"
+                              decoding="async"
                             />
                           )
                         ) : isTextAction(generation.action) ? (

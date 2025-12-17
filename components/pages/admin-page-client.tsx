@@ -15,11 +15,13 @@ import {
   ChevronDown as ChevronDownIcon,
   Calendar,
   X,
+  Search,
 } from 'lucide-react';
 import { useUser } from '@/contexts/user-context';
 import { UserRole } from '@/lib/supabase/types';
 import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, isSameDay, isWithinInterval, isBefore, isAfter } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import WorkspacesContent from '@/components/workspaces-content';
 
 interface AdminStats {
   totalWorkspaces: number;
@@ -93,6 +95,8 @@ interface AdminPageClientProps {
   userEmail: string | null;
 }
 
+type DashboardTab = 'overview' | 'workspaces';
+
 type SortField = 'name' | 'status' | 'created' | 'generations' | 'cost' | 'role';
 type SortDirection = 'asc' | 'desc';
 
@@ -163,32 +167,10 @@ function DateRangePicker({
     return isWithinInterval(date, { start: tempStart, end: tempEnd });
   };
 
-  const quickRanges = [
-    { label: 'Сегодня', start: new Date(), end: new Date() },
-    { label: 'Вчера', start: subDays(new Date(), 1), end: subDays(new Date(), 1) },
-    { label: '7 дней', start: subDays(new Date(), 7), end: new Date() },
-    { label: '30 дней', start: subDays(new Date(), 30), end: new Date() },
-    { label: 'Этот месяц', start: startOfMonth(new Date()), end: new Date() },
-  ];
+  const today = new Date();
 
   return (
     <div className="absolute top-full left-0 mt-2 bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl shadow-xl z-50 p-4 min-w-[320px]">
-      {/* Quick ranges */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {quickRanges.map((range) => (
-          <button
-            key={range.label}
-            onClick={() => {
-              setTempStart(range.start);
-              setTempEnd(range.end);
-            }}
-            className="px-2 py-1 text-[12px] text-[#a2a2a2] hover:text-white hover:bg-[#252525] rounded transition-colors"
-          >
-            {range.label}
-          </button>
-        ))}
-      </div>
-
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
@@ -222,19 +204,17 @@ function DateRangePicker({
             const isRange = isInRange(date);
 
             return (
-              <button
-                key={`${wi}-${di}`}
-                onClick={() => handleDayClick(date)}
-                className={`
-                  w-8 h-8 text-[12px] rounded transition-colors
-                  ${!isCurrentMonth ? 'text-[#4d4d4d]' : 'text-white'}
-                  ${isSelected ? 'bg-[#6366F1] text-white' : ''}
-                  ${isRange && !isSelected ? 'bg-[#6366F1]/30' : ''}
-                  ${!isSelected && !isRange ? 'hover:bg-[#252525]' : ''}
-                `}
-              >
-                {date.getDate()}
-              </button>
+                <button
+                  key={`${wi}-${di}`}
+                  onClick={() => handleDayClick(date)}
+                  className={`
+                    w-8 h-8 text-[12px] rounded transition-colors
+                    ${isSelected ? 'bg-white !text-black font-medium' : isRange ? 'bg-[#3a3a3a] text-white' : !isCurrentMonth ? 'text-[#4d4d4d]' : 'text-white hover:bg-[#252525]'}
+                    ${isSameDay(date, today) && !isSelected ? 'border border-white' : ''}
+                  `}
+                >
+                  {date.getDate()}
+                </button>
             );
           })
         ))}
@@ -257,7 +237,7 @@ function DateRangePicker({
         </button>
         <button
           onClick={handleApply}
-          className="flex-1 px-3 py-2 bg-[#6366F1] text-white text-[13px] rounded-lg hover:bg-[#5558E3] transition-colors"
+          className="flex-1 px-3 py-2 bg-white text-black text-[13px] font-medium rounded-lg hover:bg-[#e5e5e5] transition-colors"
         >
           Применить
         </button>
@@ -284,6 +264,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Side sheet state
   const [sideSheetUser, setSideSheetUser] = useState<UserWithStats | null>(null);
@@ -297,6 +278,9 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   const [errorAnalysis, setErrorAnalysis] = useState<ErrorAnalysis | null>(null);
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
   const [errorModalTab, setErrorModalTab] = useState<'overview' | 'table'>('overview');
+  
+  // Dashboard tabs
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
   // Получаем isSuperAdmin из контекста
   const { isSuperAdmin } = useUser();
@@ -472,9 +456,22 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     }
   };
 
-  // Sorted users
+  // Filtered and sorted users
   const sortedUsers = useMemo(() => {
-    return [...users].sort((a, b) => {
+    // First filter by search query
+    let filtered = users;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = users.filter(user => {
+        const name = (user.telegram_first_name || '').toLowerCase();
+        const username = (user.telegram_username || '').toLowerCase();
+        const email = (user.email || '').toLowerCase();
+        return name.includes(query) || username.includes(query) || email.includes(query);
+      });
+    }
+    
+    // Then sort
+    return [...filtered].sort((a, b) => {
       let comparison = 0;
       
       switch (sortField) {
@@ -500,7 +497,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
       
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [users, sortField, sortDirection]);
+  }, [users, sortField, sortDirection, searchQuery]);
 
   // Pagination
   const totalPages = Math.ceil(sortedUsers.length / itemsPerPage);
@@ -688,10 +685,37 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
       
       <main className="px-4 lg:px-[80px] py-8">
         {/* Title */}
-        <h1 className="font-inter font-semibold text-[20px] leading-[28px] tracking-[-0.4px] text-white mb-6">
+        <h1 className="font-inter font-semibold text-[20px] leading-[28px] tracking-[-0.4px] text-white mb-4">
           Dashboard
         </h1>
 
+        {/* Tabs */}
+        <div className="flex items-end gap-3 border-b border-[#2e2e2e] mb-6">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`pb-2.5 px-0 font-inter text-[14px] transition-colors border-b-2 -mb-[1px] ${
+              activeTab === 'overview'
+                ? 'text-white font-medium border-white'
+                : 'text-[#959595] font-normal border-transparent hover:text-white'
+            }`}
+          >
+            Обзор
+          </button>
+          <button
+            onClick={() => setActiveTab('workspaces')}
+            className={`pb-2.5 px-0 font-inter text-[14px] transition-colors border-b-2 -mb-[1px] ${
+              activeTab === 'workspaces'
+                ? 'text-white font-medium border-white'
+                : 'text-[#959595] font-normal border-transparent hover:text-white'
+            }`}
+          >
+            Пространства
+          </button>
+        </div>
+
+        {/* Overview Tab Content */}
+        {activeTab === 'overview' && (
+          <>
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
           {isLoading ? (
@@ -746,6 +770,21 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
 
         {/* Filters Row */}
         <div className="flex flex-wrap items-center gap-1 mb-4">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6d6d6d]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Поиск..."
+              className="h-9 pl-9 pr-3 w-[200px] bg-[#212121] border border-transparent rounded-[10px] font-inter text-[14px] text-white placeholder-[#6d6d6d] focus:outline-none focus:border-[#4d4d4d] transition-colors"
+            />
+          </div>
+          
           {/* Workspace Filter */}
           <div ref={workspaceRef} className="relative">
             <button
@@ -856,13 +895,14 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           </div>
 
           {/* Clear filters */}
-          {(selectedWorkspace || selectedUser || dateStart) && (
+          {(selectedWorkspace || selectedUser || dateStart || searchQuery) && (
             <button
               onClick={() => {
                 setSelectedWorkspace(null);
                 setSelectedUser(null);
                 setDateStart(null);
                 setDateEnd(null);
+                setSearchQuery('');
               }}
               className="flex items-center gap-1 px-2 py-2 text-[14px] text-[#a2a2a2] hover:text-white transition-colors"
             >
@@ -1149,6 +1189,13 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {/* Workspaces Tab Content */}
+        {activeTab === 'workspaces' && (
+          <WorkspacesContent showHeader={false} />
+        )}
       </main>
 
       {/* Side Sheet Overlay */}

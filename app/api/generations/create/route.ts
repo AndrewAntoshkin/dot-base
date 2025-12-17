@@ -5,6 +5,7 @@ import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,65 +16,49 @@ const createGenerationSchema = z.object({
     'analyze_describe', 'analyze_ocr', 'analyze_prompt'
   ]),
   model_id: z.string(),
-  prompt: z.string().nullish(), // nullable + optional для analyze моделей без prompt
+  prompt: z.string().nullish(),
   input_image_url: z.string().nullish(),
   input_video_url: z.string().nullish(),
   settings: z.record(z.any()).optional(),
-  workspace_id: z.string().nullish(), // Выбранный workspace
+  workspace_id: z.string().nullish(),
 });
+
+const MAX_CONCURRENT_GENERATIONS = 5;
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== CREATE GENERATION START ===');
-    
-    // Get current user from session
+    // Auth
     const cookieStore = await cookies();
     const supabaseAuth = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
+          getAll: () => cookieStore.getAll(),
+          setAll: (cookiesToSet) => {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
               );
-            } catch {
-              // Ignore - can happen in Server Components
-            }
+            } catch {}
           },
         },
       }
     );
 
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    
-    console.log('User auth check:', { hasUser: !!user, authError });
+    const { data: { user } } = await supabaseAuth.auth.getUser();
     
     if (!user) {
-      console.error('No user found, returning 401');
-      return NextResponse.json(
-        { error: 'Unauthorized - please log in' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = user.id;
-    console.log('User ID:', userId);
     const supabase = createServiceRoleClient();
-
     const body = await request.json();
     const validatedData = createGenerationSchema.parse(body);
 
-    // ========================================
-    // Получаем workspace пользователя для привязки генерации
-    // ========================================
+    // Get user workspace
     let workspaceId: string | null = null;
-    
-    // Получаем все workspaces пользователя
     const { data: memberships } = await supabase
       .from('workspace_members')
       .select('workspace_id')
@@ -81,33 +66,20 @@ export async function POST(request: NextRequest) {
     
     const userWorkspaceIds = (memberships as { workspace_id: string }[] | null)?.map(m => m.workspace_id) || [];
     
-    // Если передан workspace_id и пользователь в нём состоит - используем его
     if (validatedData.workspace_id && userWorkspaceIds.includes(validatedData.workspace_id)) {
       workspaceId = validatedData.workspace_id;
-      console.log('Using selected workspace:', workspaceId);
     } else if (userWorkspaceIds.length > 0) {
-      // Иначе берём первый доступный
       workspaceId = userWorkspaceIds[0];
-      console.log('Using first available workspace:', workspaceId);
     }
 
-    // ========================================
-    // ЛИМИТ: Максимум 5 одновременных генераций
-    // ========================================
-    const MAX_CONCURRENT_GENERATIONS = 5;
-    
-    const { count: activeCount, error: countError } = await supabase
+    // Check concurrent limit
+    const { count: activeCount } = await supabase
       .from('generations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .in('status', ['pending', 'processing']);
     
-    if (countError) {
-      console.error('Error checking active generations:', countError);
-    }
-    
     if (activeCount !== null && activeCount >= MAX_CONCURRENT_GENERATIONS) {
-      console.log(`User ${userId} hit concurrent limit: ${activeCount}/${MAX_CONCURRENT_GENERATIONS}`);
       return NextResponse.json(
         { 
           error: `Достигнут лимит одновременных генераций (${MAX_CONCURRENT_GENERATIONS}). Дождитесь завершения текущих генераций.`,
@@ -119,24 +91,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Получить конфигурацию модели
+    // Get model config
     const model = getModelById(validatedData.model_id);
     if (!model) {
       return NextResponse.json({ error: 'Model not found' }, { status: 404 });
     }
 
-    // Проверить, что action совпадает
     if (model.action !== validatedData.action) {
-      return NextResponse.json(
-        { error: 'Model does not support this action' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Model does not support this action' }, { status: 400 });
     }
 
-    // Подготовить input для Replicate
-    const replicateInput: Record<string, any> = {
-      ...validatedData.settings,
-    };
+    // Prepare Replicate input
+    const replicateInput: Record<string, any> = { ...validatedData.settings };
 
     if (validatedData.prompt) {
       replicateInput.prompt = validatedData.prompt;
@@ -145,91 +111,46 @@ export async function POST(request: NextRequest) {
     if (validatedData.input_image_url) {
       replicateInput.image = validatedData.input_image_url;
     }
-    
-    // Логирование для отладки Bria Expand
-    if (validatedData.model_id === 'bria-expand') {
-      console.log('[Bria Expand] Settings received:', JSON.stringify(validatedData.settings, null, 2));
-      console.log('[Bria Expand] Final replicateInput:', JSON.stringify({
-        canvas_size: replicateInput.canvas_size,
-        original_image_size: replicateInput.original_image_size,
-        original_image_location: replicateInput.original_image_location,
-        prompt: replicateInput.prompt,
-      }, null, 2));
-    }
 
     if (validatedData.input_video_url) {
       replicateInput.video = validatedData.input_video_url;
     }
     
-    // Для remove_bg моделей убедимся что изображение присутствует
+    // Handle remove_bg
     if (validatedData.action === 'remove_bg') {
-      // Изображение может быть в settings.image или input_image_url
-      if (!replicateInput.image) {
-        const settingsImage = validatedData.settings?.image;
-        if (settingsImage) {
-          replicateInput.image = settingsImage;
-        }
+      if (!replicateInput.image && validatedData.settings?.image) {
+        replicateInput.image = validatedData.settings.image;
       }
-      
       if (!replicateInput.image) {
-        console.error('Remove BG: No image provided');
-        return NextResponse.json(
-          { error: 'Требуется загрузить изображение' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Требуется загрузить изображение' }, { status: 400 });
       }
-      
-      console.log('Remove BG: Image URL =', replicateInput.image?.substring(0, 100) + '...');
     }
     
-    // Для inpaint моделей убедимся что изображение и маска присутствуют
+    // Handle inpaint
     if (validatedData.action === 'inpaint') {
       if (!replicateInput.image) {
-        console.error('Inpaint: No image provided');
-        return NextResponse.json(
-          { error: 'Требуется загрузить изображение' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Требуется загрузить изображение' }, { status: 400 });
       }
-      
       if (!replicateInput.mask) {
-        console.error('Inpaint: No mask provided');
-        return NextResponse.json(
-          { error: 'Требуется нарисовать маску' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Требуется нарисовать маску' }, { status: 400 });
       }
       
-      // FLUX Fill Pro: добавляем дефолтные значения и валидируем
+      // FLUX Fill Pro defaults
       if (model.replicateModel === 'black-forest-labs/flux-fill-pro') {
-        // Дефолтные значения согласно документации Replicate
-        if (!replicateInput.steps) {
-          replicateInput.steps = 50;
-        }
-        if (!replicateInput.guidance) {
-          replicateInput.guidance = 60;
-        }
-        // output_format: только jpg или png
+        replicateInput.steps = replicateInput.steps || 50;
+        replicateInput.guidance = replicateInput.guidance || 60;
         if (!replicateInput.output_format || !['jpg', 'png'].includes(replicateInput.output_format)) {
           replicateInput.output_format = 'jpg';
         }
-        console.log('FLUX Fill Pro params:', {
-          steps: replicateInput.steps,
-          guidance: replicateInput.guidance,
-          output_format: replicateInput.output_format,
-        });
       }
-      
-      console.log('Inpaint: Image URL =', replicateInput.image?.substring(0, 100) + '...');
-      console.log('Inpaint: Mask URL =', replicateInput.mask?.substring(0, 100) + '...');
     }
 
-    // Создать запись в БД
+    // Create DB record
     const { data: generation, error: insertError } = await (supabase
       .from('generations') as any)
       .insert({
         user_id: userId,
-        workspace_id: workspaceId, // Привязка к workspace
+        workspace_id: workspaceId,
         action: validatedData.action,
         model_id: validatedData.model_id,
         model_name: model.name,
@@ -245,30 +166,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !generation) {
-      console.error('Insert error:', insertError);
-      return NextResponse.json(
-        { error: 'Failed to create generation' },
-        { status: 500 }
-      );
+      logger.error('Failed to create generation:', insertError);
+      return NextResponse.json({ error: 'Failed to create generation' }, { status: 500 });
     }
 
-    // Запустить генерацию на Replicate
+    // Start Replicate prediction
     try {
-      // Логируем полный input для отладки (кроме самих изображений)
-      const logInput = { ...replicateInput };
-      if (logInput.image && typeof logInput.image === 'string' && logInput.image.length > 100) {
-        logInput.image = logInput.image.substring(0, 100) + '...';
-      }
-      
-      console.log('=== STARTING REPLICATE GENERATION ===');
-      console.log('Model:', model.replicateModel);
-      console.log('Version:', model.version || 'not specified');
-      console.log('Action:', validatedData.action);
-      console.log('Input:', JSON.stringify(logInput, null, 2));
-
       const replicateClient = getReplicateClient();
       
-      // Webhook только для production (требует HTTPS)
       const webhookUrl = process.env.NODE_ENV === 'production' 
         ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
         : undefined;
@@ -281,15 +186,9 @@ export async function POST(request: NextRequest) {
         webhook_events_filter: webhookUrl ? ['completed'] : undefined,
       });
 
-      console.log('Generation started:', {
-        generationId: generation.id,
-        predictionId: prediction.id,
-        tokenId,
-      });
+      logger.debug('Generation started:', generation.id, prediction.id);
 
-      // Обновить запись с prediction ID
-      await (supabase
-        .from('generations') as any)
+      await (supabase.from('generations') as any)
         .update({
           replicate_prediction_id: prediction.id,
           replicate_token_index: tokenId,
@@ -303,45 +202,21 @@ export async function POST(request: NextRequest) {
         status: 'processing',
       });
     } catch (replicateError: any) {
-      console.error('=== GENERATION ERROR ===');
-      console.error('Model:', model.replicateModel);
-      console.error('Error message:', replicateError.message);
-      console.error('Error name:', replicateError.name);
-      console.error('Error stack:', replicateError.stack);
-      const originalError = (replicateError as any).originalError;
-      if (originalError) {
-        console.error('Original error message:', originalError.message);
-        console.error('Original error response:', originalError.response?.data || originalError.response);
-      }
+      logger.error('Replicate error:', replicateError.message);
       
-      // Сообщение об ошибке уже очищено в ReplicateClient
       const userFacingError = replicateError.message || 'Ошибка при генерации';
       
-      // Обновить статус на failed
-      await (supabase
-        .from('generations') as any)
-        .update({
-          status: 'failed',
-          error_message: userFacingError,
-        })
+      await (supabase.from('generations') as any)
+        .update({ status: 'failed', error_message: userFacingError })
         .eq('id', generation.id);
 
-      return NextResponse.json(
-        { 
-          error: userFacingError,
-        },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: userFacingError }, { status: 500 });
     }
   } catch (error: any) {
-    console.error('=== CREATE GENERATION ERROR ===');
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    console.error('Full error:', JSON.stringify(error, null, 2));
+    logger.error('Create generation error:', error.message);
     return NextResponse.json(
-      { error: error.message || 'Internal server error', stack: error.stack },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
 }
-

@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, WifiOff, Check } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { Loader2, WifiOff, Check, ChevronDown } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
@@ -69,34 +69,12 @@ function NavLinkWithTooltip({ href, label, description, isActive }: {
 
 export function Header() {
   const pathname = usePathname();
-  const router = useRouter();
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isWorkspaceSwitcherOpen, setIsWorkspaceSwitcherOpen] = useState(false);
   const { unviewedCount, hasActiveGenerations, isOffline, networkError } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { email: userEmail, setEmail: setUserEmail, isAdmin, workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useUser();
-  
-  // Get display workspaces (max 5)
-  const displayWorkspaces = workspaces.slice(0, 5);
-
-  const handleLogout = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        console.error('Logout failed', await response.text());
-      }
-    } catch (error) {
-      console.error('Logout error', error);
-    } finally {
-      setUserEmail(null);
-      router.push('/login');
-      router.refresh();
-    }
-  }, [router, setUserEmail]);
+  const { email: userEmail, isAdmin, workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useUser();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -129,8 +107,8 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 bg-[#101010] border-b border-[#2f2f2f]">
         <div className="px-4 lg:px-20 py-3 flex items-center">
-          {/* Left section - Logo (+ hamburger on mobile) */}
-          <div className="flex items-center gap-6 flex-1">
+          {/* Left section - Logo + Navigation */}
+          <div className="flex items-center gap-6">
             {/* Hamburger Menu - Mobile Only */}
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -153,23 +131,23 @@ export function Header() {
                 className="h-[18px] w-auto"
               />
             </Link>
+
+            {/* Navigation Links (Desktop Only) - Next to logo */}
+            <nav className="hidden lg:flex items-center gap-2">
+              {NAV_ITEMS.map((item) => (
+                <NavLinkWithTooltip
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  description={item.description}
+                  isActive={pathname === item.href}
+                />
+              ))}
+            </nav>
           </div>
 
-          {/* Center section - Navigation Links (Desktop Only) - Absolutely centered */}
-          <nav className="hidden lg:flex items-center justify-center gap-2 absolute left-1/2 -translate-x-1/2">
-            {NAV_ITEMS.map((item) => (
-              <NavLinkWithTooltip
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                description={item.description}
-                isActive={pathname === item.href}
-              />
-            ))}
-          </nav>
-
-          {/* Right section - История, Dashboard, Count, Avatar */}
-          <div className="flex items-center gap-3 flex-1 justify-end">
+          {/* Right section - Workspace, Dashboard, Count, Avatar */}
+          <div className="flex items-center gap-2 flex-1 justify-end">
             {/* Network status indicator */}
             {(isOffline || networkError) && (
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full">
@@ -180,24 +158,64 @@ export function Header() {
               </div>
             )}
 
-            {/* История link - Desktop Only */}
-            <Link
-              href="/history"
-              className={`hidden lg:flex h-9 px-3 py-2 rounded-2xl items-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
-                pathname === '/history' ? 'bg-[#1f1f1f] text-white' : 'text-white hover:text-white/80'
-              }`}
-            >
-              История
-            </Link>
+            {/* Workspace Switcher - Desktop Only, only if more than 1 workspace */}
+            {workspaces.length > 1 && (
+              <div className="relative hidden lg:block">
+                <button
+                  onClick={() => setIsWorkspaceSwitcherOpen(!isWorkspaceSwitcherOpen)}
+                  className="flex items-center gap-2 h-9 px-3 py-2 rounded-xl border border-[#4d4d4d] font-inter font-medium text-xs text-white transition-colors hover:border-white/50"
+                >
+                  <span className="max-w-[120px] truncate">
+                    {workspaces.find(w => w.id === selectedWorkspaceId)?.name || 'Пространство'}
+                  </span>
+                  <ChevronDown className={`w-5 h-5 transition-transform ${isWorkspaceSwitcherOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {isWorkspaceSwitcherOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsWorkspaceSwitcherOpen(false)}
+                    />
+                    <div 
+                      className="absolute right-0 top-full mt-2 min-w-[200px] p-2 bg-[#1A1A1A] rounded-xl z-20"
+                      style={{ boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.8)' }}
+                    >
+                      {workspaces.map((workspace) => (
+                        <button
+                          key={workspace.id}
+                          onClick={() => {
+                            setSelectedWorkspaceId(workspace.id);
+                            setIsWorkspaceSwitcherOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 flex items-center justify-between rounded-lg transition-colors ${
+                            selectedWorkspaceId === workspace.id 
+                              ? 'bg-[#2c2c2c] text-white' 
+                              : 'text-[#959595] hover:bg-[#252525] hover:text-white'
+                          }`}
+                        >
+                          <span className="font-inter font-normal text-sm truncate">
+                            {workspace.name}
+                          </span>
+                          {selectedWorkspaceId === workspace.id && (
+                            <Check className="w-4 h-4 text-white shrink-0 ml-2" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Dashboard link - Desktop Only, only for admins */}
             {isAdmin && (
               <Link
                 href="/admin"
-                className={`hidden lg:flex h-9 px-3 py-2 rounded-2xl items-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors ${
+                className={`hidden lg:flex h-9 px-3 py-2 rounded-xl items-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors border border-[#4d4d4d] ${
                   pathname === '/admin' || pathname.startsWith('/admin/') 
                     ? 'bg-[#1f1f1f] text-white' 
-                    : 'text-white hover:text-white/80'
+                    : 'text-white hover:border-white/50'
                 }`}
               >
                 Dashboard
@@ -220,117 +238,18 @@ export function Header() {
               )}
             </button>
 
-            {/* User Avatar */}
-            <div className="relative">
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
-                style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
-              >
-                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
-                    {userEmail ? userEmail[0].toUpperCase() : 'U'}
-                  </span>
-                </div>
-              </button>
-
-              {/* User Dropdown Menu */}
-              {isUserMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setIsUserMenuOpen(false)}
-                  />
-                  <div 
-                    className="absolute right-0 top-full mt-2 p-5 bg-[#1A1A1A] rounded-3xl z-20 flex flex-col gap-5"
-                    style={{ boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.8)' }}
-                  >
-                    {/* User Info */}
-                    <div className="flex items-center gap-3 w-[300px]">
-                      {/* Avatar */}
-                      <div 
-                        className="w-8 h-8 rounded-full overflow-hidden shrink-0"
-                        style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
-                      >
-                        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                          <span className="text-white text-sm font-medium">
-                            {userEmail ? userEmail[0].toUpperCase() : 'U'}
-                          </span>
-                        </div>
-                      </div>
-                      {/* Name & Account Type */}
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-inter font-medium text-sm text-white truncate">
-                          {userEmail || 'Пользователь'}
-                        </span>
-                        <span className="font-inter font-normal text-xs text-[#959595]">
-                          Корпоративный аккаунт
-                        </span>
-                      </div>
-                      {/* Profile button */}
-                      <button className="px-2 py-2.5 bg-[#252525] rounded-lg">
-                        <span className="font-inter font-medium text-xs text-white">
-                          Профиль
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Workspaces Section */}
-                    {workspaces.length > 0 && (
-                      <div className="flex flex-col gap-3">
-                        <span className="font-inter font-normal text-xs text-[#717171]">
-                          Пространства
-                        </span>
-                        <div className="flex flex-col gap-2">
-                          {displayWorkspaces.map((workspace) => (
-                            <button
-                              key={workspace.id}
-                              onClick={() => setSelectedWorkspaceId(workspace.id)}
-                              className={`w-full px-4 py-3 flex items-center justify-between rounded-xl border transition-colors ${
-                                selectedWorkspaceId === workspace.id 
-                                  ? 'border-[#959595]' 
-                                  : 'border-[#2F2F2F] hover:border-[#4f4f4f]'
-                              }`}
-                            >
-                              <span className="font-inter font-normal text-sm text-white">
-                                {workspace.name}
-                              </span>
-                              {selectedWorkspaceId === workspace.id && (
-                                <Check className="w-4 h-4 text-white" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                        
-                        {/* All Workspaces Button - show if admin OR more than 5 workspaces */}
-                        {(isAdmin || workspaces.length > 5) && (
-                          <Link
-                            href="/workspaces"
-                            onClick={() => setIsUserMenuOpen(false)}
-                            className="w-full h-10 flex items-center justify-center gap-2 border border-[#535353] rounded-xl hover:border-white/50 transition-colors"
-                          >
-                            <span className="font-inter font-medium text-sm text-white tracking-[-0.084px]">
-                              Все пространства
-                            </span>
-                          </Link>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Logout Button */}
-                    <button
-                      onClick={handleLogout}
-                      className="w-full h-10 flex items-center justify-center gap-2 border border-[#535353] rounded-xl hover:border-white/50 transition-colors"
-                    >
-                      <Image src="/icon-logout.svg" alt="" width={16} height={16} />
-                      <span className="font-inter font-medium text-sm text-white tracking-[-0.084px]">
-                        Выйти из аккаунта
-                      </span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* User Avatar - Click to go to profile */}
+            <Link
+              href="/profile"
+              className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
+              style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
+            >
+              <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                </span>
+              </div>
+            </Link>
 
             {/* Generations Queue Dropdown */}
             <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
@@ -430,15 +349,15 @@ export function Header() {
           {/* Divider */}
           <div className="h-px w-full bg-[#606060]" />
           
-          {/* Галерея */}
+          {/* Profile */}
           <Link
-            href="/history"
+            href="/profile"
             onClick={() => setIsMobileMenuOpen(false)}
             className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
-              pathname === '/history' ? 'bg-black' : ''
+              pathname === '/profile' ? 'bg-black' : ''
             }`}
           >
-            Галерея
+            Профиль
           </Link>
           
           {/* Пространства - only for admins */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback, memo, useRef, type ChangeEvent } from 'react';
+import { useEffect, useState, useMemo, useCallback, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/header';
@@ -105,6 +105,12 @@ const UserCard = memo(function UserCard({
     onUserClick(user.id);
   }, [onUserClick, user.id]);
 
+  const isVideo = (url?: string) => {
+    if (!url) return false;
+    const u = url.toLowerCase();
+    return u.includes('.mp4') || u.includes('.webm') || u.includes('.mov');
+  };
+
   return (
     <div
       ref={cardRef}
@@ -118,11 +124,23 @@ const UserCard = memo(function UserCard({
             {/* Большое превью слева */}
             <div className="flex-1 relative bg-[#1a1a1a] rounded-[12px] overflow-hidden">
               {isVisible && (
-                <img
-                  src={user.previews[0]}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
+                isVideo(user.previews[0]) ? (
+                  <video
+                    className="absolute inset-0 w-full h-full object-cover"
+                    src={user.previews[0]}
+                    preload="metadata"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={user.previews[0]}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )
               )}
             </div>
             
@@ -130,21 +148,45 @@ const UserCard = memo(function UserCard({
             <div className="flex flex-col gap-2 w-[calc(50%-4px)]">
               <div className="flex-1 relative bg-[#1a1a1a] rounded-[12px] overflow-hidden">
                 {isVisible && user.previews[1] && (
-                  <img
-                    src={user.previews[1]}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
+                  isVideo(user.previews[1]) ? (
+                    <video
+                      className="absolute inset-0 w-full h-full object-cover"
+                      src={user.previews[1]}
+                      preload="metadata"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={user.previews[1]}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )
                 )}
               </div>
               
               <div className="flex-1 relative bg-[#1a1a1a] rounded-[12px] overflow-hidden">
                 {isVisible && user.previews[2] && (
-                  <img
-                    src={user.previews[2]}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
+                  isVideo(user.previews[2]) ? (
+                    <video
+                      className="absolute inset-0 w-full h-full object-cover"
+                      src={user.previews[2]}
+                      preload="metadata"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={user.previews[2]}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )
                 )}
                 {/* Оверлей */}
                 {user.generations_count > 3 && (
@@ -273,11 +315,7 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
     return () => observer.disconnect();
   }, [visibleCount, filteredUsers.length]);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [workspaceId]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await fetch(`/api/workspaces/${workspaceId}/users`);
       if (response.ok) {
@@ -292,7 +330,11 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [workspaceId, router]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleUserClick = useCallback((userId: string) => {
     // Переходим в историю с предустановленным фильтром по пользователю

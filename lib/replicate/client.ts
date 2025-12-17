@@ -1,5 +1,6 @@
 import Replicate from 'replicate';
 import { ReplicateTokenPool } from './token-pool';
+import logger from '@/lib/logger';
 
 type WebhookEventType = 'start' | 'output' | 'logs' | 'completed';
 
@@ -24,51 +25,34 @@ export interface ReplicatePrediction {
 
 /**
  * Replicate Client с автоматическим выбором токена из пула
- * Включает retry логику и валидацию
  */
 export class ReplicateClient {
   private tokenPool: ReplicateTokenPool;
   private maxRetries: number = 3;
-  private retryDelay: number = 2000; // 2 секунды
+  private retryDelay: number = 2000;
 
   constructor() {
     this.tokenPool = ReplicateTokenPool.getInstance();
   }
 
-  /**
-   * Валидация и очистка input параметров
-   */
   private validateAndCleanInput(input: Record<string, any>, modelName?: string): Record<string, any> {
     const cleaned = { ...input };
     
-    // Модели которые НЕ поддерживают match_input_image
-    // Для них всегда конвертируем в стандартный формат
-    const modelsWithoutMatchInput = [
-      'flux-2-pro',
-      'black-forest-labs/flux-2-pro',
-    ];
-    
+    const modelsWithoutMatchInput = ['flux-2-pro', 'black-forest-labs/flux-2-pro'];
     const modelDoesntSupportMatchInput = modelName && 
       modelsWithoutMatchInput.some(m => modelName.toLowerCase().includes(m.toLowerCase()));
     
-    // Fallback для aspect_ratio: если match_input_image
     if (cleaned.aspect_ratio === 'match_input_image') {
       const hasImage = cleaned.image || cleaned.input_image || cleaned.image_input || 
                        cleaned.start_image || cleaned.first_frame_image;
       
-      // Всегда конвертируем для моделей без поддержки ИЛИ если нет изображения
       if (!hasImage || modelDoesntSupportMatchInput) {
-        console.log(`aspect_ratio fallback: match_input_image → 1:1 (model: ${modelName}, hasImage: ${!!hasImage})`);
         cleaned.aspect_ratio = '1:1';
       } else {
-        // Даже если есть изображение, некоторые модели не принимают match_input_image
-        // Удаляем параметр чтобы модель сама определила по изображению
-        console.log(`aspect_ratio: removing match_input_image, letting model determine from image`);
         delete cleaned.aspect_ratio;
       }
     }
     
-    // Конвертация строковых чисел в числа для известных полей
     const numericFields = [
       'duration', 'fps', 'seed', 'width', 'height', 'steps', 'num_steps',
       'num_inference_steps', 'cfg_strength', 'guidance_scale', 'cfg_scale',
@@ -78,99 +62,63 @@ export class ReplicateClient {
       'compression_quality', 'threshold'
     ];
     
+    const integerFields = ['duration', 'fps', 'seed', 'width', 'height', 'steps', 
+      'num_steps', 'num_inference_steps', 'number_of_images', 'max_images',
+      'tiling_width', 'tiling_height', 'fontsize', 'target_fps', 'output_quality',
+      'compression_quality'];
+    
     for (const field of numericFields) {
       if (cleaned[field] !== undefined && typeof cleaned[field] === 'string') {
         const parsed = parseFloat(cleaned[field]);
         if (!isNaN(parsed)) {
-          // Для полей которые должны быть целыми числами
-          const integerFields = ['duration', 'fps', 'seed', 'width', 'height', 'steps', 
-            'num_steps', 'num_inference_steps', 'number_of_images', 'max_images',
-            'tiling_width', 'tiling_height', 'fontsize', 'target_fps', 'output_quality',
-            'compression_quality'];
-          if (integerFields.includes(field)) {
-            cleaned[field] = Math.round(parsed);
-          } else {
-            cleaned[field] = parsed;
-          }
-          console.log(`Converted ${field}: "${input[field]}" → ${cleaned[field]}`);
+          cleaned[field] = integerFields.includes(field) ? Math.round(parsed) : parsed;
         }
       }
     }
     
-    // Специальная валидация для duration на видео моделях
-    // Разные модели имеют разные допустимые значения duration
+    // Duration validation
     if (cleaned.duration !== undefined) {
       const duration = Number(cleaned.duration);
       const modelLower = (modelName || '').toLowerCase();
       
-      // Kling, Wan и Gen4 модели принимают только 5 или 10
       if (modelLower.includes('kling') || modelLower.includes('wan') || modelLower.includes('gen4')) {
-        if (duration <= 7) {
-          cleaned.duration = 5;
-        } else {
-          cleaned.duration = 10;
-        }
-        console.log(`Duration validated for ${modelName}: ${duration} → ${cleaned.duration}`);
-      }
-      // Hailuo модели принимают 6 или 10
-      else if (modelLower.includes('hailuo') || modelLower.includes('minimax')) {
-        if (duration <= 8) {
-          cleaned.duration = 6;
-        } else {
-          cleaned.duration = 10;
-        }
-        console.log(`Duration validated for ${modelName}: ${duration} → ${cleaned.duration}`);
-      }
-      // Seedance принимает 2-12 (оставляем как есть, но ограничиваем диапазон)
-      else if (modelLower.includes('seedance')) {
+        cleaned.duration = duration <= 7 ? 5 : 10;
+      } else if (modelLower.includes('hailuo') || modelLower.includes('minimax')) {
+        cleaned.duration = duration <= 8 ? 6 : 10;
+      } else if (modelLower.includes('seedance')) {
         cleaned.duration = Math.max(2, Math.min(12, Math.round(duration)));
-        console.log(`Duration clamped for ${modelName}: ${duration} → ${cleaned.duration}`);
-      }
-      // Veo принимает 5 или 8
-      else if (modelLower.includes('veo')) {
-        if (duration <= 6) {
-          cleaned.duration = 5;
-        } else {
-          cleaned.duration = 8;
-        }
-        console.log(`Duration validated for ${modelName}: ${duration} → ${cleaned.duration}`);
+      } else if (modelLower.includes('veo')) {
+        cleaned.duration = duration <= 6 ? 5 : 8;
       }
     }
     
-    // Конвертация canvas_size для bria/expand-image
+    // canvas_size conversion
     if (cleaned.canvas_size !== undefined && typeof cleaned.canvas_size === 'string') {
       try {
-        // Парсим строку как JSON array
         const parsed = JSON.parse(cleaned.canvas_size);
         if (Array.isArray(parsed) && parsed.length === 2) {
           cleaned.canvas_size = parsed.map(Number);
-          console.log(`canvas_size converted: ${cleaned.canvas_size}`);
         }
       } catch {
-        // Если не удалось распарсить - удаляем
-        console.warn('Invalid canvas_size format, removing');
         delete cleaned.canvas_size;
       }
     }
     
-    // Валидация URL полей
+    // URL validation
     const urlFields = ['image', 'input_image', 'image_input', 'video', 'mask', 'start_image', 'first_frame_image'];
     for (const field of urlFields) {
       if (cleaned[field] && typeof cleaned[field] === 'string') {
         try {
-          // Проверяем что это валидный URL
           new URL(cleaned[field]);
         } catch {
-          // Если не валидный URL и не base64 - удаляем
           if (!cleaned[field].startsWith('data:')) {
-            console.warn(`Invalid URL in field ${field}, removing`);
             delete cleaned[field];
           }
         }
       }
     }
     
-    // Удаляем undefined и null значения
+    // Remove empty values
     Object.keys(cleaned).forEach(key => {
       if (cleaned[key] === undefined || cleaned[key] === null || cleaned[key] === '') {
         delete cleaned[key];
@@ -180,29 +128,19 @@ export class ReplicateClient {
     return cleaned;
   }
   
-  /**
-   * Очистка сообщения об ошибке от технических деталей
-   * Убирает упоминания replicate и другие внутренние данные
-   */
   private sanitizeErrorMessage(error: any): string {
     let message = error.message || 'Произошла ошибка при генерации';
     
-    // Убираем URL-ы с replicate
     message = message.replace(/https?:\/\/[^\s]*replicate[^\s]*/gi, '');
     message = message.replace(/api\.replicate\.com[^\s]*/gi, '');
-    message = message.replace(/replicate\.com[^\s]*/gi, '');
-    
-    // Убираем упоминания replicate
     message = message.replace(/replicate/gi, 'API');
     message = message.replace(/Request to\s+failed/gi, 'Запрос не выполнен');
     
-    // Парсим JSON ошибки и извлекаем понятное сообщение
     const jsonMatch = message.match(/\{.*"detail":\s*"([^"]+)"/);
     if (jsonMatch && jsonMatch[1]) {
       message = jsonMatch[1];
     }
     
-    // Переводим типичные ошибки на понятный язык
     const errorMappings: [RegExp, string][] = [
       [/start_image is required/i, 'Для этой модели требуется входное изображение'],
       [/first_frame_image is required/i, 'Для этой модели требуется входное изображение'],
@@ -225,48 +163,28 @@ export class ReplicateClient {
       }
     }
     
-    // Убираем технические детали в скобках и JSON
-    message = message.replace(/\{[^}]+\}/g, '').trim();
-    message = message.replace(/\[[^\]]+\]/g, '').trim();
+    message = message.replace(/\{[^}]+\}/g, '').replace(/\[[^\]]+\]/g, '').trim();
     
-    // Если сообщение слишком длинное или техническое - заменяем на общее
     if (message.length > 200 || /status\s*\d+|response|request|http/i.test(message)) {
-      return 'Ошибка при генерации. Попробуйте изменить параметры или выбрать другую модель';
+      return 'Ошибка при генерации. Попробуйте изменить параметры';
     }
     
     return message.trim() || 'Произошла ошибка при генерации';
   }
 
-  /**
-   * Проверка, является ли ошибка НЕ восстановимой (не нужно retry)
-   * По умолчанию делаем retry для всех ошибок, кроме явных проблем
-   */
   private isNonRetryableError(error: any): boolean {
     const message = error.message?.toLowerCase() || '';
-    // Эти ошибки точно НЕ нужно повторять
     const noRetryPatterns = [
-      'invalid token',
-      'authentication',
-      '401',
-      '403',
-      'permission denied',
-      'not found',
-      '404',
-      'does not exist',
-      'is required', // Missing required field
-      'invalid type', // Wrong parameter type
+      'invalid token', 'authentication', '401', '403', 'permission denied',
+      'not found', '404', 'does not exist', 'is required', 'invalid type',
     ];
     return noRetryPatterns.some(pattern => message.includes(pattern));
   }
 
-  /**
-   * Запустить модель на Replicate с retry логикой
-   */
   async run(options: ReplicateRunOptions): Promise<{
     prediction: ReplicatePrediction;
     tokenId: number;
   }> {
-    // Валидация и очистка input
     const cleanedInput = this.validateAndCleanInput(options.input, options.model);
     
     let lastError: any = null;
@@ -283,14 +201,6 @@ export class ReplicateClient {
       const replicate = new Replicate({ auth: tokenData.token });
 
       try {
-        console.log(`Replicate attempt ${attempt}/${this.maxRetries}:`, {
-          model: options.model,
-          version: options.version ? options.version.substring(0, 8) + '...' : undefined,
-          inputKeys: Object.keys(cleanedInput),
-        });
-
-        // Если есть version - используем только version (для community моделей)
-        // Если нет version - используем model (для official моделей)
         const createOptions: any = {
           input: cleanedInput,
           webhook: options.webhook,
@@ -311,68 +221,33 @@ export class ReplicateClient {
         };
       } catch (error: any) {
         lastError = error;
-        console.error(`=== Replicate attempt ${attempt} FAILED ===`);
-        console.error('Error message:', error.message);
-        console.error('Error status:', error.status || error.statusCode);
-        console.error('Error response:', error.response?.data || error.response?.body);
-        
-        // Если это ошибка Replicate API - извлекаем детали
-        if (error.response) {
-          try {
-            const responseBody = typeof error.response.body === 'string' 
-              ? JSON.parse(error.response.body) 
-              : error.response.body;
-            console.error('Replicate API error details:', JSON.stringify(responseBody, null, 2));
-          } catch (e) {
-            console.error('Raw response body:', error.response.body);
-          }
-        }
+        logger.error('Replicate attempt failed:', attempt, error.message);
 
-        // Сообщить об ошибке токена
-        await this.tokenPool.reportTokenError(
-          tokenData.id,
-          error.message || 'Unknown error'
-        );
+        await this.tokenPool.reportTokenError(tokenData.id, error.message || 'Unknown error');
 
-        // Если ошибка авторизации - деактивировать токен
-        if (
-          error.message?.includes('authentication') ||
-          error.message?.includes('401') ||
-          error.message?.includes('Invalid token')
-        ) {
+        if (error.message?.includes('authentication') || 
+            error.message?.includes('401') || 
+            error.message?.includes('Invalid token')) {
           await this.tokenPool.deactivateToken(tokenData.id);
         }
 
-        // Если ошибка точно не восстановимая - не retry
         if (this.isNonRetryableError(error)) {
-          console.log('Non-retryable error detected, stopping attempts:', error.message?.substring(0, 100));
           break;
         }
 
-        // Ждем перед следующей попыткой (retry для всех остальных ошибок)
         if (attempt < this.maxRetries) {
-          const delay = this.retryDelay * attempt; // Exponential backoff
-          console.log(`Retryable error, waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
         }
       }
     }
 
-    // Все попытки исчерпаны - очищаем сообщение об ошибке
     const sanitizedMessage = this.sanitizeErrorMessage(lastError);
     const cleanError = new Error(sanitizedMessage);
-    // Сохраняем оригинальную ошибку для логов
     (cleanError as any).originalError = lastError;
     throw cleanError;
   }
 
-  /**
-   * Получить статус prediction
-   */
-  async getPrediction(
-    predictionId: string,
-    tokenOverride?: string
-  ): Promise<ReplicatePrediction> {
+  async getPrediction(predictionId: string, tokenOverride?: string): Promise<ReplicatePrediction> {
     let token = tokenOverride;
 
     if (!token) {
@@ -384,18 +259,10 @@ export class ReplicateClient {
     }
 
     const replicate = new Replicate({ auth: token });
-    const prediction = await replicate.predictions.get(predictionId);
-
-    return prediction as ReplicatePrediction;
+    return await replicate.predictions.get(predictionId) as ReplicatePrediction;
   }
 
-  /**
-   * Отменить prediction
-   */
-  async cancelPrediction(
-    predictionId: string,
-    tokenOverride?: string
-  ): Promise<void> {
+  async cancelPrediction(predictionId: string, tokenOverride?: string): Promise<void> {
     let token = tokenOverride;
 
     if (!token) {
@@ -410,29 +277,24 @@ export class ReplicateClient {
     await replicate.predictions.cancel(predictionId);
   }
 
-  /**
-   * Ожидать завершения prediction с polling
-   */
   async waitForPrediction(
     predictionId: string,
     tokenOverride?: string,
-    maxWaitTime = 300000, // 5 минут
-    pollInterval = 2000 // 2 секунды
+    maxWaitTime = 300000,
+    pollInterval = 2000
   ): Promise<ReplicatePrediction> {
     const startTime = Date.now();
 
     while (Date.now() - startTime < maxWaitTime) {
       const prediction = await this.getPrediction(predictionId, tokenOverride);
 
-      if (
-        prediction.status === 'succeeded' ||
-        prediction.status === 'failed' ||
-        prediction.status === 'canceled'
-      ) {
+      if (prediction.status === 'succeeded' || 
+          prediction.status === 'failed' || 
+          prediction.status === 'canceled') {
         return prediction;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
     throw new Error('Prediction timed out');
@@ -448,5 +310,3 @@ export function getReplicateClient(): ReplicateClient {
   }
   return replicateClientInstance;
 }
-
-

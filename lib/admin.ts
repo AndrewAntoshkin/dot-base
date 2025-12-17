@@ -377,7 +377,6 @@ export async function updateUserRole(
     return { success: false, error: 'Cannot change super admin role' };
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('users') as any)
     .update({ role: newRole })
     .eq('id', userId);
@@ -411,7 +410,6 @@ export async function toggleUserStatus(userId: string): Promise<{ success: boole
     return { success: false, error: 'Cannot deactivate super admin' };
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('users') as any)
     .update({ is_active: !user.is_active })
     .eq('id', userId);
