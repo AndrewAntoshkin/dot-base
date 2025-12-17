@@ -493,7 +493,7 @@ export const CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 3. Nano Banana Pro (Google Gemini 3 Pro)
+  // 3. Nano Banana Pro (Google)
   {
     id: 'nano-banana-pro',
     name: 'nano-banana-pro',
@@ -502,7 +502,7 @@ export const CREATE_MODELS: Model[] = [
     action: 'create',
     runs: '4.8M runs',
     price: 'Priced by multiple properties',
-    description: 'Google Gemini 3 Pro - генерация с текстом и до 14 референсов. ⏱️ 1-2 мин',
+    description: 'Генерация с текстом и до 14 референсов. ⏱️ 1-2 мин',
     settings: [
       {
         name: 'prompt',
@@ -1443,7 +1443,7 @@ export const EDIT_MODELS: Model[] = [
     replicateModel: 'google/nano-banana-pro',
     action: 'edit',
     runs: '4.8M runs',
-    description: 'Google Gemini 3 Pro - редактирование с текстом. ⏱️ 1-2 мин',
+    description: 'Редактирование с текстом на изображении. ⏱️ 1-2 мин',
     settings: [
       {
         name: 'prompt',
