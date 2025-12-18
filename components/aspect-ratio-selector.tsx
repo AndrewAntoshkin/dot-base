@@ -170,7 +170,7 @@ export function AspectRatioSelector({
                   : 'bg-[#1a1a1a] border border-transparent text-white hover:border-[#555]'
               }`}
             >
-              {option.label}
+              {option.value}
             </button>
           ))}
         </div>
