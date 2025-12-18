@@ -133,14 +133,17 @@ export async function POST(request: NextRequest) {
       console.log(`Created segment ${i + 1} generation: ${generation.id}`);
     }
 
-    // Start processing in background
-    processKeyframeGeneration(keyframeGroupId, userId, parts, segmentGenerations, supabase).catch(console.error);
+    // Process keyframes - must await because Vercel terminates after response
+    // Note: For multi-segment videos, consider using webhook-based architecture
+    // to avoid hitting the 300s function limit
+    const result = await processKeyframeGeneration(keyframeGroupId, userId, parts, segmentGenerations, supabase);
 
     return NextResponse.json({
       keyframeGroupId,
       segmentGenerationIds: segmentGenerations,
-      status: 'processing',
-      message: 'Keyframe generation started',
+      status: result.success ? 'completed' : 'failed',
+      message: result.success ? 'Keyframe generation completed' : result.error,
+      mergeGenerationId: result.mergeGenerationId,
     });
 
   } catch (error: any) {
@@ -152,14 +155,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Background processing function
+// Processing function - returns result for response
 async function processKeyframeGeneration(
   keyframeGroupId: string,
   userId: string,
   parts: z.infer<typeof partSchema>[],
   segmentGenerationIds: string[],
   supabase: any
-) {
+): Promise<{ success: boolean; error?: string; mergeGenerationId?: string }> {
   const replicateClient = getReplicateClient();
   const segmentVideos: string[] = [];
 
@@ -240,7 +243,7 @@ async function processKeyframeGeneration(
           })
           .eq('id', generationId);
         
-        return; // Stop if any segment fails
+        return { success: false, error: segmentError.message }; // Stop if any segment fails
       }
     }
 
@@ -274,7 +277,7 @@ async function processKeyframeGeneration(
 
     if (mergeError || !mergeGeneration) {
       console.error('Failed to create merge generation:', mergeError);
-      return;
+      return { success: false, error: 'Failed to create merge generation' };
     }
 
     console.log(`Merge generation created: ${mergeGeneration.id}`);
@@ -323,6 +326,8 @@ async function processKeyframeGeneration(
             completed_at: new Date().toISOString(),
           })
           .eq('id', mergeGeneration.id);
+        
+        return { success: true, mergeGenerationId: mergeGeneration.id };
       } else {
         throw new Error(mergeResult.error || 'Merge failed');
       }
@@ -336,11 +341,16 @@ async function processKeyframeGeneration(
           completed_at: new Date().toISOString(),
         })
         .eq('id', mergeGeneration.id);
+      
+      return { success: false, error: mergeErr.message };
     }
 
   } catch (error: any) {
     console.error('Keyframe generation failed:', error);
+    return { success: false, error: error.message };
   }
+  
+  return { success: false, error: 'Unknown error' };
 }
 
 
