@@ -120,8 +120,8 @@ export function ExpandPageClient() {
       }
     };
 
-    // Polling каждые 2 секунды
-    const interval = setInterval(checkGeneration, 2000);
+    // Polling каждые 3 секунды (оптимизировано для Disk IO)
+    const interval = setInterval(checkGeneration, 3000);
     checkGeneration(); // Сразу проверяем
 
     return () => {

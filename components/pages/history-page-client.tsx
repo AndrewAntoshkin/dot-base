@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
 import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, X, Check } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { OnlyMineToggle } from '@/components/only-mine-toggle';
 
 // Типы фильтров
@@ -115,9 +114,9 @@ function formatDateCustom(dateString: string): string {
   return `${day}.${month}.${year} / ${hours}:${minutes}`;
 }
 
-// Интервалы polling
-const POLLING_ACTIVE = 3000;  // 3 сек - есть активные генерации
-const POLLING_IDLE = 30000;   // 30 сек - нет активных
+// Интервалы polling (оптимизированы для снижения Disk IO)
+const POLLING_ACTIVE = 5000;  // 5 сек - есть активные генерации
+const POLLING_IDLE = 60000;   // 60 сек - нет активных
 
 // SVG иконки для пиксель-перфект
 const HeartOutlineIcon = () => (
@@ -212,7 +211,6 @@ export default function HistoryPageClient() {
   const [counts, setCounts] = useState<TabCounts>({ all: 0, processing: 0, favorites: 0, failed: 0 });
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const supabaseRef = useRef(createClient());
   
   // Workspace state
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -474,57 +472,10 @@ export default function HistoryPageClient() {
     };
   }, [hasActiveGenerations, activeTab, fetchGenerations, syncProcessingStatuses]);
 
-  // Supabase Real-time подписка на изменения
-  useEffect(() => {
-    const supabase = supabaseRef.current;
-    
-    const channel = supabase
-      .channel('generations-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'generations',
-        },
-        (payload) => {
-          const newData = payload.new as Generation;
-          console.log('[History] Real-time update:', newData.id, newData.status);
-          
-          // Проверяем, должна ли генерация оставаться в текущем табе
-          const shouldBeInCurrentTab = (gen: Generation) => {
-            switch (activeTab) {
-              case 'processing':
-                return gen.status === 'pending' || gen.status === 'processing';
-              case 'favorites':
-                return gen.is_favorite === true;
-              case 'failed':
-                return gen.status === 'failed';
-              default: // 'all'
-                return true;
-            }
-          };
-          
-          setGenerations(prev => {
-            // Обновляем генерацию
-            const updated = prev.map(g => 
-              g.id === newData.id ? { ...g, ...newData } : g
-            );
-            
-            // Фильтруем - убираем те, что больше не соответствуют табу
-            return updated.filter(shouldBeInCurrentTab);
-          });
-          
-          // Обновляем счётчики (отдельный запрос)
-          updateCounts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeTab, updateCounts]);
+  // NOTE: Realtime подписка отключена для снижения Disk IO
+  // Все обновления обрабатываются через polling выше
+  // Это значительно снижает нагрузку на WAL и Disk IO
+  // См. supabase/migrations/optimize_disk_io.sql
 
   const handleDownload = async (e: React.MouseEvent, url: string, id: string) => {
     e.preventDefault();

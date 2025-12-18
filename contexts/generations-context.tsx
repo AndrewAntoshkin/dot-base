@@ -28,11 +28,11 @@ interface GenerationsContextType {
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
-// Адаптивные интервалы polling
-const POLLING_ACTIVE = 3000;      // 3 сек - есть активные генерации
-const POLLING_IDLE = 30000;       // 30 сек - нет активных генераций
-const POLLING_BACKGROUND = 60000; // 60 сек - вкладка в фоне
-const POLLING_ERROR = 45000;      // 45 сек - при ошибках соединения
+// Адаптивные интервалы polling (оптимизированы для снижения Disk IO)
+const POLLING_ACTIVE = 5000;       // 5 сек - есть активные генерации (было 3)
+const POLLING_IDLE = 60000;        // 60 сек - нет активных генераций (было 30)
+const POLLING_BACKGROUND = 120000; // 120 сек - вкладка в фоне (было 60)
+const POLLING_ERROR = 60000;       // 60 сек - при ошибках соединения (было 45)
 const MAX_CONSECUTIVE_ERRORS = 3;
 
 /**

@@ -471,7 +471,7 @@ export default function BrainstormPageClient() {
           console.error('Error polling generation:', error);
         }
       }
-    }, 2000);
+    }, 3000); // Оптимизировано для Disk IO (было 2000)
     
     return () => clearInterval(pollInterval);
   }, [generations]);
