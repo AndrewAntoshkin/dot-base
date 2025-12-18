@@ -2,15 +2,36 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Имя cookie для кэширования роли
+const USER_ROLE_COOKIE = 'user_role';
+const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 минут
+
 /**
- * Получить роль пользователя из БД
- * Используем service role client для middleware
+ * Получить роль пользователя с кэшированием в cookie
+ * Снижает количество DB запросов на каждый переход в admin
  */
-async function getUserRoleFromDb(email: string | null | undefined): Promise<string> {
+async function getUserRole(
+  email: string | null | undefined,
+  request: NextRequest,
+  response: NextResponse
+): Promise<string> {
   if (!email) return 'user';
   
+  // Проверяем кэш в cookie
+  const cachedRole = request.cookies.get(USER_ROLE_COOKIE)?.value;
+  if (cachedRole) {
+    // Парсим кэш: role:email:timestamp
+    const [role, cachedEmail, timestamp] = cachedRole.split(':');
+    const age = Date.now() - parseInt(timestamp || '0');
+    
+    // Если email совпадает и кэш свежий - возвращаем из кэша
+    if (cachedEmail === email && age < ROLE_CACHE_TTL) {
+      return role || 'user';
+    }
+  }
+  
+  // Запрашиваем из БД
   try {
-    // Создаём отдельный клиент для middleware (без cookies)
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -28,7 +49,19 @@ async function getUserRoleFromDb(email: string | null | undefined): Promise<stri
       .eq('email', email.toLowerCase())
       .single() as { data: { role: string } | null };
     
-    return data?.role || 'user';
+    const role = data?.role || 'user';
+    
+    // Кэшируем в cookie
+    const cacheValue = `${role}:${email}:${Date.now()}`;
+    response.cookies.set(USER_ROLE_COOKIE, cacheValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60, // 1 час максимум
+      path: '/',
+    });
+    
+    return role;
   } catch (error) {
     console.error('[Middleware] Error fetching user role:', error);
     return 'user';
@@ -126,9 +159,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin routes - check if user has admin access (role from DB)
+  // Admin routes - check if user has admin access (role from DB with caching)
   if (isAdminPath && user) {
-    const userRole = await getUserRoleFromDb(user.email);
+    const userRole = await getUserRole(user.email, request, supabaseResponse);
     if (!isAdminRole(userRole)) {
       // Redirect non-admin users to home
       const url = request.nextUrl.clone();
