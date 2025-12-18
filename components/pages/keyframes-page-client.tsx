@@ -2,16 +2,52 @@
 
 import { useState, useRef, Suspense, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
-import { ImagePlus, ArrowRight, Wand2, Plus, RefreshCw, Download, Play, Trash2 } from 'lucide-react';
+import { ImagePlus, ArrowRight, Wand2, Plus, RefreshCw, Download, Play, Trash2, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
+
+// Конфигурация моделей
+const MODEL_CONFIG = {
+  'hailuo-02': {
+    name: 'Hailuo 02',
+    durations: [6, 10],
+    resolutions: ['720p', '1080p'],
+    defaultDuration: 6,
+    defaultResolution: '1080p',
+  },
+  'seedance-1-pro': {
+    name: 'Seedance 1 Pro',
+    durations: [5, 8, 10],
+    resolutions: ['1080p'],
+    defaultDuration: 5,
+    defaultResolution: '1080p',
+  },
+  'luma-ray-2': {
+    name: 'Luma Ray 2',
+    durations: [5, 9],
+    resolutions: ['540p', '720p'],
+    defaultDuration: 5,
+    defaultResolution: '720p',
+  },
+  'veo-3': {
+    name: 'Google Veo 3',
+    durations: [5, 8],
+    resolutions: ['720p', '1080p'],
+    defaultDuration: 8,
+    defaultResolution: '720p',
+  },
+} as const;
+
+type ModelId = keyof typeof MODEL_CONFIG;
 
 // Типы
 interface KeyframePart {
   id: string;
-  model: 'hailuo-02' | 'seedance-1-pro';
+  model: ModelId;
   startImage: string | null;
   endImage: string | null;
   prompt: string;
+  duration: number;
+  resolution: string;
 }
 
 interface GenerationSegment {
@@ -183,6 +219,40 @@ function PartCard({
   onRemove: () => void;
   canRemove: boolean;
 }) {
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const modelConfig = MODEL_CONFIG[part.model];
+  
+  // Закрываем dropdown при клике вне
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  // При смене модели — обновляем duration/resolution на дефолтные если текущие недоступны
+  const handleModelChange = (newModel: ModelId) => {
+    const newConfig = MODEL_CONFIG[newModel];
+    const newDuration = (newConfig.durations as readonly number[]).includes(part.duration) 
+      ? part.duration 
+      : newConfig.defaultDuration;
+    const newResolution = (newConfig.resolutions as readonly string[]).includes(part.resolution)
+      ? part.resolution
+      : newConfig.defaultResolution;
+    
+    onChange({ 
+      ...part, 
+      model: newModel,
+      duration: newDuration,
+      resolution: newResolution,
+    });
+    setIsModelDropdownOpen(false);
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -200,7 +270,7 @@ function PartCard({
       </div>
       
       <div className="border border-[#2f2f2f] rounded-2xl p-4 flex flex-col gap-6">
-        {/* Модель */}
+        {/* Модель - выпадающий список */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1 text-[#959595]">
             <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
@@ -208,27 +278,32 @@ function PartCard({
             </svg>
             <span className="text-[10px] font-medium uppercase tracking-wider">Модель</span>
           </div>
-          <div className="flex gap-2">
+          <div className="relative" ref={dropdownRef}>
             <button
-              onClick={() => onChange({ ...part, model: 'hailuo-02' })}
-              className={`flex-1 h-10 px-6 rounded-xl text-[13px] text-center transition-colors ${
-                part.model === 'hailuo-02'
-                  ? 'bg-neutral-900 border border-white text-white'
-                  : 'bg-neutral-900 text-white hover:bg-neutral-800'
-              }`}
+              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+              className="w-full h-10 px-4 bg-[#1a1a1a] rounded-lg flex items-center justify-between text-[13px] text-white hover:bg-[#222] transition-colors"
             >
-              Hailuo 02
+              <span>{modelConfig.name}</span>
+              <ChevronDown className={`w-4 h-4 text-[#959595] transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
-            <button
-              onClick={() => onChange({ ...part, model: 'seedance-1-pro' })}
-              className={`flex-1 h-10 px-6 rounded-xl text-[13px] text-center transition-colors ${
-                part.model === 'seedance-1-pro'
-                  ? 'bg-neutral-900 border border-white text-white'
-                  : 'bg-neutral-900 text-white hover:bg-neutral-800'
-              }`}
-            >
-              Seedance 1 Pro
-            </button>
+            
+            {isModelDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2f2f2f] rounded-lg overflow-hidden z-20 shadow-xl">
+                {(Object.keys(MODEL_CONFIG) as ModelId[]).map((modelId) => (
+                  <button
+                    key={modelId}
+                    onClick={() => handleModelChange(modelId)}
+                    className={`w-full h-10 px-4 text-left text-[13px] transition-colors ${
+                      part.model === modelId
+                        ? 'bg-white/10 text-white'
+                        : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {MODEL_CONFIG[modelId].name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -272,6 +347,58 @@ function PartCard({
             className="w-full h-20 min-h-[80px] bg-[#212121] rounded-lg px-3 py-2 text-sm text-white placeholder-[#959595] resize-y focus:outline-none focus:ring-1 focus:ring-white/20"
           />
         </div>
+
+        {/* Длительность */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1 text-[#959595]">
+            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+              <path d="M2 4h8M2 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span className="text-[10px] font-medium uppercase tracking-wider">Длительность</span>
+          </div>
+          <div className="flex gap-2">
+            {modelConfig.durations.map((dur) => (
+              <button
+                key={dur}
+                onClick={() => onChange({ ...part, duration: dur })}
+                className={`h-9 px-4 rounded-full text-[13px] transition-colors ${
+                  part.duration === dur
+                    ? 'bg-[#212121] border border-white text-white'
+                    : 'bg-[#212121] text-white/70 hover:text-white'
+                }`}
+              >
+                {dur} сек
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Качество (только если несколько вариантов) */}
+        {modelConfig.resolutions.length > 1 && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1 text-[#959595]">
+              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+                <path d="M2 4h8M2 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <span className="text-[10px] font-medium uppercase tracking-wider">Качество</span>
+            </div>
+            <div className="flex gap-2">
+              {modelConfig.resolutions.map((res) => (
+                <button
+                  key={res}
+                  onClick={() => onChange({ ...part, resolution: res })}
+                  className={`h-9 px-4 rounded-full text-[13px] transition-colors ${
+                    part.resolution === res
+                      ? 'bg-[#212121] border border-white text-white'
+                      : 'bg-[#212121] text-white/70 hover:text-white'
+                  }`}
+                >
+                  {res.replace('p', '')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -530,6 +657,8 @@ function KeyframesContent() {
       startImage: null,
       endImage: null,
       prompt: '',
+      duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
+      resolution: MODEL_CONFIG['hailuo-02'].defaultResolution,
     },
   ]);
   
@@ -551,6 +680,8 @@ function KeyframesContent() {
         startImage: null,
         endImage: null,
         prompt: '',
+        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
+        resolution: MODEL_CONFIG['hailuo-02'].defaultResolution,
       },
     ]);
   };
@@ -571,6 +702,8 @@ function KeyframesContent() {
         startImage: null,
         endImage: null,
         prompt: '',
+        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
+        resolution: MODEL_CONFIG['hailuo-02'].defaultResolution,
       },
     ]);
     setGeneration({
@@ -610,6 +743,8 @@ function KeyframesContent() {
             startImage: p.startImage,
             endImage: p.endImage,
             prompt: p.prompt,
+            duration: p.duration,
+            resolution: p.resolution,
           })),
         }),
       });

@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import { getFullAuth } from '@/lib/supabase/auth-helpers';
 
 // GET /api/users/profile - Get current user's profile
 export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient();
+    // Используем кэшированный auth - данные уже есть в dbUser
+    const auth = await getFullAuth();
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) {
+    if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createServiceRoleClient();
+    
+    // Получаем полный профиль (dbUser содержит только базовые поля)
     const { data: profile, error } = await supabase
       .from('users')
       .select('id, email, display_name, avatar_url, cover_url, role, created_at')
-      .eq('email', user.email.toLowerCase())
+      .eq('id', auth.dbUser.id)
       .single();
 
     if (error) {
@@ -32,10 +36,10 @@ export async function GET() {
 // PATCH /api/users/profile - Update current user's profile
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    // Используем кэшированный auth
+    const auth = await getFullAuth();
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) {
+    if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -52,10 +56,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
 
-    const { data: profile, error } = await supabase
-      .from('users')
+    const supabase = createServiceRoleClient();
+    
+    const { data: profile, error } = await (supabase
+      .from('users') as any)
       .update(updateData)
-      .eq('email', user.email.toLowerCase())
+      .eq('id', auth.dbUser.id)
       .select('id, email, display_name, avatar_url, cover_url, role, created_at')
       .single();
 
@@ -70,4 +76,3 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

@@ -3,7 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { AppProviders } from '@/components/providers/app-providers';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { getFullAuth } from '@/lib/supabase/auth-helpers';
 import type { UserRole } from '@/contexts/user-context';
 
 // This layout reads auth cookies (Supabase SSR), so it must always be dynamic.
@@ -75,34 +75,12 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let userEmail: string | null = null;
-  let userRole: UserRole = 'user';
-  let isAuthenticated = false;
+  // Используем кэшированный auth helper - один запрос вместо двух
+  const auth = await getFullAuth();
   
-  try {
-    const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    userEmail = user?.email ?? null;
-    isAuthenticated = !!user;
-    
-    // Получаем роль пользователя из БД
-    if (user?.email) {
-      const serviceClient = createServiceRoleClient();
-      const { data: userData } = await serviceClient
-        .from('users')
-        .select('role')
-        .eq('email', user.email.toLowerCase())
-        .single() as { data: { role: string } | null };
-      
-      if (userData?.role) {
-        userRole = userData.role as UserRole;
-      }
-    }
-  } catch (error) {
-    console.error('Failed to fetch user for layout:', error);
-  }
+  const userEmail = auth.user?.email ?? null;
+  const userRole: UserRole = auth.dbUser?.role ?? 'user';
+  const isAuthenticated = auth.isAuthenticated;
 
   return (
     <html lang="ru">

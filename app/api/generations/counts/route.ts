@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { getFullAuth } from '@/lib/supabase/auth-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,43 +10,22 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   try {
-    // Get current user from session
-    const cookieStore = await cookies();
-    const supabaseAuth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    // Используем кэшированный auth
+    const auth = await getFullAuth();
     
-    if (!user) {
+    if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    const dbUser = auth.dbUser;
     const supabase = createServiceRoleClient();
 
     // Try optimized SQL function first (single query instead of 4)
     const { data: countsData, error: rpcError } = await supabase
-      .rpc('get_generation_counts', { p_user_id: user.id } as any)
+      .rpc('get_generation_counts', { p_user_id: dbUser.id } as any)
       .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
 
     if (!rpcError && countsData) {
@@ -65,24 +43,24 @@ export async function GET() {
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', dbUser.id)
         .not('is_keyframe_segment', 'is', true),
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', dbUser.id)
         .in('status', ['pending', 'processing'])
         .not('is_keyframe_segment', 'is', true),
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', dbUser.id)
         .eq('is_favorite', true)
         .not('is_keyframe_segment', 'is', true),
       supabase
         .from('generations')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', dbUser.id)
         .eq('status', 'failed')
         .not('is_keyframe_segment', 'is', true),
     ]);
@@ -101,10 +79,3 @@ export async function GET() {
     );
   }
 }
-
-
-
-
-
-
-

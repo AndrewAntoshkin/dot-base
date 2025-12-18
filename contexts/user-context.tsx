@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 
 // Роли пользователей - синхронизированы с БД
 export type UserRole = 'user' | 'admin' | 'super_admin';
@@ -23,6 +23,7 @@ interface UserContextValue {
   selectedWorkspaceId: string | null;
   setSelectedWorkspaceId: (id: string | null) => void;
   loadWorkspaces: () => Promise<void>;
+  isLoadingWorkspaces: boolean;
 }
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -38,15 +39,27 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
   const [role, setRole] = useState<UserRole>(initialRole);
   const [workspaces, setWorkspaces] = useState<UserWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceIdState] = useState<string | null>(null);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+  
+  // Предотвращаем повторную загрузку
+  const hasLoadedWorkspaces = useRef(false);
 
-  // Load workspaces
+  // Load workspaces - оптимизировано для отложенной загрузки
   const loadWorkspaces = useCallback(async () => {
+    // Предотвращаем дублирование запросов
+    if (isLoadingWorkspaces || hasLoadedWorkspaces.current) {
+      return;
+    }
+    
+    setIsLoadingWorkspaces(true);
+    
     try {
       const res = await fetch('/api/workspaces');
       if (res.ok) {
         const data = await res.json();
         const loadedWorkspaces = data.workspaces || [];
         setWorkspaces(loadedWorkspaces);
+        hasLoadedWorkspaces.current = true;
         
         // Auto-select workspace
         if (loadedWorkspaces.length > 0) {
@@ -65,8 +78,10 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
       }
     } catch (error) {
       console.error('Failed to fetch workspaces:', error);
+    } finally {
+      setIsLoadingWorkspaces(false);
     }
-  }, []);
+  }, [isLoadingWorkspaces]);
 
   // Set selected workspace and save to localStorage
   const setSelectedWorkspaceId = useCallback((id: string | null) => {
@@ -76,13 +91,19 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     }
   }, []);
 
-  // Load workspaces on mount when user is logged in
+  // ОПТИМИЗАЦИЯ: Отложенная загрузка workspaces
+  // Загружаем через 100ms после монтирования, чтобы не блокировать начальный рендер
   useEffect(() => {
-    if (email) {
-      loadWorkspaces();
-    } else {
+    if (email && !hasLoadedWorkspaces.current) {
+      const timer = setTimeout(() => {
+        loadWorkspaces();
+      }, 100); // Небольшая задержка для приоритета основного контента
+      
+      return () => clearTimeout(timer);
+    } else if (!email) {
       setWorkspaces([]);
       setSelectedWorkspaceIdState(null);
+      hasLoadedWorkspaces.current = false;
     }
   }, [email, loadWorkspaces]);
 
@@ -97,7 +118,8 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     selectedWorkspaceId,
     setSelectedWorkspaceId,
     loadWorkspaces,
-  }), [email, role, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, loadWorkspaces]);
+    isLoadingWorkspaces,
+  }), [email, role, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, loadWorkspaces, isLoadingWorkspaces]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

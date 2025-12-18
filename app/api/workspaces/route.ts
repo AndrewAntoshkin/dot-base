@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import { getFullAuth } from '@/lib/supabase/auth-helpers';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -7,26 +8,15 @@ export const dynamic = 'force-dynamic';
 // GET /api/workspaces - Список пространств пользователя
 export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Используем кэшированный auth - один вызов вместо двух
+    const auth = await getFullAuth();
 
-    if (!user) {
+    if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Используем service role для надёжного доступа
+    const dbUser = auth.dbUser;
     const adminClient = createServiceRoleClient();
-
-    // Получаем пользователя из нашей таблицы
-    const { data: dbUser } = await adminClient
-      .from('users')
-      .select('id, role')
-      .eq('email', user.email as string)
-      .single() as { data: { id: string; role: string } | null };
-
-    if (!dbUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
 
     // Для super_admin - все пространства, для остальных - только свои
     let workspaces: any[] | null = null;
@@ -124,24 +114,10 @@ export async function GET() {
       }
     }
 
-    // Получаем количество генераций для каждого workspace
-    let generationsCountMap: Record<string, number> = {};
-    
-    if (workspaceIds.length > 0) {
-      // Используем отдельные count запросы для точного подсчёта
-      const countPromises = workspaceIds.map(async (wsId: string) => {
-        const { count } = await adminClient
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', wsId);
-        return { wsId, count: count || 0 };
-      });
-      
-      const counts = await Promise.all(countPromises);
-      counts.forEach(({ wsId, count }) => {
-        generationsCountMap[wsId] = count;
-      });
-    }
+    // ОПТИМИЗАЦИЯ: Не грузим counts при первоначальной загрузке
+    // Это убирает N дополнительных запросов к БД
+    // Если нужны точные counts - можно добавить отдельный endpoint
+    const generationsCountMap: Record<string, number> = {};
 
     // Форматируем ответ
     const formattedWorkspaces = workspaces?.map((ws: any) => {
@@ -174,25 +150,21 @@ export async function GET() {
 // POST /api/workspaces - Создать пространство (только admin/super_admin)
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Используем кэшированный auth
+    const auth = await getFullAuth();
 
-    if (!user) {
+    if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminClient = createServiceRoleClient();
+    const dbUser = auth.dbUser;
 
     // Проверяем роль пользователя
-    const { data: dbUser } = await adminClient
-      .from('users')
-      .select('id, role')
-      .eq('email', user.email as string)
-      .single() as { data: { id: string; role: string } | null };
-
-    if (!dbUser || !['admin', 'super_admin'].includes(dbUser.role)) {
+    if (!['admin', 'super_admin'].includes(dbUser.role)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
+
+    const adminClient = createServiceRoleClient();
 
     const body = await request.json();
     const { name, description, members } = body;
@@ -263,7 +235,7 @@ export async function POST(request: Request) {
       const { data: usersToAdd } = await adminClient
         .from('users')
         .select('id, email')
-        .in('email', members.filter((m: string) => m !== user.email)) as { data: { id: string; email: string }[] | null };
+        .in('email', members.filter((m: string) => m !== auth.user?.email)) as { data: { id: string; email: string }[] | null };
 
       if (usersToAdd && usersToAdd.length > 0) {
         const memberInserts = usersToAdd.map(u => ({

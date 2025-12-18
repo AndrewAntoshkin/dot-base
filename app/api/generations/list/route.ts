@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { getFullAuth } from '@/lib/supabase/auth-helpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,38 +9,17 @@ type TabFilter = 'all' | 'processing' | 'favorites' | 'failed';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get current user from session
-    const cookieStore = await cookies();
-    const supabaseAuth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    // Используем кэшированный auth - один вызов вместо двух
+    const auth = await getFullAuth();
     
-    if (!user) {
+    if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    const dbUser = auth.dbUser;
     const supabase = createServiceRoleClient();
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -67,17 +45,6 @@ export async function GET(request: NextRequest) {
 
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-
-    // Получаем пользователя из нашей БД для workspace проверки
-    const { data: dbUser } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('email', user.email as string)
-      .single() as { data: { id: string; role: string } | null };
-
-    if (!dbUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
 
     // Build query based on filters
     // Hide keyframe segments (only show final merge)

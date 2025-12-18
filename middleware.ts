@@ -2,9 +2,23 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Имя cookie для кэширования роли
+// Имя cookie для кэширования сессии
+const SESSION_CHECK_COOKIE = 'session_checked';
 const USER_ROLE_COOKIE = 'user_role';
 const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 минут
+const SESSION_CHECK_TTL = 60 * 1000; // 1 минута - для быстрой проверки сессии
+
+/**
+ * Быстрая проверка наличия сессии по cookie
+ * Избегаем полного getUser() если сессия недавно проверялась
+ */
+function hasRecentSessionCheck(request: NextRequest): boolean {
+  const sessionCheck = request.cookies.get(SESSION_CHECK_COOKIE)?.value;
+  if (!sessionCheck) return false;
+  
+  const timestamp = parseInt(sessionCheck);
+  return Date.now() - timestamp < SESSION_CHECK_TTL;
+}
 
 /**
  * Получить роль пользователя с кэшированием в cookie
@@ -107,6 +121,17 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
+  // ОПТИМИЗАЦИЯ: Проверяем наличие auth cookies без полного getUser()
+  // Если есть sb-access-token cookie - сессия скорее всего валидна
+  const hasAuthCookie = request.cookies.has('sb-access-token') || 
+                        request.cookies.getAll().some(c => c.name.includes('auth-token'));
+  
+  // Для не-admin путей можно пропустить полную проверку если есть cookie
+  // и недавно была успешная проверка
+  if (!isAdminPath && !isLoginPage && hasAuthCookie && hasRecentSessionCheck(request)) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -135,11 +160,22 @@ export async function middleware(request: NextRequest) {
   let user = null;
   try {
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Auth timeout')), 5000)
+      setTimeout(() => reject(new Error('Auth timeout')), 3000) // Уменьшили с 5 до 3 сек
     );
     const authPromise = supabase.auth.getUser();
     const result = await Promise.race([authPromise, timeoutPromise]) as { data: { user: any } };
     user = result.data?.user;
+    
+    // Помечаем успешную проверку сессии
+    if (user) {
+      supabaseResponse.cookies.set(SESSION_CHECK_COOKIE, Date.now().toString(), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60, // 1 минута
+        path: '/',
+      });
+    }
   } catch (error) {
     console.error('[Middleware] Auth check failed or timed out:', error);
     // On timeout/error, allow request to proceed (API routes handle their own auth)
