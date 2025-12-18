@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { checkAdminAccess } from '@/lib/admin';
 
 // Количество генераций которые оставляем по умолчанию
 const DEFAULT_KEEP_LATEST = 20;
@@ -28,6 +29,15 @@ interface GenerationStats {
  */
 export async function POST(request: Request) {
   try {
+    // Check admin access
+    const { isAdmin, error } = await checkAdminAccess();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: error || 'Access denied' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const keepLatest = body.keepLatest || DEFAULT_KEEP_LATEST;
     const dryRun = body.dryRun || false;
@@ -159,16 +169,25 @@ export async function POST(request: Request) {
  */
 export async function GET() {
   try {
+    // Check admin access
+    const { isAdmin, error } = await checkAdminAccess();
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: error || 'Access denied' },
+        { status: 403 }
+      );
+    }
+
     const supabase = createServiceRoleClient();
 
     // Получить все генерации
-    const { data: generationsData, error } = await supabase
+    const { data: generationsData, error: generationsError } = await supabase
       .from('generations')
       .select('id, created_at, output_urls')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (generationsError) {
+      return NextResponse.json({ error: generationsError.message }, { status: 500 });
     }
 
     const generations: GenerationStats[] = generationsData || [];

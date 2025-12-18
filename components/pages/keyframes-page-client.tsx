@@ -28,6 +28,13 @@ interface KeyframeGeneration {
   finalVideoUrl?: string;
   mergeGenerationId?: string;
   error?: string;
+  progress?: {
+    completed: number;
+    total: number;
+    percent: number;
+    isMerging: boolean;
+  };
+  currentSegmentIndex?: number;
 }
 
 // Компонент загрузки изображения
@@ -270,26 +277,39 @@ function PartCard({
   );
 }
 
-// Timeline компонент
+// Timeline компонент с прогрессом
 function Timeline({
   parts,
   segments,
+  progress,
+  isMerging,
 }: {
   parts: KeyframePart[];
   segments: GenerationSegment[];
+  progress?: { completed: number; total: number; percent: number; isMerging: boolean };
+  isMerging?: boolean;
 }) {
-  const totalDuration = parts.length * 5; // 5 секунд на часть
-  
   return (
-    <div className="flex flex-col gap-2">
-      {/* Временная шкала */}
-      <div className="flex items-center h-6 text-[10px] text-[#959595]">
-        {Array.from({ length: Math.ceil(totalDuration / 2) + 1 }).map((_, i) => (
-          <div key={i} className="flex-1 text-center">
-            {i === 0 ? '0' : `0:${String(i * 2).padStart(2, '0')}`}
+    <div className="flex flex-col gap-4">
+      {/* Общий прогресс */}
+      {progress && progress.total > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#959595]">
+              {isMerging || progress.isMerging 
+                ? 'Объединение видео...' 
+                : `Генерация части ${progress.completed + 1} из ${progress.total}`}
+            </span>
+            <span className="text-white font-medium">{progress.percent}%</span>
           </div>
-        ))}
-      </div>
+          <div className="h-1.5 bg-[#2f2f2f] rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white rounded-full transition-all duration-500"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
       
       {/* Сегменты */}
       <div className="flex gap-2">
@@ -298,22 +318,138 @@ function Timeline({
           const status = segment?.status || 'pending';
           
           return (
-            <div key={part.id} className="flex-1 flex flex-col gap-1">
-              <div
-                className={`h-2 rounded-full transition-colors ${
-                  status === 'completed' ? 'bg-green-500' :
-                  status === 'processing' ? 'bg-yellow-500 animate-pulse' :
-                  status === 'failed' ? 'bg-red-500' :
-                  'bg-[#2f2f2f]'
-                }`}
-              />
+            <div key={part.id} className="flex-1 flex flex-col gap-1.5">
+              <div className="relative">
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    status === 'completed' ? 'bg-green-500' :
+                    status === 'processing' ? 'bg-yellow-500' :
+                    status === 'failed' ? 'bg-red-500' :
+                    'bg-[#2f2f2f]'
+                  }`}
+                />
+                {status === 'processing' && (
+                  <div className="absolute inset-0 h-2 rounded-full bg-yellow-500/50 animate-pulse" />
+                )}
+              </div>
               <div className="flex items-center justify-between text-[10px]">
-                <span className="text-white">ЧАСТЬ {index + 1}</span>
-                <span className="text-[#959595]">5 секунд</span>
+                <span className={`font-medium ${
+                  status === 'completed' ? 'text-green-500' :
+                  status === 'processing' ? 'text-yellow-500' :
+                  status === 'failed' ? 'text-red-500' :
+                  'text-[#959595]'
+                }`}>
+                  {status === 'completed' ? '✓' : status === 'failed' ? '✗' : ''} ЧАСТЬ {index + 1}
+                </span>
+                <span className="text-[#959595]">
+                  {status === 'processing' ? '⏳' : status === 'completed' ? '✓' : ''}
+                </span>
               </div>
             </div>
           );
         })}
+        
+        {/* Merge indicator */}
+        {parts.length > 1 && (
+          <div className="flex-1 flex flex-col gap-1.5 max-w-[100px]">
+            <div className="relative">
+              <div
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  isMerging ? 'bg-blue-500' :
+                  progress?.percent === 100 ? 'bg-green-500' :
+                  'bg-[#2f2f2f]'
+                }`}
+              />
+              {isMerging && (
+                <div className="absolute inset-0 h-2 rounded-full bg-blue-500/50 animate-pulse" />
+              )}
+            </div>
+            <div className="flex items-center justify-between text-[10px]">
+              <span className={`font-medium ${
+                progress?.percent === 100 ? 'text-green-500' :
+                isMerging ? 'text-blue-500' :
+                'text-[#959595]'
+              }`}>
+                {progress?.percent === 100 ? '✓' : ''} MERGE
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Generating Output - показывает прогресс генерации
+function GeneratingOutput({
+  status,
+  progress,
+  error,
+}: {
+  status: string;
+  progress?: { completed: number; total: number; percent: number; isMerging: boolean };
+  error?: string;
+}) {
+  if (status === 'failed') {
+    return (
+      <div className="bg-[#050505] rounded-2xl h-[660px] flex items-center justify-center px-16">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+            <span className="text-3xl">✕</span>
+          </div>
+          <p className="text-xl font-medium text-white">Генерация не удалась</p>
+          <p className="text-sm text-[#959595] max-w-md">{error || 'Произошла ошибка. Попробуйте снова.'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isMerging = status === 'merging' || progress?.isMerging;
+  
+  return (
+    <div className="bg-[#050505] rounded-2xl h-[660px] flex items-center justify-center px-16">
+      <div className="flex flex-col items-center gap-6 text-center">
+        {/* Animated loader */}
+        <div className="relative w-24 h-24">
+          <div className="absolute inset-0 rounded-full border-4 border-[#2f2f2f]" />
+          <div 
+            className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"
+            style={{ animationDuration: '1.5s' }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-2xl font-bold text-white">
+              {progress?.percent || 0}%
+            </span>
+          </div>
+        </div>
+        
+        {/* Status text */}
+        <div className="flex flex-col gap-2">
+          <p className="text-xl font-medium text-white">
+            {isMerging 
+              ? 'Объединение видео...' 
+              : progress 
+                ? `Генерация части ${progress.completed + 1} из ${progress.total}` 
+                : 'Подготовка...'}
+          </p>
+          <p className="text-sm text-[#959595]">
+            {isMerging 
+              ? 'Финальный этап — склеиваем все части вместе' 
+              : 'Видео генерируется. Это может занять несколько минут.'}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        {progress && (
+          <div className="w-64">
+            <div className="h-2 bg-[#2f2f2f] rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -518,7 +654,7 @@ function KeyframesContent() {
         
         const status = await response.json();
         
-        // Map API segments to our format
+        // Map API segments to our format, matching by index
         const mappedSegments = status.segments?.map((s: any) => ({
           partId: parts[s.index]?.id || s.id,
           status: s.status,
@@ -534,6 +670,8 @@ function KeyframesContent() {
           finalVideoUrl: status.finalVideoUrl,
           mergeGenerationId: status.mergeGenerationId,
           error: status.error,
+          progress: status.progress,
+          currentSegmentIndex: status.currentSegmentIndex,
         }));
         
         if (status.status === 'completed' || status.status === 'failed') {
@@ -541,12 +679,14 @@ function KeyframesContent() {
           return;
         }
         
-        // Продолжаем polling
-        setTimeout(poll, 3000);
+        // Continue polling - faster during active generation
+        const pollInterval = status.status === 'merging' ? 2000 : 3000;
+        setTimeout(poll, pollInterval);
         
       } catch (error) {
         console.error('Status polling error:', error);
-        setIsGenerating(false);
+        // Don't stop on network errors, retry
+        setTimeout(poll, 5000);
       }
     };
     
@@ -623,7 +763,11 @@ function KeyframesContent() {
                 disabled={isGenerating || !canGenerate}
                 className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
-                {isGenerating ? 'Генерация...' : 'Создать'}
+                {isGenerating 
+                  ? generation.progress 
+                    ? `${generation.progress.percent}% — ${generation.status === 'merging' ? 'Merge' : `Часть ${generation.progress.completed + 1}/${generation.progress.total}`}`
+                    : 'Запуск...'
+                  : 'Создать'}
               </button>
             </div>
           </div>
@@ -665,6 +809,12 @@ function KeyframesContent() {
           <div className="animate-fade-in-up animate-delay-200">
             {generation.finalVideoUrl ? (
               <VideoPlayer videoUrl={generation.finalVideoUrl} />
+            ) : generation.status !== 'idle' ? (
+              <GeneratingOutput 
+                status={generation.status}
+                progress={generation.progress}
+                error={generation.error}
+              />
             ) : (
               <EmptyOutput />
             )}
@@ -673,7 +823,12 @@ function KeyframesContent() {
           {/* Timeline (показываем когда есть генерация) */}
           {(generation.status !== 'idle' || parts.some(p => p.startImage || p.endImage)) && (
             <div className="animate-fade-in-up animate-delay-300">
-              <Timeline parts={parts} segments={generation.segments} />
+              <Timeline 
+                parts={parts} 
+                segments={generation.segments} 
+                progress={generation.progress}
+                isMerging={generation.status === 'merging'}
+              />
             </div>
           )}
         </div>

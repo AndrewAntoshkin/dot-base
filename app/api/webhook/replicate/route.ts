@@ -4,6 +4,7 @@ import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
 import { calculateCostUsd } from '@/lib/pricing';
+import { startNextKeyframeSegment } from '@/lib/keyframes';
 import logger from '@/lib/logger';
 
 interface GenerationRecord {
@@ -21,6 +22,7 @@ interface GenerationRecord {
   cost_credits?: number;
   cost_usd?: number;
   replicate_input?: Record<string, any>;
+  is_keyframe_segment?: boolean;
   [key: string]: any;
 }
 
@@ -323,6 +325,22 @@ export async function POST(request: NextRequest) {
     } catch (updateError: any) {
       logger.error('Failed to update generation:', updateError.message);
       return NextResponse.json({ error: 'Failed to save result' }, { status: 500 });
+    }
+
+    // Handle keyframe segment completion - start next segment or merge
+    if (generation.is_keyframe_segment && updateData.status === 'completed') {
+      logger.info('Keyframe segment completed, checking for next...', generation.id);
+      
+      try {
+        const nextResult = await startNextKeyframeSegment(generation.id, supabase);
+        
+        if (nextResult.started) {
+          logger.info(`Started next keyframe ${nextResult.type}: ${nextResult.generationId}`);
+        }
+      } catch (keyframeError: any) {
+        // Log but don't fail the webhook - segment is already saved
+        logger.error('Failed to start next keyframe segment:', keyframeError.message);
+      }
     }
 
     return NextResponse.json({ success: true });

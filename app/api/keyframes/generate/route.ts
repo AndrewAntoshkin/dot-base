@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
-import { saveMediaToStorage } from '@/lib/supabase/storage';
+import { KEYFRAME_MODELS } from '@/lib/keyframes';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,38 +21,9 @@ const requestSchema = z.object({
   parts: z.array(partSchema).min(1).max(10),
 });
 
-// Model configurations
-const MODELS = {
-  'hailuo-02': {
-    replicateModel: 'minimax/hailuo-02',
-    modelId: 'hailuo-02-i2v',
-    modelName: 'hailuo-02',
-    inputMapper: (part: z.infer<typeof partSchema>) => ({
-      first_frame_image: part.startImage,
-      last_frame_image: part.endImage,
-      prompt: part.prompt,
-      duration: '6',
-      resolution: '1080p',
-      prompt_optimizer: true,
-    }),
-  },
-  'seedance-1-pro': {
-    replicateModel: 'bytedance/seedance-1-pro',
-    modelId: 'seedance-1-pro',
-    modelName: 'seedance-1-pro',
-    inputMapper: (part: z.infer<typeof partSchema>) => ({
-      image: part.startImage,
-      last_frame_image: part.endImage,
-      prompt: part.prompt,
-      duration: 6,
-      resolution: '1080p',
-    }),
-  },
-};
-
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== KEYFRAMES GENERATE START ===');
+    logger.info('=== KEYFRAMES GENERATE START ===');
     
     // Auth check
     const cookieStore = await cookies();
@@ -89,17 +61,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { parts } = requestSchema.parse(body);
 
-    console.log(`Creating keyframe generation with ${parts.length} parts`);
+    logger.info(`Creating keyframe generation with ${parts.length} parts`);
 
     // Create unique group ID for this keyframe session
     const keyframeGroupId = crypto.randomUUID();
 
-    // Create generation records for each segment
+    // Create generation records for ALL segments (pending status)
     const segmentGenerations: string[] = [];
     
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      const modelConfig = MODELS[part.model];
+      const modelConfig = KEYFRAME_MODELS[part.model];
       
       const { data: generation, error } = await (supabase
         .from('generations') as any)
@@ -116,6 +88,13 @@ export async function POST(request: NextRequest) {
             keyframe_index: i,
             keyframe_total: parts.length,
             last_frame_image: part.endImage,
+            // Store original input for potential restart
+            keyframe_input: {
+              model: part.model,
+              startImage: part.startImage,
+              endImage: part.endImage,
+              prompt: part.prompt,
+            },
           },
           status: 'pending',
           replicate_input: modelConfig.inputMapper(part),
@@ -125,29 +104,70 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (error || !generation) {
-        console.error('Failed to create segment generation:', error);
+        logger.error('Failed to create segment generation:', error);
         return NextResponse.json({ error: 'Failed to create generation' }, { status: 500 });
       }
 
       segmentGenerations.push(generation.id);
-      console.log(`Created segment ${i + 1} generation: ${generation.id}`);
+      logger.info(`Created segment ${i + 1}/${parts.length} generation: ${generation.id}`);
     }
 
-    // Process keyframes - must await because Vercel terminates after response
-    // Note: For multi-segment videos, consider using webhook-based architecture
-    // to avoid hitting the 300s function limit
-    const result = await processKeyframeGeneration(keyframeGroupId, userId, parts, segmentGenerations, supabase);
+    // Start ONLY the first segment - subsequent segments will be started by webhook
+    const firstSegmentId = segmentGenerations[0];
+    const firstPart = parts[0];
+    const firstModelConfig = KEYFRAME_MODELS[firstPart.model];
 
+    try {
+      const replicateClient = getReplicateClient();
+      
+      const webhookUrl = process.env.NODE_ENV === 'production' 
+        ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
+        : undefined;
+
+      const { prediction, tokenId } = await replicateClient.run({
+        model: firstModelConfig.replicateModel,
+        input: firstModelConfig.inputMapper(firstPart),
+        webhook: webhookUrl,
+        webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+      });
+
+      // Update first segment to processing
+      await (supabase.from('generations') as any)
+        .update({
+          replicate_prediction_id: prediction.id,
+          replicate_token_index: tokenId,
+          status: 'processing',
+          started_at: new Date().toISOString(),
+        })
+        .eq('id', firstSegmentId);
+
+      logger.info(`Started first segment: ${firstSegmentId}, prediction: ${prediction.id}`);
+
+    } catch (replicateError: any) {
+      logger.error('Failed to start first segment:', replicateError.message);
+      
+      // Mark first segment as failed
+      await (supabase.from('generations') as any)
+        .update({ 
+          status: 'failed', 
+          error_message: replicateError.message,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', firstSegmentId);
+
+      return NextResponse.json({ error: replicateError.message }, { status: 500 });
+    }
+
+    // Return immediately - webhook will handle progress
     return NextResponse.json({
       keyframeGroupId,
       segmentGenerationIds: segmentGenerations,
-      status: result.success ? 'completed' : 'failed',
-      message: result.success ? 'Keyframe generation completed' : result.error,
-      mergeGenerationId: result.mergeGenerationId,
+      status: 'processing',
+      message: `Started keyframe generation with ${parts.length} parts`,
     });
 
   } catch (error: any) {
-    console.error('Keyframes generate error:', error);
+    logger.error('Keyframes generate error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -155,202 +175,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Processing function - returns result for response
-async function processKeyframeGeneration(
-  keyframeGroupId: string,
-  userId: string,
-  parts: z.infer<typeof partSchema>[],
-  segmentGenerationIds: string[],
-  supabase: any
-): Promise<{ success: boolean; error?: string; mergeGenerationId?: string }> {
-  const replicateClient = getReplicateClient();
-  const segmentVideos: string[] = [];
-
-  try {
-    // Generate each segment sequentially
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const generationId = segmentGenerationIds[i];
-      const modelConfig = MODELS[part.model];
-      
-      console.log(`Processing segment ${i + 1}/${parts.length}: ${part.model}`);
-      
-      // Update status to processing
-      await (supabase.from('generations') as any)
-        .update({ status: 'processing', started_at: new Date().toISOString() })
-        .eq('id', generationId);
-
-      try {
-        const input = modelConfig.inputMapper(part);
-        
-        const { prediction, tokenId } = await replicateClient.run({
-          model: modelConfig.replicateModel,
-          input,
-        });
-
-        // Save prediction ID
-        await (supabase.from('generations') as any)
-          .update({ 
-            replicate_prediction_id: prediction.id,
-            replicate_token_index: tokenId,
-          })
-          .eq('id', generationId);
-
-        console.log(`Segment ${i + 1} prediction created: ${prediction.id}`);
-
-        // Wait for completion
-        const result = await replicateClient.waitForPrediction(
-          prediction.id,
-          undefined,
-          600000, // 10 min
-          5000
-        );
-
-        if (result.status === 'succeeded' && result.output) {
-          const replicateVideoUrl = typeof result.output === 'string' 
-            ? result.output 
-            : result.output.video || result.output[0];
-          
-          // Save video to permanent storage
-          console.log(`Saving segment ${i + 1} video to storage...`);
-          const savedVideoUrl = await saveMediaToStorage(replicateVideoUrl, generationId, 0);
-          const videoUrl = savedVideoUrl || replicateVideoUrl;
-          
-          segmentVideos.push(videoUrl);
-          
-          // Update generation as completed
-          await (supabase.from('generations') as any)
-            .update({ 
-              status: 'completed',
-              output_urls: [videoUrl],
-              replicate_output: result.output,
-              completed_at: new Date().toISOString(),
-            })
-            .eq('id', generationId);
-
-          console.log(`Segment ${i + 1} completed and saved: ${videoUrl}`);
-        } else {
-          throw new Error(result.error || 'Generation failed');
-        }
-      } catch (segmentError: any) {
-        console.error(`Segment ${i + 1} failed:`, segmentError.message);
-        
-        await (supabase.from('generations') as any)
-          .update({ 
-            status: 'failed',
-            error_message: segmentError.message,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', generationId);
-        
-        return { success: false, error: segmentError.message }; // Stop if any segment fails
-      }
-    }
-
-    // All segments completed - create merge generation
-    console.log('All segments completed, creating merge generation...');
-
-    const { data: mergeGeneration, error: mergeError } = await (supabase
-      .from('generations') as any)
-      .insert({
-        user_id: userId,
-        action: 'video_edit',
-        model_id: 'video-merge',
-        model_name: 'video-merge',
-        replicate_model: 'lucataco/video-merge',
-        prompt: `Merge ${parts.length} keyframe segments`,
-        settings: {
-          keyframe_group_id: keyframeGroupId,
-          keyframe_merge: true,
-          segment_generation_ids: segmentGenerationIds,
-        },
-        status: 'processing',
-        started_at: new Date().toISOString(),
-        replicate_input: {
-          video_files: segmentVideos,
-          keep_audio: true,
-        },
-        is_keyframe_segment: false,
-      })
-      .select()
-      .single();
-
-    if (mergeError || !mergeGeneration) {
-      console.error('Failed to create merge generation:', mergeError);
-      return { success: false, error: 'Failed to create merge generation' };
-    }
-
-    console.log(`Merge generation created: ${mergeGeneration.id}`);
-
-    try {
-      const { prediction: mergePrediction, tokenId } = await replicateClient.run({
-        model: 'lucataco/video-merge',
-        version: '65c81d0d0689d8608af8c2f59728135925419f4b5e62065c37fc350130fed67a',
-        input: {
-          video_files: segmentVideos,
-          keep_audio: true,
-        },
-      });
-
-      await (supabase.from('generations') as any)
-        .update({ 
-          replicate_prediction_id: mergePrediction.id,
-          replicate_token_index: tokenId,
-        })
-        .eq('id', mergeGeneration.id);
-
-      const mergeResult = await replicateClient.waitForPrediction(
-        mergePrediction.id,
-        undefined,
-        600000,
-        5000
-      );
-
-      if (mergeResult.status === 'succeeded' && mergeResult.output) {
-        const replicateFinalUrl = typeof mergeResult.output === 'string' 
-          ? mergeResult.output 
-          : mergeResult.output[0];
-        
-        // Save merged video to permanent storage
-        console.log('Saving merged video to storage...');
-        const savedFinalUrl = await saveMediaToStorage(replicateFinalUrl, mergeGeneration.id, 0);
-        const finalVideoUrl = savedFinalUrl || replicateFinalUrl;
-        
-        console.log('Merge completed and saved:', finalVideoUrl);
-        
-        await (supabase.from('generations') as any)
-          .update({ 
-            status: 'completed',
-            output_urls: [finalVideoUrl],
-            replicate_output: mergeResult.output,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', mergeGeneration.id);
-        
-        return { success: true, mergeGenerationId: mergeGeneration.id };
-      } else {
-        throw new Error(mergeResult.error || 'Merge failed');
-      }
-    } catch (mergeErr: any) {
-      console.error('Merge failed:', mergeErr.message);
-      
-      await (supabase.from('generations') as any)
-        .update({ 
-          status: 'failed',
-          error_message: mergeErr.message,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', mergeGeneration.id);
-      
-      return { success: false, error: mergeErr.message };
-    }
-
-  } catch (error: any) {
-    console.error('Keyframe generation failed:', error);
-    return { success: false, error: error.message };
-  }
-  
-  return { success: false, error: 'Unknown error' };
-}
 
 
