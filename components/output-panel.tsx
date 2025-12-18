@@ -263,51 +263,41 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     if (!url || !generation) return;
 
     try {
-      // Браузеры поддерживают только image/png для clipboard.write()
-      // Поэтому всегда конвертируем через Canvas
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      
-      await new Promise<void>((resolve, reject) => {
-        img.onload = async () => {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            const ctx = canvas.getContext('2d');
-            
-            if (!ctx) {
-              reject(new Error('Canvas context not available'));
-              return;
-            }
-            
-            ctx.drawImage(img, 0, 0);
-            
-            canvas.toBlob(async (pngBlob) => {
-              if (!pngBlob) {
-                reject(new Error('Failed to create blob'));
-                return;
-              }
-              
-              try {
-                await navigator.clipboard.write([
-                  new ClipboardItem({ 'image/png': pngBlob })
-                ]);
-                setCopiedImage(true);
-                setTimeout(() => setCopiedImage(false), 2000);
-                resolve();
-              } catch (clipboardError) {
-                reject(clipboardError);
-              }
-            }, 'image/png');
-          } catch (err) {
-            reject(err);
-          }
-        };
+      // ClipboardItem может принимать Promise - это сохраняет user gesture
+      // Создаём Promise который резолвится в PNG blob
+      const pngBlobPromise = (async () => {
+        const response = await fetch(url);
+        const blob = await response.blob();
         
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = url;
-      });
+        // Конвертируем в PNG через canvas
+        const imageBitmap = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = imageBitmap.width;
+        canvas.height = imageBitmap.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          throw new Error('Canvas context not available');
+        }
+        
+        ctx.drawImage(imageBitmap, 0, 0);
+        
+        // toBlob через Promise
+        return new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((b) => {
+            if (b) resolve(b);
+            else reject(new Error('Failed to create blob'));
+          }, 'image/png');
+        });
+      })();
+      
+      // Передаём Promise напрямую в ClipboardItem - браузер сам дождётся
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': pngBlobPromise })
+      ]);
+      
+      setCopiedImage(true);
+      setTimeout(() => setCopiedImage(false), 2000);
     } catch (error) {
       console.error('Copy image error:', error);
     }
