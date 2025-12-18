@@ -89,12 +89,17 @@ interface CopyButtonProps {
 }
 
 function CopyImageButton({ onClick, copied, size = 'md' }: CopyButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
   const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
   const padding = size === 'sm' ? 'p-2' : 'p-[10px]';
   const borderRadius = size === 'sm' ? 'rounded-md' : 'rounded-[12px]';
   
   return (
-    <div className="relative group">
+    <div 
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <button 
         onClick={onClick} 
         className={`${padding} ${borderRadius} border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors`}
@@ -103,11 +108,22 @@ function CopyImageButton({ onClick, copied, size = 'md' }: CopyButtonProps) {
       </button>
       
       {/* Tooltip */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[#1a1a1a] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
-        <p className="font-inter text-xs text-white">Скопировать изображение</p>
-        <p className="font-inter text-[10px] text-[#959595]">Вставьте в Figma, Photoshop и др.</p>
+      <div 
+        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-3 p-3 bg-[#1A1A1A] rounded-xl whitespace-nowrap transition-all duration-200 pointer-events-none ${
+          isHovered ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible translate-y-1'
+        }`}
+        style={{ 
+          boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.8)',
+          zIndex: 9999 
+        }}
+      >
         {/* Arrow */}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-[#1a1a1a] rotate-45 -mt-1" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1A1A1A] rotate-45 -mt-1.5" />
+        
+        <div className="relative flex flex-col gap-1">
+          <p className="font-inter font-medium text-[13px] text-white">Скопировать изображение</p>
+          <p className="font-inter text-[11px] text-[#959595]">Cmd+V в Figma, Photoshop и др.</p>
+        </div>
       </div>
     </div>
   );
