@@ -16,6 +16,7 @@ interface Generation {
   model_name: string;
   status: string;
   output_urls: string[] | null;
+  output_thumbs: string[] | null; // Оптимизация: используем thumbnails для превью
   prompt: string | null;
   created_at: string;
   is_favorite: boolean;
@@ -144,6 +145,28 @@ const BrokenLinkIcon = () => (
     <path d="M23.3333 11.6667L16.6667 28.3333" stroke="#959595" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
+
+// Оптимизированное изображение с shimmer placeholder
+function ImageWithShimmer({ src, alt }: { src: string; alt: string }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  return (
+    <>
+      {!isLoaded && (
+        <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse rounded-[12px]" />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className={`absolute inset-0 w-full h-full object-cover rounded-[12px] transition-opacity duration-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setIsLoaded(true)}
+      />
+    </>
+  );
+}
 
 // Filter Dropdown Component
 interface FilterDropdownProps {
@@ -824,17 +847,15 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                             <div className="absolute inset-0 flex items-center justify-center">
                               <BrokenLinkIcon />
                             </div>
-                          ) : generation.output_urls?.[0] && isValidMediaUrl(generation.output_urls[0]) ? (
-                            isVideoUrl(generation.output_urls[0]) ? (
+                          ) : (generation.output_thumbs?.[0] || generation.output_urls?.[0]) && isValidMediaUrl((generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string) ? (
+                            isVideoUrl((generation.output_urls?.[0] || '') as string) ? (
                               <div className="absolute inset-0 flex items-center justify-center">
                                 <Play className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
                               </div>
                             ) : (
-                              <img
-                                src={generation.output_urls[0]}
+                              <ImageWithShimmer
+                                src={(generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string}
                                 alt={generation.prompt || 'Generated'}
-                                className="absolute inset-0 w-full h-full object-cover rounded-[12px]"
-                                loading="lazy"
                               />
                             )
                           ) : isTextAction(generation.action) ? (

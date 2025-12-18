@@ -139,6 +139,29 @@ const BrokenLinkIcon = () => (
   </svg>
 );
 
+// Оптимизированное изображение с shimmer placeholder
+function ImageWithShimmer({ src, alt }: { src: string; alt: string }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  return (
+    <>
+      {/* Shimmer placeholder */}
+      {!isLoaded && (
+        <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse rounded-[12px]" />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className={`absolute inset-0 w-full h-full object-cover rounded-[12px] transition-opacity duration-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setIsLoaded(true)}
+      />
+    </>
+  );
+}
+
 // Компонент dropdown фильтра
 interface FilterDropdownProps {
   label: string;
@@ -826,12 +849,9 @@ export default function HistoryPageClient() {
                               playsInline
                             />
                           ) : (
-                            <img
+                            <ImageWithShimmer
                               src={(generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string}
                               alt={generation.prompt || 'Generated'}
-                              className="absolute inset-0 w-full h-full object-cover rounded-[12px]"
-                              loading="lazy"
-                              decoding="async"
                             />
                           )
                         ) : isTextAction(generation.action) ? (

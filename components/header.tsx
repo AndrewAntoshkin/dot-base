@@ -8,6 +8,7 @@ import { Loader2, WifiOff, Check, ChevronDown } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
+import { AnnouncementBanner } from './announcement-banner';
 
 // Navigation items with descriptions
 const NAV_ITEMS = [
@@ -105,8 +106,11 @@ export function Header() {
   
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#101010] border-b border-[#2f2f2f]">
-        <div className="px-4 lg:px-20 py-3 flex items-center">
+      <header className="sticky top-0 z-50 bg-[#101010]">
+        {/* Announcement Banner - над хедером */}
+        <AnnouncementBanner />
+        
+        <div className="px-4 lg:px-20 py-3 flex items-center border-b border-[#2f2f2f]">
           {/* Left section - Logo + Navigation */}
           <div className="flex items-center gap-6">
             {/* Hamburger Menu - Mobile Only */}

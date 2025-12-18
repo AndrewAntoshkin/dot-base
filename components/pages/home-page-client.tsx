@@ -30,6 +30,7 @@ function HomeContent() {
   const router = useRouter();
   const generationIdParam = searchParams.get('generationId');
   const startParam = searchParams.get('start');
+  const modelParam = searchParams.get('model');
   
   const [selectedAction, setSelectedAction] = useState<ActionType>('create');
   const [selectedModelId, setSelectedModelId] = useState<string>('');
@@ -52,6 +53,28 @@ function HomeContent() {
       router.replace('/', { scroll: false });
     }
   }, [startParam, router]);
+
+  // Handle model param from announcement banner
+  useEffect(() => {
+    if (!modelParam) return;
+    
+    const loadModel = async () => {
+      // Dynamic import для избежания загрузки тяжёлого models-config на старте
+      const { getModelById } = await import('@/lib/models-config');
+      const model = getModelById(modelParam);
+      
+      if (model) {
+        setSelectedAction(model.action);
+        setSelectedModelId(model.id);
+        setMobileShowForm(true);
+      }
+      
+      // Clear URL param
+      router.replace('/', { scroll: false });
+    };
+    
+    loadModel();
+  }, [modelParam, router]);
 
   // Load generation from URL parameter
   useEffect(() => {
