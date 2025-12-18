@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { MaskEditor } from '@/components/mask-editor';
 import { INPAINT_MODELS } from '@/lib/models-config';
@@ -23,6 +24,10 @@ interface GenerationResult {
 }
 
 export default function InpaintPageClient() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const imageUrlParam = searchParams.get('imageUrl');
+  
   const { addGeneration, refreshGenerations } = useGenerations();
   const { selectedWorkspaceId } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +39,18 @@ export default function InpaintPageClient() {
   const [selectedModelId, setSelectedModelId] = useState<string>(INPAINT_MODELS[0].id);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Handle imageUrl param from Quick Actions
+  useEffect(() => {
+    if (!imageUrlParam) return;
+    
+    // Set image directly from URL (it's already a valid HTTP URL)
+    setUploadedImage(imageUrlParam);
+    setMaskDataUrl(null);
+    
+    // Clear URL param
+    router.replace('/inpaint', { scroll: false });
+  }, [imageUrlParam, router]);
 
   // Get selected model from full config
   const selectedModel = useMemo(() => {

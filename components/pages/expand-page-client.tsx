@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { ModelSelector } from '@/components/model-selector';
 import { AspectRatioSelector } from '@/components/aspect-ratio-selector';
@@ -37,6 +38,10 @@ const ASPECT_RATIOS = [
 ];
 
 export function ExpandPageClient() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const imageUrlParam = searchParams.get('imageUrl');
+  
   const { addGeneration, generations, refreshGenerations } = useGenerations();
   const { selectedWorkspaceId } = useUser();
   
@@ -51,6 +56,27 @@ export function ExpandPageClient() {
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [outputImage, setOutputImage] = useState<string | null>(null);
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
+
+  // Handle imageUrl param from Quick Actions
+  useEffect(() => {
+    if (!imageUrlParam) return;
+    
+    // Load image from URL and get dimensions
+    const img = new Image();
+    img.onload = () => {
+      console.log('[Expand] Quick Action image loaded:', img.naturalWidth, 'x', img.naturalHeight);
+      setImage(imageUrlParam);
+      setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      setOutputImage(null);
+    };
+    img.onerror = () => {
+      console.error('[Expand] Failed to load image from URL:', imageUrlParam);
+    };
+    img.src = imageUrlParam;
+    
+    // Clear URL param
+    router.replace('/expand', { scroll: false });
+  }, [imageUrlParam, router]);
   
   // Настройки для Outpainter
   const [steps, setSteps] = useState(50);

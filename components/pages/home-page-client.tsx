@@ -31,6 +31,8 @@ function HomeContent() {
   const generationIdParam = searchParams.get('generationId');
   const startParam = searchParams.get('start');
   const modelParam = searchParams.get('model');
+  const actionParam = searchParams.get('action');
+  const imageUrlParam = searchParams.get('imageUrl');
   
   const [selectedAction, setSelectedAction] = useState<ActionType>('create');
   const [selectedModelId, setSelectedModelId] = useState<string>('');
@@ -53,6 +55,48 @@ function HomeContent() {
       router.replace('/', { scroll: false });
     }
   }, [startParam, router]);
+
+  // Handle Quick Action params (action + imageUrl)
+  useEffect(() => {
+    if (!actionParam) return;
+    
+    const loadQuickAction = async () => {
+      // Get first model for this action
+      const { getModelsByAction } = await import('@/lib/models-config');
+      const models = getModelsByAction(actionParam as ActionType);
+      
+      if (models.length > 0) {
+        const model = models[0];
+        
+        // Set image URL in form data using the correct field name from model settings
+        let newFormData = {};
+        if (imageUrlParam) {
+          // Find first file or file_array field
+          const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
+          const fieldName = fileField?.name || 'image';
+          // For file_array, wrap in array
+          const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
+          newFormData = { [fieldName]: value };
+        }
+        
+        // Set all state at once (React will batch these)
+        // Set action (only non-video actions for home page)
+        if (!isVideoAction(actionParam)) {
+          setSelectedAction(actionParam as ActionType);
+        }
+        setSelectedModelId(model.id);
+        setFormData(newFormData);
+        setMobileShowForm(true);
+      }
+      
+      // Clear URL params after a small delay to ensure state is applied
+      setTimeout(() => {
+        router.replace('/', { scroll: false });
+      }, 100);
+    };
+    
+    loadQuickAction();
+  }, [actionParam, imageUrlParam, router]);
 
   // Handle model param from announcement banner
   useEffect(() => {

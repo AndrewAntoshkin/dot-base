@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { Loader2, Download, RotateCcw, Copy, WifiOff, Maximize2, Check } from 'lucide-react';
 import { ErrorState } from '@/components/error-state';
+import { QuickActions } from '@/components/quick-actions';
 import { formatDate } from '@/lib/utils';
 import { fetchWithTimeout, isOnline, isSlowConnection } from '@/lib/network-utils';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
@@ -538,6 +539,15 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
           </div>
         )}
 
+        {/* Quick Actions - быстрые действия с результатом */}
+        {currentMediaUrl && isValidUrl && (
+          <QuickActions
+            mediaUrl={currentMediaUrl}
+            mediaType={isVideo ? 'video' : 'image'}
+            compact
+          />
+        )}
+
         {/* Actions */}
         <div className="flex gap-2">
           <button onClick={handleRegenerate} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Повторить">
@@ -648,6 +658,16 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Quick Actions - быстрые действия с результатом */}
+      {currentMediaUrl && isValidUrl && (
+        <div className="mb-4">
+          <QuickActions
+            mediaUrl={currentMediaUrl}
+            mediaType={isVideo ? 'video' : 'image'}
+          />
         </div>
       )}
 

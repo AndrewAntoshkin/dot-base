@@ -30,6 +30,9 @@ function VideoContent() {
   const router = useRouter();
   const generationIdParam = searchParams.get('generationId');
   const startParam = searchParams.get('start');
+  const actionParam = searchParams.get('action');
+  const imageUrlParam = searchParams.get('imageUrl');
+  const videoUrlParam = searchParams.get('videoUrl');
   
   // Видео режим - начинаем с video_create
   const [selectedAction, setSelectedAction] = useState<ActionType>('video_create');
@@ -53,6 +56,53 @@ function VideoContent() {
       router.replace('/video', { scroll: false });
     }
   }, [startParam, router]);
+
+  // Handle Quick Action params (action + imageUrl/videoUrl)
+  useEffect(() => {
+    if (!actionParam) return;
+    
+    const loadQuickAction = async () => {
+      // Get first model for this action
+      const { getModelsByAction } = await import('@/lib/models-config');
+      const models = getModelsByAction(actionParam as ActionType);
+      
+      if (models.length > 0) {
+        const model = models[0];
+        
+        // Set media URL in form data using the correct field name from model settings
+        let newFormData = {};
+        if (imageUrlParam) {
+          // Find first file or file_array field
+          const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
+          const fieldName = fileField?.name || 'image';
+          // For file_array, wrap in array
+          const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
+          newFormData = { [fieldName]: value };
+        } else if (videoUrlParam) {
+          // Find video field
+          const fileField = model.settings.find(s => (s.type === 'file' || s.type === 'file_array') && s.name.toLowerCase().includes('video'));
+          const fieldName = fileField?.name || 'video';
+          const value = fileField?.type === 'file_array' ? [videoUrlParam] : videoUrlParam;
+          newFormData = { [fieldName]: value };
+        }
+        
+        // Set all state at once (React will batch these)
+        if (isVideoAction(actionParam)) {
+          setSelectedAction(actionParam as ActionType);
+        }
+        setSelectedModelId(model.id);
+        setFormData(newFormData);
+        setMobileShowForm(true);
+      }
+      
+      // Clear URL params after a small delay to ensure state is applied
+      setTimeout(() => {
+        router.replace('/video', { scroll: false });
+      }, 100);
+    };
+    
+    loadQuickAction();
+  }, [actionParam, imageUrlParam, videoUrlParam, router]);
 
   // Load generation from URL parameter
   useEffect(() => {
