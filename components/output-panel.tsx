@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
-import { Loader2, Download, RotateCcw, Copy, WifiOff, Maximize2, ClipboardCopy, Check } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Copy, WifiOff, Maximize2, Check } from 'lucide-react';
 import { ErrorState } from '@/components/error-state';
 import { formatDate } from '@/lib/utils';
 import { fetchWithTimeout, isOnline, isSlowConnection } from '@/lib/network-utils';
@@ -77,6 +77,38 @@ function CreatorBadge({ creator }: { creator: Creator }) {
       <span className="font-inter text-[13px] text-white">
         {creator.email || creator.name}
       </span>
+    </div>
+  );
+}
+
+// Компонент кнопки копирования с тултипом
+interface CopyButtonProps {
+  onClick: () => void;
+  copied: boolean;
+  size?: 'sm' | 'md';
+}
+
+function CopyImageButton({ onClick, copied, size = 'md' }: CopyButtonProps) {
+  const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+  const padding = size === 'sm' ? 'p-2' : 'p-[10px]';
+  const borderRadius = size === 'sm' ? 'rounded-md' : 'rounded-[12px]';
+  
+  return (
+    <div className="relative group">
+      <button 
+        onClick={onClick} 
+        className={`${padding} ${borderRadius} border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors`}
+      >
+        {copied ? <Check className={`${iconSize} text-green-500`} /> : <Copy className={iconSize} />}
+      </button>
+      
+      {/* Tooltip */}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[#1a1a1a] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
+        <p className="font-inter text-xs text-white">Скопировать изображение</p>
+        <p className="font-inter text-[10px] text-[#959595]">Вставьте в Figma, Photoshop и др.</p>
+        {/* Arrow */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-[#1a1a1a] rotate-45 -mt-1" />
+      </div>
     </div>
   );
 }
@@ -495,9 +527,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
             <RotateCcw className="h-5 w-5" />
           </button>
           {!isVideo && (
-            <button onClick={handleCopyImage} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скопировать изображение">
-              {copiedImage ? <Check className="h-5 w-5 text-green-500" /> : <ClipboardCopy className="h-5 w-5" />}
-            </button>
+            <CopyImageButton onClick={handleCopyImage} copied={copiedImage} size="md" />
           )}
           <button onClick={handleDownload} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скачать">
             <Download className="h-5 w-5" />
@@ -632,9 +662,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
             <RotateCcw className="h-4 w-4" />
           </button>
           {!isVideo && (
-            <button onClick={handleCopyImage} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скопировать изображение">
-              {copiedImage ? <Check className="h-4 w-4 text-green-500" /> : <ClipboardCopy className="h-4 w-4" />}
-            </button>
+            <CopyImageButton onClick={handleCopyImage} copied={copiedImage} size="sm" />
           )}
           <button onClick={handleDownload} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скачать">
             <Download className="h-4 w-4" />
