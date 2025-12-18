@@ -263,57 +263,53 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     if (!url || !generation) return;
 
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
+      // Браузеры поддерживают только image/png для clipboard.write()
+      // Поэтому всегда конвертируем через Canvas
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
       
-      // Определяем MIME тип из blob или URL
-      let mimeType = blob.type;
-      if (!mimeType || mimeType === 'application/octet-stream') {
-        // Пробуем определить по расширению
-        if (url.includes('.png')) mimeType = 'image/png';
-        else if (url.includes('.jpg') || url.includes('.jpeg')) mimeType = 'image/jpeg';
-        else if (url.includes('.webp')) mimeType = 'image/webp';
-        else if (url.includes('.gif')) mimeType = 'image/gif';
-        else mimeType = 'image/png'; // fallback
-      }
-
-      // Создаём ClipboardItem с оригинальным форматом
-      const item = new ClipboardItem({
-        [mimeType]: blob,
-      });
-      
-      await navigator.clipboard.write([item]);
-      
-      setCopiedImage(true);
-      setTimeout(() => setCopiedImage(false), 2000);
-    } catch (error) {
-      console.error('Copy image error:', error);
-      // Fallback: пробуем скопировать как PNG через canvas
-      try {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve, reject) => {
         img.onload = async () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              reject(new Error('Canvas context not available'));
+              return;
+            }
+            
             ctx.drawImage(img, 0, 0);
+            
             canvas.toBlob(async (pngBlob) => {
-              if (pngBlob) {
+              if (!pngBlob) {
+                reject(new Error('Failed to create blob'));
+                return;
+              }
+              
+              try {
                 await navigator.clipboard.write([
                   new ClipboardItem({ 'image/png': pngBlob })
                 ]);
                 setCopiedImage(true);
                 setTimeout(() => setCopiedImage(false), 2000);
+                resolve();
+              } catch (clipboardError) {
+                reject(clipboardError);
               }
             }, 'image/png');
+          } catch (err) {
+            reject(err);
           }
         };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
         img.src = url;
-      } catch (fallbackError) {
-        console.error('Fallback copy error:', fallbackError);
-      }
+      });
+    } catch (error) {
+      console.error('Copy image error:', error);
     }
   };
 
