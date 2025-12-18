@@ -48,7 +48,7 @@ function NavLinkWithTooltip({ href, label, description, isActive }: {
       {/* Tooltip */}
       <div 
         className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[280px] p-4 bg-[#1A1A1A] rounded-xl z-50 transition-all duration-200 ${
-          isHovered ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1'
+          isHovered ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
         }`}
         style={{ boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.8)' }}
       >
