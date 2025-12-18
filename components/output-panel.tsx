@@ -109,20 +109,21 @@ function CopyImageButton({ onClick, copied, size = 'md' }: CopyButtonProps) {
       
       {/* Tooltip */}
       <div 
-        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-3 p-3 bg-[#1A1A1A] rounded-xl whitespace-nowrap transition-all duration-200 pointer-events-none ${
+        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 transition-all duration-200 pointer-events-none ${
           isHovered ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible translate-y-1'
         }`}
-        style={{ 
-          boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.8)',
-          zIndex: 9999 
-        }}
+        style={{ zIndex: 9999 }}
       >
-        {/* Arrow */}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1A1A1A] rotate-45 -mt-1.5" />
-        
-        <div className="relative flex flex-col gap-1">
+        <div 
+          className="p-3 bg-[#1A1A1A] rounded-xl whitespace-nowrap"
+          style={{ boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.8)' }}
+        >
           <p className="font-inter font-medium text-[13px] text-white">Скопировать изображение</p>
           <p className="font-inter text-[11px] text-[#959595]">Cmd+V в Figma, Photoshop и др.</p>
+        </div>
+        {/* Arrow */}
+        <div className="flex justify-center -mt-[1px]">
+          <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-[#1A1A1A]" />
         </div>
       </div>
     </div>
