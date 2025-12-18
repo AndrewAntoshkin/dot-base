@@ -1037,6 +1037,7 @@ export function SettingsForm({
               onChange={(v) => updateFormData(setting.name, v)}
               description={setting.description}
               defaultLabel={defaultOption?.label}
+              defaultValue={setting.default}
             />
           );
         }

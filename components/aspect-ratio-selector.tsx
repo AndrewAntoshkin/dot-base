@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { RotateCcw } from 'lucide-react';
 
 interface AspectRatioOption {
   value: string;
@@ -13,6 +14,7 @@ interface AspectRatioSelectorProps {
   onChange: (value: string) => void;
   description?: string;
   defaultLabel?: string;
+  defaultValue?: string;
 }
 
 // Парсим соотношение сторон из строки вида "16:9" в числа
@@ -55,6 +57,7 @@ export function AspectRatioSelector({
   onChange,
   description,
   defaultLabel,
+  defaultValue,
 }: AspectRatioSelectorProps) {
   const parsedRatio = parseAspectRatio(value);
   
@@ -65,6 +68,12 @@ export function AspectRatioSelector({
   // Размер контейнера для превью (по Figma)
   const containerHeight = 120;
   const maxWidth = 213;
+  
+  // Определяем значение по умолчанию
+  const resolvedDefault = defaultValue || options[0]?.value || '1:1';
+  
+  // Показываем кнопку сброса, если текущее значение отличается от дефолтного
+  const showReset = value !== resolvedDefault;
   
   // Получаем все рамки для отображения (для dashed borders)
   const allRatios = useMemo(() => visualOptions.map(opt => {
@@ -93,7 +102,19 @@ export function AspectRatioSelector({
   return (
     <div className="flex flex-col gap-2">
       {/* Visual preview container - bg-[#101010] по Figma, py-[32px], gap-[24px] */}
-      <div className="bg-[#101010] rounded-[20px] py-8 flex flex-col gap-6 items-center justify-center">
+      <div className="bg-[#101010] rounded-[20px] py-8 flex flex-col gap-6 items-center justify-center relative">
+        {/* Reset button - top right corner */}
+        {showReset && (
+          <button
+            type="button"
+            onClick={() => onChange(resolvedDefault)}
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-[#666] hover:text-white hover:bg-[#252525] transition-all duration-200"
+            title="Сбросить"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        )}
+        
         {/* Aspect ratio preview box */}
         <div 
           className="relative flex items-center justify-center"

@@ -741,6 +741,7 @@ export function ExpandPageClient() {
                   onChange={handleRatioSelect}
                   description="Соотношение сторон. Растягивайте на canvas справа для ручного контроля."
                   defaultLabel="1:1"
+                  defaultValue="1:1"
                 />
               </div>
             </div>
