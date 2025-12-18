@@ -98,6 +98,46 @@ function HomeContent() {
     loadQuickAction();
   }, [actionParam, imageUrlParam, router]);
 
+  // Known image field names across different models
+  const IMAGE_FIELD_NAMES = ['image', 'start_image', 'first_frame_image', 'img_cond_path', 'input_image', 'image_input'];
+
+  // Handle model change - transfer image to correct field
+  const handleModelChange = async (newModelId: string) => {
+    if (!newModelId) {
+      setSelectedModelId('');
+      return;
+    }
+
+    // Get the new model to find correct field name
+    const { getModelById } = await import('@/lib/models-config');
+    const newModel = getModelById(newModelId);
+    
+    if (newModel) {
+      // Find existing image in formData
+      let existingImageUrl: string | null = null;
+      
+      for (const fieldName of IMAGE_FIELD_NAMES) {
+        const value = formData[fieldName];
+        if (value) {
+          existingImageUrl = Array.isArray(value) ? value[0] : value;
+          break;
+        }
+      }
+      
+      // If we have image, transfer it to the correct field
+      if (existingImageUrl) {
+        const fileField = newModel.settings.find(s => s.type === 'file' || s.type === 'file_array');
+        
+        if (fileField) {
+          const value = fileField.type === 'file_array' ? [existingImageUrl] : existingImageUrl;
+          setFormData({ [fileField.name]: value });
+        }
+      }
+    }
+    
+    setSelectedModelId(newModelId);
+  };
+
   // Handle model param from announcement banner
   useEffect(() => {
     if (!modelParam) return;
@@ -283,7 +323,7 @@ function HomeContent() {
                 <ModelSelector
                   action={selectedAction}
                   value={selectedModelId}
-                  onChange={setSelectedModelId}
+                  onChange={handleModelChange}
                 />
               </div>
 
@@ -410,7 +450,7 @@ function HomeContent() {
                   <ModelSelector
                     action={selectedAction}
                     value={selectedModelId}
-                    onChange={setSelectedModelId}
+                    onChange={handleModelChange}
                   />
                 </div>
 

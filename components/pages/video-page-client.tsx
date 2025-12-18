@@ -104,6 +104,62 @@ function VideoContent() {
     loadQuickAction();
   }, [actionParam, imageUrlParam, videoUrlParam, router]);
 
+  // Known image field names across different models
+  const IMAGE_FIELD_NAMES = ['image', 'start_image', 'first_frame_image', 'img_cond_path', 'input_image'];
+  const VIDEO_FIELD_NAMES = ['video', 'input_video'];
+
+  // Handle model change - transfer image/video to correct field
+  const handleModelChange = async (newModelId: string) => {
+    if (!newModelId) {
+      setSelectedModelId('');
+      return;
+    }
+
+    // Get the new model to find correct field name
+    const { getModelById } = await import('@/lib/models-config');
+    const newModel = getModelById(newModelId);
+    
+    if (newModel) {
+      // Find existing image/video in formData
+      let existingImageUrl: string | null = null;
+      let existingVideoUrl: string | null = null;
+      
+      for (const fieldName of IMAGE_FIELD_NAMES) {
+        const value = formData[fieldName];
+        if (value) {
+          existingImageUrl = Array.isArray(value) ? value[0] : value;
+          break;
+        }
+      }
+      
+      for (const fieldName of VIDEO_FIELD_NAMES) {
+        const value = formData[fieldName];
+        if (value) {
+          existingVideoUrl = Array.isArray(value) ? value[0] : value;
+          break;
+        }
+      }
+      
+      // If we have media, transfer it to the correct field
+      if (existingImageUrl || existingVideoUrl) {
+        const fileField = newModel.settings.find(s => s.type === 'file' || s.type === 'file_array');
+        
+        if (fileField && existingImageUrl) {
+          const value = fileField.type === 'file_array' ? [existingImageUrl] : existingImageUrl;
+          setFormData({ [fileField.name]: value });
+        } else if (existingVideoUrl) {
+          const videoField = newModel.settings.find(s => (s.type === 'file' || s.type === 'file_array') && s.name.toLowerCase().includes('video'));
+          if (videoField) {
+            const value = videoField.type === 'file_array' ? [existingVideoUrl] : existingVideoUrl;
+            setFormData({ [videoField.name]: value });
+          }
+        }
+      }
+    }
+    
+    setSelectedModelId(newModelId);
+  };
+
   // Load generation from URL parameter
   useEffect(() => {
     if (!generationIdParam) return;
@@ -268,7 +324,7 @@ function VideoContent() {
                 <ModelSelector
                   action={selectedAction}
                   value={selectedModelId}
-                  onChange={setSelectedModelId}
+                  onChange={handleModelChange}
                 />
               </div>
 
@@ -396,7 +452,7 @@ function VideoContent() {
                   <ModelSelector
                     action={selectedAction}
                     value={selectedModelId}
-                    onChange={setSelectedModelId}
+                    onChange={handleModelChange}
                   />
                 </div>
 
