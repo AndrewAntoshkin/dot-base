@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
-import { Loader2, Download, RotateCcw, Copy, WifiOff, Maximize2 } from 'lucide-react';
+import { Loader2, Download, RotateCcw, Copy, WifiOff, Maximize2, ClipboardCopy, Check } from 'lucide-react';
 import { ErrorState } from '@/components/error-state';
 import { formatDate } from '@/lib/utils';
 import { fetchWithTimeout, isOnline, isSlowConnection } from '@/lib/network-utils';
@@ -86,6 +86,7 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
   const [isLoading, setIsLoading] = useState(false);
   const [imageAspectRatio, setImageAspectRatio] = useState<'landscape' | 'portrait' | 'square'>('square');
   const [copied, setCopied] = useState(false);
+  const [copiedImage, setCopiedImage] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
@@ -254,6 +255,65 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Copy error:', err);
+    }
+  };
+
+  const handleCopyImage = async () => {
+    const url = generation?.output_urls?.[selectedImageIndex] || generation?.output_urls?.[0];
+    if (!url || !generation) return;
+
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      // Определяем MIME тип из blob или URL
+      let mimeType = blob.type;
+      if (!mimeType || mimeType === 'application/octet-stream') {
+        // Пробуем определить по расширению
+        if (url.includes('.png')) mimeType = 'image/png';
+        else if (url.includes('.jpg') || url.includes('.jpeg')) mimeType = 'image/jpeg';
+        else if (url.includes('.webp')) mimeType = 'image/webp';
+        else if (url.includes('.gif')) mimeType = 'image/gif';
+        else mimeType = 'image/png'; // fallback
+      }
+
+      // Создаём ClipboardItem с оригинальным форматом
+      const item = new ClipboardItem({
+        [mimeType]: blob,
+      });
+      
+      await navigator.clipboard.write([item]);
+      
+      setCopiedImage(true);
+      setTimeout(() => setCopiedImage(false), 2000);
+    } catch (error) {
+      console.error('Copy image error:', error);
+      // Fallback: пробуем скопировать как PNG через canvas
+      try {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob(async (pngBlob) => {
+              if (pngBlob) {
+                await navigator.clipboard.write([
+                  new ClipboardItem({ 'image/png': pngBlob })
+                ]);
+                setCopiedImage(true);
+                setTimeout(() => setCopiedImage(false), 2000);
+              }
+            }, 'image/png');
+          }
+        };
+        img.src = url;
+      } catch (fallbackError) {
+        console.error('Fallback copy error:', fallbackError);
+      }
     }
   };
 
@@ -445,10 +505,15 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
 
         {/* Actions */}
         <div className="flex gap-2">
-          <button onClick={handleRegenerate} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]">
+          <button onClick={handleRegenerate} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Повторить">
             <RotateCcw className="h-5 w-5" />
           </button>
-          <button onClick={handleDownload} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]">
+          {!isVideo && (
+            <button onClick={handleCopyImage} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скопировать изображение">
+              {copiedImage ? <Check className="h-5 w-5 text-green-500" /> : <ClipboardCopy className="h-5 w-5" />}
+            </button>
+          )}
+          <button onClick={handleDownload} className="p-[10px] rounded-[12px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скачать">
             <Download className="h-5 w-5" />
           </button>
         </div>
@@ -577,10 +642,15 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
           )}
         </div>
         <div className="flex gap-2">
-          <button onClick={handleRegenerate} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]">
+          <button onClick={handleRegenerate} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Повторить">
             <RotateCcw className="h-4 w-4" />
           </button>
-          <button onClick={handleDownload} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]">
+          {!isVideo && (
+            <button onClick={handleCopyImage} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скопировать изображение">
+              {copiedImage ? <Check className="h-4 w-4 text-green-500" /> : <ClipboardCopy className="h-4 w-4" />}
+            </button>
+          )}
+          <button onClick={handleDownload} className="p-2 rounded-md border border-[#2f2f2f] text-white hover:bg-[#1f1f1f]" title="Скачать">
             <Download className="h-4 w-4" />
           </button>
         </div>
