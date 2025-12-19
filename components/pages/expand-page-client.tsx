@@ -456,6 +456,11 @@ export function ExpandPageClient() {
         const result = await response.json();
         console.log('[Expand] Generation created:', result.id, 'status:', result.status);
         addGeneration(result);
+        
+        // Сохраняем ID - OutputPanel будет отслеживать прогресс
+        setCurrentGenerationId(result.id);
+        setIsCreating(false);
+        console.log('[Expand] Set currentGenerationId:', result.id);
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
@@ -463,11 +468,6 @@ export function ExpandPageClient() {
         }
         throw fetchError;
       }
-      
-      // Сохраняем ID - OutputPanel будет отслеживать прогресс
-      setCurrentGenerationId(result.id);
-      setIsCreating(false);
-      console.log('[Expand] Set currentGenerationId:', result.id);
       
     } catch (error: any) {
       console.error('[Expand] Generation error:', error);
