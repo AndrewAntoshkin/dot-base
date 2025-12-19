@@ -414,18 +414,20 @@ export default function HistoryPageClient() {
 
   // Синхронизация статусов processing генераций с Replicate
   const syncProcessingStatuses = useCallback(async () => {
+    console.log('🔄 Calling sync-status API...');
     try {
       const response = await fetch('/api/generations/sync-status', { method: 'POST' });
+      console.log('✅ Sync-status response:', response.status);
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 Sync result:', data);
         if (data.synced > 0) {
-          console.log(`Synced ${data.synced} generations`);
           // Перезагрузить данные после синхронизации
           fetchGenerations(true);
         }
       }
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('❌ Sync error:', error);
     }
   }, [fetchGenerations]);
 
@@ -469,31 +471,41 @@ export default function HistoryPageClient() {
     }
   }, [activeTab, syncProcessingStatuses]);
 
-  // Polling для обновления - быстрее на табе "В работе" или при активных генерациях
+  // Polling для обновления - всегда используем быстрый polling для автообновления
   useEffect(() => {
-    const needsFastPolling = activeTab === 'processing' || hasActiveGenerations;
-    const interval = needsFastPolling ? POLLING_ACTIVE : POLLING_IDLE;
-    
+    // Всегда используем быстрый интервал для автоматического обновления превью
+    const interval = POLLING_ACTIVE;
+
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
-    
+
     pollingRef.current = setInterval(async () => {
-      // Если есть активные генерации - сначала синхронизируем статусы
-      if (hasActiveGenerations) {
-        await syncProcessingStatuses();
-      } else {
-        // Silent polling - skip counts to reduce DB load
-        fetchGenerations(true, true);
+      console.log('⏰ Polling interval triggered');
+      
+      // Синхронизируем статусы с Replicate
+      try {
+        console.log('🔄 Calling sync-status API...');
+        const syncResponse = await fetch('/api/generations/sync-status', { method: 'POST' });
+        console.log('✅ Sync-status response:', syncResponse.status);
+        if (syncResponse.ok) {
+          const syncData = await syncResponse.json();
+          console.log('📊 Sync result:', syncData);
+        }
+      } catch (error) {
+        console.error('❌ Sync error:', error);
       }
+      
+      // Обновляем список
+      fetchGenerations(true, true);
     }, interval);
-    
+
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
       }
     };
-  }, [hasActiveGenerations, activeTab, fetchGenerations, syncProcessingStatuses]);
+  }, [fetchGenerations]);
 
   // NOTE: Realtime подписка отключена для снижения Disk IO
   // Все обновления обрабатываются через polling выше

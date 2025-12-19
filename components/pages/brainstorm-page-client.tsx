@@ -6,8 +6,8 @@ import { Header } from '@/components/header';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import { CREATE_MODELS_LITE } from '@/lib/models-lite';
-import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
-import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut, Download, Copy, Maximize2 } from 'lucide-react';
+import { BrainstormImageSheet } from '@/components/brainstorm-image-sheet';
+import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 
 // Check icon matching the design
 const CheckIcon = () => (
@@ -16,16 +16,7 @@ const CheckIcon = () => (
   </svg>
 );
 
-// Close circle icon from Figma design
-const CloseCircleIcon = () => (
-  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M16 29.3333C23.3638 29.3333 29.3333 23.3638 29.3333 16C29.3333 8.63619 23.3638 2.66666 16 2.66666C8.63619 2.66666 2.66666 8.63619 2.66666 16C2.66666 23.3638 8.63619 29.3333 16 29.3333Z" stroke="#666666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M12.2267 19.7733L19.7733 12.2267" stroke="#666666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M19.7733 19.7733L12.2267 12.2267" stroke="#666666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-interface BrainstormGeneration {
+export interface BrainstormGeneration {
   id: string;
   modelId: string;
   modelName: string;
@@ -145,8 +136,6 @@ export default function BrainstormPageClient() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
   const [modalGeneration, setModalGeneration] = useState<BrainstormGeneration | null>(null);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
   
   // Zoom and pan state
   const [zoom, setZoom] = useState(0.6);
@@ -417,8 +406,7 @@ export default function BrainstormPageClient() {
           const response = await fetch(`/api/generations/${gen.id}`);
           if (response.ok) {
             const data = await response.json();
-            console.log('Poll response for', gen.id, ':', data.status, data.output_urls);
-            
+
             // Use first output_url from the array
             const imageUrl = data.output_urls?.[0] || gen.resultUrl;
             
@@ -521,6 +509,16 @@ export default function BrainstormPageClient() {
       const tempId = newGenerations[i].id;
       
       try {
+        // Default settings for models that require them
+        const defaultSettings: Record<string, any> = {
+          aspect_ratio: '1:1',
+        };
+        
+        // Recraft models require 'size' parameter
+        if (modelId.includes('recraft')) {
+          defaultSettings.size = '1024x1024';
+        }
+        
         const response = await fetch('/api/generations/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -529,7 +527,7 @@ export default function BrainstormPageClient() {
             action: 'create',
             model_id: modelId,
             prompt: prompt.trim(),
-            settings: {},
+            settings: defaultSettings,
             workspace_id: selectedWorkspaceId,
           }),
         });
@@ -606,45 +604,27 @@ export default function BrainstormPageClient() {
   
   const handleCloseModal = useCallback(() => {
     setModalGeneration(null);
-    setCopiedPrompt(false);
   }, []);
   
-  const handleCopyPrompt = useCallback(async () => {
-    if (modalGeneration?.prompt) {
-      try {
-        await navigator.clipboard.writeText(modalGeneration.prompt);
-        setCopiedPrompt(true);
-        setTimeout(() => setCopiedPrompt(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy:', err);
-      }
-    }
-  }, [modalGeneration]);
+  const handleNavigateToGeneration = useCallback((generation: BrainstormGeneration) => {
+    setModalGeneration(generation);
+    setSelectedGenerationId(generation.id);
+  }, []);
   
-  const handleDownload = useCallback(async () => {
-    if (modalGeneration?.resultUrl) {
-      try {
-        const response = await fetch(modalGeneration.resultUrl);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${modalGeneration.modelName}-${modalGeneration.id}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error('Failed to download:', err);
-      }
-    }
-  }, [modalGeneration]);
-  
-  const handleEditGeneration = useCallback(() => {
-    if (modalGeneration) {
-      router.push(`/?generationId=${modalGeneration.id}`);
-    }
-  }, [modalGeneration, router]);
+  const handleScrollToGeneration = useCallback((generation: BrainstormGeneration) => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Calculate new pan to center the generation
+    const newPanX = centerX - (generation.position.x + DEFAULT_CARD_SIZE.width / 2) * zoom;
+    const newPanY = centerY - (generation.position.y + DEFAULT_CARD_SIZE.height / 2) * zoom;
+    
+    setPan({ x: newPanX, y: newPanY });
+  }, [zoom]);
   
   const activeGenerationsCount = generations.filter(
     g => g.status === 'pending' || g.status === 'processing'
@@ -986,126 +966,15 @@ export default function BrainstormPageClient() {
         </div>
       </div>
       
-      {/* Generation Modal */}
-      {modalGeneration && (
-        <div 
-          className="fixed inset-0 bg-black/60 flex items-center justify-center p-8 z-50"
-          onClick={handleCloseModal}
-        >
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            {/* Modal content */}
-            <div className="bg-[#151515] rounded-[32px] p-8 w-[660px] flex flex-col gap-3">
-              {/* Header */}
-              <div className="flex items-center justify-between gap-6">
-                <h2 className="flex-1 font-inter font-medium text-lg text-white truncate">
-                  {modalGeneration.modelName}
-                </h2>
-                <div className="flex items-center gap-1">
-                  {/* Refresh button */}
-                  <button
-                    onClick={() => {
-                      // TODO: Implement regenerate
-                    }}
-                    className="w-9 h-9 border border-[#2f2f2f] rounded-lg flex items-center justify-center hover:bg-[#252525] transition-colors"
-                    title="Перегенерировать"
-                  >
-                    <RefreshCw className="w-4 h-4 text-white" />
-                  </button>
-                  {/* Download button */}
-                  <button
-                    onClick={handleDownload}
-                    className="w-9 h-9 border border-[#2f2f2f] rounded-lg flex items-center justify-center hover:bg-[#252525] transition-colors"
-                    title="Скачать"
-                  >
-                    <Download className="w-4 h-4 text-white" />
-                  </button>
-                  {/* Fullscreen viewer button */}
-                  <button
-                    onClick={() => setIsFullscreenViewerOpen(true)}
-                    className="w-9 h-9 border border-[#2f2f2f] rounded-lg flex items-center justify-center hover:bg-[#252525] transition-colors"
-                    title="Полноэкранный просмотр"
-                  >
-                    <Maximize2 className="w-4 h-4 text-white" />
-                  </button>
-                  {/* Edit button */}
-                  <button
-                    onClick={handleEditGeneration}
-                    className="h-9 px-3 bg-[#252525] rounded-lg flex items-center justify-center hover:bg-[#303030] transition-colors"
-                  >
-                    <span className="font-inter font-medium text-sm text-white">
-                      Редактировать
-                    </span>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Image preview */}
-              <div 
-                className="w-full h-[480px] bg-[#101010] rounded-2xl flex items-center justify-center overflow-hidden cursor-pointer hover:bg-[#0a0a0a] transition-colors group relative"
-                onClick={() => setIsFullscreenViewerOpen(true)}
-              >
-                {modalGeneration.resultUrl && (
-                  <>
-                    <img
-                      src={modalGeneration.resultUrl}
-                      alt={`Generated by ${modalGeneration.modelName}`}
-                      className="max-w-full max-h-full object-contain"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg px-3 py-2">
-                        <p className="text-white text-xs">Нажмите для полноэкранного просмотра</p>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              {/* Prompt section */}
-              {modalGeneration.prompt && (
-                <div className="border border-[#2f2f2f] rounded-xl p-4 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium text-base text-[#656565]">
-                      Prompt
-                    </span>
-                    <button
-                      onClick={handleCopyPrompt}
-                      className="hover:opacity-70 transition-opacity"
-                      title="Копировать"
-                    >
-                      {copiedPrompt ? (
-                        <CheckIcon />
-                      ) : (
-                        <Copy className="w-4 h-4 text-[#707070]" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="font-inter text-[15px] leading-[22px] text-white">
-                    {modalGeneration.prompt}
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={handleCloseModal}
-              className="shrink-0 hover:opacity-70 transition-opacity self-start mt-3"
-            >
-              <CloseCircleIcon />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Fullscreen Image Viewer */}
-      {modalGeneration?.resultUrl && (
-        <ImageFullscreenViewer
-          imageUrl={modalGeneration.resultUrl}
-          isOpen={isFullscreenViewerOpen}
-          onClose={() => setIsFullscreenViewerOpen(false)}
-          alt={`Generated by ${modalGeneration.modelName}`}
-        />
-      )}
+      {/* Image Sheet */}
+      <BrainstormImageSheet
+        generation={modalGeneration}
+        allGenerations={generations}
+        isOpen={!!modalGeneration}
+        onClose={handleCloseModal}
+        onNavigate={handleNavigateToGeneration}
+        onScrollToGeneration={handleScrollToGeneration}
+      />
     </div>
   );
 }

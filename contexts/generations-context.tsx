@@ -125,6 +125,21 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     abortControllerRef.current = abortController;
     
     try {
+      // Сначала синхронизируем статусы с Replicate (только если есть активные)
+      if (hasActiveRef.current) {
+        try {
+          await fetchWithTimeout('/api/generations/sync-status', {
+            method: 'POST',
+            timeout: 10000,
+            retries: 0,
+            credentials: 'include',
+          });
+        } catch (syncError) {
+          // Игнорируем ошибки sync - продолжаем получать список
+          console.error('[Generations] Sync error:', syncError);
+        }
+      }
+      
       // Use skipCounts=true to avoid 4 extra COUNT queries on each poll
       // Context only needs the list for badge/unviewed count
       const response = await fetchWithTimeout('/api/generations/list?limit=20&skipCounts=true', {

@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,8 @@ export async function POST() {
       .not('replicate_prediction_id', 'is', null);
 
     const generations = (data || []) as GenerationRecord[];
+
+    logger.info(`[Sync] Found ${generations.length} processing generations for user ${user.id}`);
 
     if (generations.length === 0) {
       return NextResponse.json({ synced: 0 });
@@ -174,7 +177,7 @@ export async function POST() {
       }
     }
 
-    console.log(`Synced ${syncedCount} of ${generations.length} processing generations`);
+    logger.info(`[Sync] Completed: synced ${syncedCount} of ${generations.length} generations`);
 
     return NextResponse.json({ 
       synced: syncedCount,
