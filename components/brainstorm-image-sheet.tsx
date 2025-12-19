@@ -104,10 +104,11 @@ export function BrainstormImageSheet({
 
   // Download image
   const handleDownload = useCallback(async () => {
-    if (!generation?.resultUrl) return;
+    const url = generation?.resultUrl;
+    if (!url) return;
 
     try {
-      const response = await fetch(generation.resultUrl);
+      const response = await fetch(url);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -124,12 +125,13 @@ export function BrainstormImageSheet({
 
   // Copy image to clipboard (same method as in output-panel)
   const handleCopyImage = useCallback(async () => {
-    if (!generation?.resultUrl) return;
+    const url = generation?.resultUrl;
+    if (!url) return;
 
     try {
       // Создаём Promise для blob (асинхронно)
       const pngBlobPromise = (async () => {
-        const response = await fetch(generation.resultUrl);
+        const response = await fetch(url);
         const blob = await response.blob();
         
         // Конвертируем в PNG через canvas
