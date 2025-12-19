@@ -276,15 +276,58 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     try {
       const response = await fetch(url);
       const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = blobUrl;
+      
       const suffix = generation.output_urls && generation.output_urls.length > 1 
         ? `-${selectedImageIndex + 1}` 
         : '';
-      const extension = isVideoUrl(url) ? 'mp4' : isSvgUrl(url) ? 'svg' : 'png';
-      link.download = `generation-${generation.id}${suffix}.${extension}`;
+      
+      // Для видео и SVG - скачиваем как есть
+      if (isVideoUrl(url)) {
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `generation-${generation.id}${suffix}.mp4`;
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+      
+      if (isSvgUrl(url)) {
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `generation-${generation.id}${suffix}.svg`;
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+      
+      // Для изображений - конвертируем в реальный PNG через canvas
+      // Это решает проблему с WebP файлами от Replicate, которые не показывают превью на macOS/iOS
+      const imageBitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = imageBitmap.width;
+      canvas.height = imageBitmap.height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Canvas context not available');
+      }
+      
+      ctx.drawImage(imageBitmap, 0, 0);
+      
+      // Конвертируем в PNG blob
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error('Failed to create PNG blob'));
+        }, 'image/png');
+      });
+      
+      const blobUrl = URL.createObjectURL(pngBlob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `generation-${generation.id}${suffix}.png`;
       link.click();
       URL.revokeObjectURL(blobUrl);
     } catch (error) {

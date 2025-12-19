@@ -515,15 +515,48 @@ export default function HistoryPageClient() {
   const handleDownload = async (e: React.MouseEvent, url: string, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     try {
       const response = await fetch(url);
       const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
 
+      // Для видео - скачиваем как есть
+      if (isVideoUrl(url)) {
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `generation-${id}.mp4`;
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+
+      // Для изображений - конвертируем в реальный PNG через canvas
+      // Это решает проблему с WebP файлами от Replicate, которые не показывают превью на macOS/iOS
+      const imageBitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = imageBitmap.width;
+      canvas.height = imageBitmap.height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        throw new Error('Canvas context not available');
+      }
+
+      ctx.drawImage(imageBitmap, 0, 0);
+
+      // Конвертируем в PNG blob
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error('Failed to create PNG blob'));
+        }, 'image/png');
+      });
+
+      const blobUrl = URL.createObjectURL(pngBlob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `generation-${id}.${isVideoUrl(url) ? 'mp4' : 'png'}`;
+      link.download = `generation-${id}.png`;
       link.click();
       URL.revokeObjectURL(blobUrl);
     } catch (error) {

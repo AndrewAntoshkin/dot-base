@@ -102,7 +102,8 @@ export function BrainstormImageSheet({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, handlePrevious, handleNext]);
 
-  // Download image
+  // Download image - конвертируем в реальный PNG через canvas
+  // Это решает проблему с WebP файлами от Replicate, которые не показывают превью на macOS/iOS
   const handleDownload = useCallback(async () => {
     const url = generation?.resultUrl;
     if (!url) return;
@@ -110,7 +111,29 @@ export function BrainstormImageSheet({
     try {
       const response = await fetch(url);
       const blob = await response.blob();
-      const objectUrl = window.URL.createObjectURL(blob);
+      
+      // Конвертируем в PNG через canvas
+      const imageBitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = imageBitmap.width;
+      canvas.height = imageBitmap.height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Canvas context not available');
+      }
+      
+      ctx.drawImage(imageBitmap, 0, 0);
+      
+      // Конвертируем в PNG blob
+      const pngBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error('Failed to create PNG blob'));
+        }, 'image/png');
+      });
+      
+      const objectUrl = window.URL.createObjectURL(pngBlob);
       const a = document.createElement('a');
       a.href = objectUrl;
       a.download = `brainstorm-${generation.modelName}-${Date.now()}.png`;
