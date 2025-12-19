@@ -166,29 +166,47 @@ export async function GET(request: NextRequest) {
     let counts = { all: 0, processing: 0, favorites: 0, failed: 0 };
     
     if (!skipCounts) {
-      // Для workspace запросов или с любыми фильтрами - всегда используем fallback
-      // RPC функция работает только для простого случая "мои генерации" без фильтров
+      // Проверяем есть ли дополнительные фильтры (требуют fallback запросов)
       const hasFilters = creatorId || dateRange || modelName || actionType || statusFilter;
-      const useRpc = !workspaceId && onlyMine && !hasFilters;
       
-      if (useRpc) {
-        // Try optimized SQL function first (single query instead of 4)
-        const { data: countsData, error: rpcError } = await supabase
-          .rpc('get_generation_counts', { p_user_id: dbUser.id } as any)
-          .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
+      // Используем RPC функции если нет дополнительных фильтров
+      if (!hasFilters) {
+        if (workspaceId) {
+          // Workspace counts - используем новую RPC функцию
+          const { data: countsData, error: rpcError } = await supabase
+            .rpc('get_workspace_generation_counts', { 
+              p_workspace_id: workspaceId, 
+              p_user_id: onlyMine ? dbUser.id : null 
+            } as any)
+            .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
 
-        if (!rpcError && countsData) {
-          counts = {
-            all: Number(countsData.all_count) || 0,
-            processing: Number(countsData.processing_count) || 0,
-            favorites: Number(countsData.favorites_count) || 0,
-            failed: Number(countsData.failed_count) || 0,
-          };
+          if (!rpcError && countsData) {
+            counts = {
+              all: Number(countsData.all_count) || 0,
+              processing: Number(countsData.processing_count) || 0,
+              favorites: Number(countsData.favorites_count) || 0,
+              failed: Number(countsData.failed_count) || 0,
+            };
+          }
+        } else {
+          // User counts - используем существующую RPC функцию
+          const { data: countsData, error: rpcError } = await supabase
+            .rpc('get_generation_counts', { p_user_id: dbUser.id } as any)
+            .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
+
+          if (!rpcError && countsData) {
+            counts = {
+              all: Number(countsData.all_count) || 0,
+              processing: Number(countsData.processing_count) || 0,
+              favorites: Number(countsData.favorites_count) || 0,
+              failed: Number(countsData.failed_count) || 0,
+            };
+          }
         }
       }
       
-      // Fallback: parallel count queries with filters
-      if (!useRpc || counts.all === 0) {
+      // Fallback: parallel count queries with filters (только если есть фильтры или RPC не сработал)
+      if (hasFilters || counts.all === 0) {
         // Build base filter function with all active filters
         const buildCountQuery = () => {
           let q = supabase

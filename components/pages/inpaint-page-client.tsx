@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { MaskEditor } from '@/components/mask-editor';
@@ -14,8 +14,8 @@ import {
   X, 
   Wand2,
   AlignRight,
-  Clipboard,
 } from 'lucide-react';
+import { ImageUploadArea } from '@/components/ui/image-upload-area';
 
 interface GenerationResult {
   id: string;
@@ -30,8 +30,6 @@ export default function InpaintPageClient() {
   
   const { addGeneration, refreshGenerations } = useGenerations();
   const { selectedWorkspaceId } = useUser();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
   // State
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [maskDataUrl, setMaskDataUrl] = useState<string | null>(null);
@@ -69,14 +67,7 @@ export default function InpaintPageClient() {
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
   const [generationHistory, setGenerationHistory] = useState<GenerationResult[]>([]);
 
-  // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processFile(file);
-    }
-  };
-
+  // Process uploaded file
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Пожалуйста, загрузите изображение');
@@ -92,74 +83,6 @@ export default function InpaintPageClient() {
     reader.readAsDataURL(file);
   };
 
-  // Drag & drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processFile(file);
-    }
-  };
-
-  // Handle paste from clipboard
-  const handlePaste = useCallback(async (e?: ClipboardEvent) => {
-    const clipboardItems = e?.clipboardData?.items || (await navigator.clipboard.read?.() as any);
-    
-    if (e?.clipboardData?.items) {
-      for (const item of Array.from(e.clipboardData.items)) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
-            processFile(file);
-            return;
-          }
-        }
-      }
-    } else {
-      // Fallback for button click - use Clipboard API
-      try {
-        const items = await navigator.clipboard.read();
-        for (const item of items) {
-          const imageType = item.types.find(type => type.startsWith('image/'));
-          if (imageType) {
-            const blob = await item.getType(imageType);
-            const file = new File([blob], 'pasted-image.png', { type: imageType });
-            processFile(file);
-            return;
-          }
-        }
-      } catch (err) {
-        console.log('Clipboard read failed:', err);
-      }
-    }
-  }, []);
-
-  // Paste button handler
-  const handlePasteButtonClick = async () => {
-    await handlePaste();
-  };
-
-  // Listen for paste events when no image is uploaded
-  useEffect(() => {
-    if (uploadedImage) return;
-    
-    const onPaste = (e: ClipboardEvent) => handlePaste(e);
-    document.addEventListener('paste', onPaste);
-    return () => document.removeEventListener('paste', onPaste);
-  }, [uploadedImage, handlePaste]);
-
   // Handle mask change from editor
   const handleMaskChange = useCallback((dataUrl: string) => {
     setMaskDataUrl(dataUrl);
@@ -169,9 +92,6 @@ export default function InpaintPageClient() {
   const handleClearImage = () => {
     setUploadedImage(null);
     setMaskDataUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   // Upload data URL to server (or return HTTP URL as-is)
@@ -390,37 +310,11 @@ export default function InpaintPageClient() {
                 </label>
                 
                 {!uploadedImage ? (
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`min-h-[180px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors ${
-                      isDragging 
-                        ? 'border-white bg-white/10' 
-                        : 'border-[#3f3f3f] bg-[#0f0f0f]'
-                    }`}
-                  >
-                    <Upload className="w-8 h-8 text-[#666] mb-3" />
-                    <p className="font-inter text-base font-medium text-white mb-1">Перетащите сюда</p>
-                    <p className="font-inter text-xs text-[#959595] mb-4">или нажмите на кнопку</p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors"
-                      >
-                        Выбрать
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handlePasteButtonClick}
-                        className="px-4 py-2 rounded-xl border border-[#656565] hover:border-white text-white font-inter font-medium text-sm transition-colors flex items-center gap-1.5"
-                      >
-                        <Clipboard className="w-3.5 h-3.5" />
-                        Вставить
-                      </button>
-                    </div>
-                  </div>
+                  <ImageUploadArea
+                    onFileSelect={processFile}
+                    isDragging={isDragging}
+                    onDragStateChange={setIsDragging}
+                  />
                 ) : (
                   <div className="flex items-center gap-3">
                     <div className="w-20 h-20 rounded-lg overflow-hidden border border-[#2f2f2f] flex-shrink-0">
@@ -438,13 +332,6 @@ export default function InpaintPageClient() {
                     </button>
                   </div>
                 )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
               </div>
 
               {/* Prompt card - SECOND */}
@@ -628,37 +515,11 @@ export default function InpaintPageClient() {
                 <Upload className="w-3 h-3" />
                 Изображение
               </label>
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`min-h-[200px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors ${
-                  isDragging 
-                    ? 'border-white bg-white/10' 
-                    : 'border-[#3f3f3f] bg-[#0f0f0f]'
-                }`}
-              >
-                <Upload className="w-10 h-10 text-[#666] mb-4" />
-                <p className="font-inter text-lg font-medium text-white mb-1">Перетащите сюда</p>
-                <p className="font-inter text-sm text-[#959595] mb-5">или нажмите на кнопку</p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-5 py-2.5 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors"
-                  >
-                    Выбрать
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePasteButtonClick}
-                    className="px-5 py-2.5 rounded-xl border border-[#656565] hover:border-white text-white font-inter font-medium text-sm transition-colors flex items-center gap-1.5"
-                  >
-                    <Clipboard className="w-4 h-4" />
-                    Вставить
-                  </button>
-                </div>
-              </div>
+              <ImageUploadArea
+                onFileSelect={processFile}
+                isDragging={isDragging}
+                onDragStateChange={setIsDragging}
+              />
             </div>
           ) : (
             <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
@@ -690,8 +551,6 @@ export default function InpaintPageClient() {
               />
             </div>
           )}
-
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
         </div>
 
         {/* Mobile bottom bar */}

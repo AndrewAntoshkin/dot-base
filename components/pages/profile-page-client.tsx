@@ -351,7 +351,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
   const searchParams = useSearchParams();
   const supabaseRef = useRef(createClient());
   
-  const { email, setEmail, workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useUser();
+  const { email, setEmail, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, setAvatarUrl } = useUser();
   
   // Profile state
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -395,8 +395,11 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     fetchProfile();
   }, []);
 
-  // Fetch generations
+  // Fetch generations - ОПТИМИЗИРОВАНО: ждём пока workspace загрузится
   const fetchGenerations = useCallback(async (silent = false) => {
+    // Не загружаем пока workspace не готов (избегаем двойного запроса)
+    if (!selectedWorkspaceId) return;
+    
     if (!silent) setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -404,9 +407,9 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
         limit: '20',
         tab: activeTab,
         onlyMine: 'true',
+        workspaceId: selectedWorkspaceId,
       });
       
-      if (selectedWorkspaceId) params.set('workspaceId', selectedWorkspaceId);
       if (filterDate) params.set('dateRange', filterDate);
       if (filterModel) params.set('modelName', filterModel);
       if (filterType) params.set('actionType', filterType);
@@ -426,7 +429,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     }
   }, [page, activeTab, selectedWorkspaceId, filterDate, filterModel, filterType, filterStatus]);
 
-  // Fetch filter options
+  // Fetch filter options - ОПТИМИЗИРОВАНО: только когда есть workspace
   const fetchFilterOptions = useCallback(async () => {
     if (!selectedWorkspaceId) return;
     try {
@@ -445,8 +448,20 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     }
   }, [selectedWorkspaceId]);
 
-  useEffect(() => { fetchFilterOptions(); }, [fetchFilterOptions]);
-  useEffect(() => { fetchGenerations(); }, [fetchGenerations]);
+  // ОПТИМИЗАЦИЯ: Загружаем данные только когда workspace готов
+  useEffect(() => { 
+    if (selectedWorkspaceId) {
+      fetchFilterOptions(); 
+    }
+  }, [selectedWorkspaceId, fetchFilterOptions]);
+  
+  useEffect(() => { 
+    if (selectedWorkspaceId) {
+      fetchGenerations(); 
+    }
+  }, [selectedWorkspaceId, fetchGenerations]);
+  
+  // Сброс страницы при смене фильтров (но не при смене workspace - там новый запрос)
   useEffect(() => { setPage(1); }, [activeTab, filterDate, filterModel, filterType, filterStatus]);
   
   useEffect(() => {
@@ -478,6 +493,10 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     if (response.ok) {
       const result = await response.json();
       setProfile(result.profile);
+      // Обновляем контекст чтобы аватар в хедере тоже обновился
+      if (data.avatar_url !== undefined) {
+        setAvatarUrl(data.avatar_url || null);
+      }
     }
   };
 
@@ -600,116 +619,153 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
       <Header />
 
       <main className="flex-1">
-        {/* Profile Header Section */}
-        <div className="relative">
-          {/* Cover Image */}
-          <div className="relative h-[320px] mx-4 lg:mx-20 mt-4 rounded-3xl overflow-hidden bg-[#1a1a1a] group">
-            {profile?.cover_url ? (
-              <img 
-                src={profile.cover_url} 
-                alt="Cover" 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#2a2a2a] to-[#1a1a1a]" />
-            )}
-            
-            {/* Hover Overlay */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors duration-200" />
-            
-            {/* Edit Cover Button */}
-            <label className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file, 'cover');
-                }}
-                disabled={isUploadingCover}
-              />
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#1f1f1f] rounded-xl text-white font-inter font-medium text-xs hover:bg-[#2a2a2a] transition-colors">
-                {isUploadingCover ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Pencil className="w-4 h-4" />
-                )}
-                <span>Редактировать</span>
-              </div>
-            </label>
-          </div>
-
-          {/* Avatar */}
-          <div className="absolute left-4 lg:left-[136px] bottom-0 translate-y-1/2">
+        {/* Profile Header Section - with skeleton */}
+        {isProfileLoading ? (
+          // Profile Skeleton
+          <>
             <div className="relative">
-              <div 
-                className="w-[160px] h-[160px] rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
-                style={{ border: '8px solid #101010' }}
-              >
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-5xl font-semibold">{initials}</span>
-                )}
+              {/* Cover Skeleton */}
+              <div className="relative h-[320px] mx-4 lg:mx-20 mt-4 rounded-3xl overflow-hidden">
+                <div className="w-full h-full bg-[#1a1a1a] animate-pulse" />
               </div>
               
-              {/* Edit Avatar Button */}
-              <label className="absolute bottom-2 right-2 cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(file, 'avatar');
-                  }}
-                  disabled={isUploadingAvatar}
+              {/* Avatar Skeleton */}
+              <div className="absolute left-4 lg:left-[136px] bottom-0 translate-y-1/2">
+                <div 
+                  className="w-[160px] h-[160px] rounded-full bg-[#252525] animate-pulse"
+                  style={{ border: '8px solid #101010' }}
                 />
-                <div className="w-10 h-10 rounded-full bg-[#1f1f1f] flex items-center justify-center hover:bg-[#2a2a2a] transition-colors border-2 border-[#101010]">
-                  {isUploadingAvatar ? (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4 text-white" />
-                  )}
-                </div>
-              </label>
+              </div>
             </div>
-          </div>
-        </div>
+            
+            {/* User Info Skeleton */}
+            <div className="px-4 lg:px-20 mt-[100px]">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="h-9 w-48 bg-[#252525] rounded-lg animate-pulse" />
+                  <div className="h-5 w-64 bg-[#1a1a1a] rounded animate-pulse" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-28 bg-[#1f1f1f] rounded-xl animate-pulse" />
+                  <div className="h-8 w-16 bg-[#1f1f1f] rounded-xl animate-pulse" />
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          // Loaded Profile
+          <>
+            <div className="relative">
+              {/* Cover Image */}
+              <div className="relative h-[320px] mx-4 lg:mx-20 mt-4 rounded-3xl overflow-hidden bg-[#1a1a1a] group">
+                {profile?.cover_url ? (
+                  <img 
+                    src={profile.cover_url} 
+                    alt="Cover" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-[#2a2a2a] to-[#1a1a1a]" />
+                )}
+                
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors duration-200" />
+                
+                {/* Edit Cover Button */}
+                <label className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, 'cover');
+                    }}
+                    disabled={isUploadingCover}
+                  />
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[#1f1f1f] rounded-xl text-white font-inter font-medium text-xs hover:bg-[#2a2a2a] transition-colors">
+                    {isUploadingCover ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Pencil className="w-4 h-4" />
+                    )}
+                    <span>Редактировать</span>
+                  </div>
+                </label>
+              </div>
 
-        {/* User Info Section */}
-        <div className="px-4 lg:px-20 mt-[100px]">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            {/* Name and Email */}
-            <div className="flex flex-col gap-1">
-              <h1 className="font-inter font-semibold text-[28px] leading-[36px] tracking-[-0.02em] text-white">
-                {displayName}
-              </h1>
-              <div className="flex items-center gap-3 text-[#8c8c8c] font-inter text-sm">
-                <span>{displayEmail}</span>
-                <span>•</span>
-                <span>Корпоративный аккаунт</span>
+              {/* Avatar */}
+              <div className="absolute left-4 lg:left-[136px] bottom-0 translate-y-1/2">
+                <div className="relative">
+                  <div 
+                    className="w-[160px] h-[160px] rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                    style={{ border: '8px solid #101010' }}
+                  >
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-5xl font-semibold">{initials}</span>
+                    )}
+                  </div>
+                  
+                  {/* Edit Avatar Button */}
+                  <label className="absolute bottom-2 right-2 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'avatar');
+                      }}
+                      disabled={isUploadingAvatar}
+                    />
+                    <div className="w-10 h-10 rounded-full bg-[#1f1f1f] flex items-center justify-center hover:bg-[#2a2a2a] transition-colors border-2 border-[#101010]">
+                      {isUploadingAvatar ? (
+                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                      ) : (
+                        <Camera className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsEditModalOpen(true)}
-                className="px-3 py-2 h-8 bg-[#1f1f1f] rounded-xl flex items-center justify-center font-inter font-medium text-xs text-white hover:bg-[#2a2a2a] transition-colors"
-              >
-                Редактировать
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-3 py-2 h-8 bg-[#1f1f1f] rounded-xl flex items-center justify-center font-inter font-medium text-xs text-white hover:bg-[#2a2a2a] transition-colors"
-              >
-                Выйти
-              </button>
+            {/* User Info Section */}
+            <div className="px-4 lg:px-20 mt-[100px]">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                {/* Name and Email */}
+                <div className="flex flex-col gap-1">
+                  <h1 className="font-inter font-semibold text-[28px] leading-[36px] tracking-[-0.02em] text-white">
+                    {displayName}
+                  </h1>
+                  <div className="flex items-center gap-3 text-[#8c8c8c] font-inter text-sm">
+                    <span>{displayEmail}</span>
+                    <span>•</span>
+                    <span>Корпоративный аккаунт</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="px-3 py-2 h-8 bg-[#1f1f1f] rounded-xl flex items-center justify-center font-inter font-medium text-xs text-white hover:bg-[#2a2a2a] transition-colors"
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-2 h-8 bg-[#1f1f1f] rounded-xl flex items-center justify-center font-inter font-medium text-xs text-white hover:bg-[#2a2a2a] transition-colors"
+                  >
+                    Выйти
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* History Section */}
         <div className="px-4 lg:px-20 py-6">

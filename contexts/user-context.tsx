@@ -14,8 +14,12 @@ export interface UserWorkspace {
 interface UserContextValue {
   email: string | null;
   role: UserRole;
+  avatarUrl: string | null;
+  displayName: string | null;
   setEmail: (email: string | null) => void;
   setRole: (role: UserRole) => void;
+  setAvatarUrl: (url: string | null) => void;
+  setDisplayName: (name: string | null) => void;
   isAdmin: boolean;
   isSuperAdmin: boolean;
   // Workspaces
@@ -24,6 +28,8 @@ interface UserContextValue {
   setSelectedWorkspaceId: (id: string | null) => void;
   loadWorkspaces: () => Promise<void>;
   isLoadingWorkspaces: boolean;
+  // Profile
+  loadProfile: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -37,12 +43,15 @@ interface UserProviderProps {
 export function UserProvider({ initialEmail, initialRole = 'user', children }: UserProviderProps) {
   const [email, setEmail] = useState<string | null>(initialEmail);
   const [role, setRole] = useState<UserRole>(initialRole);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<UserWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceIdState] = useState<string | null>(null);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   
   // Предотвращаем повторную загрузку
   const hasLoadedWorkspaces = useRef(false);
+  const hasLoadedProfile = useRef(false);
 
   // Load workspaces - оптимизировано для отложенной загрузки
   const loadWorkspaces = useCallback(async () => {
@@ -91,27 +100,54 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     }
   }, []);
 
-  // ОПТИМИЗАЦИЯ: Отложенная загрузка workspaces
+  // Load user profile (avatar, display name)
+  const loadProfile = useCallback(async () => {
+    if (hasLoadedProfile.current) return;
+    
+    try {
+      const res = await fetch('/api/users/profile');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.profile) {
+          setAvatarUrl(data.profile.avatar_url || null);
+          setDisplayName(data.profile.display_name || null);
+          hasLoadedProfile.current = true;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    }
+  }, []);
+
+  // ОПТИМИЗАЦИЯ: Отложенная загрузка workspaces и профиля
   // Загружаем через 100ms после монтирования, чтобы не блокировать начальный рендер
   useEffect(() => {
     if (email && !hasLoadedWorkspaces.current) {
       const timer = setTimeout(() => {
         loadWorkspaces();
+        loadProfile(); // Загружаем профиль параллельно с workspaces
       }, 100); // Небольшая задержка для приоритета основного контента
       
       return () => clearTimeout(timer);
     } else if (!email) {
       setWorkspaces([]);
       setSelectedWorkspaceIdState(null);
+      setAvatarUrl(null);
+      setDisplayName(null);
       hasLoadedWorkspaces.current = false;
+      hasLoadedProfile.current = false;
     }
-  }, [email, loadWorkspaces]);
+  }, [email, loadWorkspaces, loadProfile]);
 
   const value = useMemo<UserContextValue>(() => ({
     email,
     role,
+    avatarUrl,
+    displayName,
     setEmail,
     setRole,
+    setAvatarUrl,
+    setDisplayName,
     isAdmin: role === 'admin' || role === 'super_admin',
     isSuperAdmin: role === 'super_admin',
     workspaces,
@@ -119,7 +155,8 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     setSelectedWorkspaceId,
     loadWorkspaces,
     isLoadingWorkspaces,
-  }), [email, role, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, loadWorkspaces, isLoadingWorkspaces]);
+    loadProfile,
+  }), [email, role, avatarUrl, displayName, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, loadWorkspaces, isLoadingWorkspaces, loadProfile]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

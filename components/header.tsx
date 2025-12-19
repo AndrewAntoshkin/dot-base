@@ -75,7 +75,7 @@ export function Header() {
   const [isWorkspaceSwitcherOpen, setIsWorkspaceSwitcherOpen] = useState(false);
   const { unviewedCount, hasActiveGenerations, isOffline, networkError } = useGenerations();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { email: userEmail, isAdmin, workspaces, selectedWorkspaceId, setSelectedWorkspaceId } = useUser();
+  const { email: userEmail, isAdmin, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, avatarUrl } = useUser();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -253,11 +253,19 @@ export function Header() {
               className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
               style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
             >
-              <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <span className="text-white text-sm font-medium">
-                  {userEmail ? userEmail[0].toUpperCase() : 'U'}
-                </span>
-              </div>
+              {avatarUrl ? (
+                <img 
+                  src={avatarUrl} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">
+                    {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                  </span>
+                </div>
+              )}
             </Link>
           </div>
         </div>

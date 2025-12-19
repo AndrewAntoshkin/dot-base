@@ -28,6 +28,8 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
   const [imageAspectRatio, setImageAspectRatio] = useState<'landscape' | 'portrait' | 'square'>('square');
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Load image and set up canvas
@@ -299,14 +301,35 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
   }, [getCanvasCoords, draw]);
 
   const handleMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const coords = getCanvasCoords(e);
+    if (coords) {
+      // Always update cursor position for visual indicator
+      const maskCanvas = maskCanvasRef.current;
+      if (maskCanvas) {
+        const rect = maskCanvas.getBoundingClientRect();
+        // Convert canvas coords back to screen coords relative to canvas element
+        const screenX = (coords.x / maskCanvas.width) * rect.width;
+        const screenY = (coords.y / maskCanvas.height) * rect.height;
+        setCursorPos({ x: screenX, y: screenY });
+      }
+    }
+    
     if (!isDrawing) return;
     e.preventDefault();
 
-    const coords = getCanvasCoords(e);
     if (!coords) return;
 
     draw(coords.x, coords.y);
   }, [isDrawing, getCanvasCoords, draw]);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovering(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovering(false);
+    setCursorPos(null);
+  }, []);
 
   const handleEnd = useCallback(() => {
     if (isDrawing) {
@@ -457,7 +480,7 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
           {/* Mask overlay */}
           <canvas
             ref={maskCanvasRef}
-            className="absolute inset-0 cursor-crosshair touch-none"
+            className="absolute inset-0 cursor-none touch-none"
             style={{
               width: imageDimensions.width,
               height: imageDimensions.height,
@@ -465,11 +488,27 @@ export function MaskEditor({ imageUrl, onMaskChange, width = 660, height = 660 }
             onMouseDown={handleStart}
             onMouseMove={handleMove}
             onMouseUp={handleEnd}
-            onMouseLeave={handleEnd}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={(e) => { handleEnd(); handleMouseLeave(); }}
             onTouchStart={handleStart}
             onTouchMove={handleMove}
             onTouchEnd={handleEnd}
           />
+          
+          {/* Brush cursor indicator */}
+          {isHovering && cursorPos && (
+            <div
+              className="absolute pointer-events-none rounded-full border-2 border-yellow-400"
+              style={{
+                width: brushSize / zoom,
+                height: brushSize / zoom,
+                left: cursorPos.x,
+                top: cursorPos.y,
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: tool === 'brush' ? 'rgba(250, 204, 21, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+              }}
+            />
+          )}
         </div>
       </div>
 

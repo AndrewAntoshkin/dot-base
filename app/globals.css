@@ -284,6 +284,16 @@
     animation-delay: 0.3s;
     opacity: 0;
   }
+
+  .animate-delay-400 {
+    animation-delay: 0.4s;
+    opacity: 0;
+  }
+
+  .animate-delay-500 {
+    animation-delay: 0.5s;
+    opacity: 0;
+  }
 }
 
 /* Mobile: faster animations, not disabled (Radix UI needs them) */
@@ -297,7 +307,9 @@
   
   .animate-delay-100,
   .animate-delay-200,
-  .animate-delay-300 {
+  .animate-delay-300,
+  .animate-delay-400,
+  .animate-delay-500 {
     animation-delay: 0s;
     opacity: 1;
   }

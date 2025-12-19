@@ -11,13 +11,13 @@ import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import { 
   ImageIcon, 
-  RefreshCw, 
-  Download,
   Wand2,
   Ban,
   X,
-  Clipboard
+  ImagePlus,
 } from 'lucide-react';
+import { ImageUploadArea } from '@/components/ui/image-upload-area';
+import { OutputPanel } from '@/components/output-panel';
 
 // Форматы для расширения
 const ASPECT_RATIO_OPTIONS = [
@@ -42,7 +42,7 @@ export function ExpandPageClient() {
   const router = useRouter();
   const imageUrlParam = searchParams.get('imageUrl');
   
-  const { addGeneration, generations, refreshGenerations } = useGenerations();
+  const { addGeneration } = useGenerations();
   const { selectedWorkspaceId } = useUser();
   
   // Состояние
@@ -50,12 +50,11 @@ export function ExpandPageClient() {
   const [image, setImage] = useState<string | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedRatio, setSelectedRatio] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
-  const [outputImage, setOutputImage] = useState<string | null>(null);
   const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false); // Когда кнопка нажата и запрос отправляется
 
   // Handle imageUrl param from Quick Actions
   useEffect(() => {
@@ -67,7 +66,7 @@ export function ExpandPageClient() {
       console.log('[Expand] Quick Action image loaded:', img.naturalWidth, 'x', img.naturalHeight);
       setImage(imageUrlParam);
       setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-      setOutputImage(null);
+      setCurrentGenerationId(null); // Clear any previous generation
     };
     img.onerror = () => {
       console.error('[Expand] Failed to load image from URL:', imageUrlParam);
@@ -94,69 +93,6 @@ export function ExpandPageClient() {
   const initialExpandRef = useRef({ top: 0, right: 0, bottom: 0, left: 0 });
   const expandRef = useRef({ top: 0, right: 0, bottom: 0, left: 0 });
 
-  // Отслеживание текущей генерации
-  useEffect(() => {
-    console.log('[Expand] useEffect triggered, currentGenerationId:', currentGenerationId);
-    
-    if (!currentGenerationId) {
-      console.log('[Expand] No currentGenerationId, skipping polling');
-      return;
-    }
-
-    let isMounted = true;
-    console.log('[Expand] Starting polling for:', currentGenerationId);
-
-    const checkGeneration = async () => {
-      if (!isMounted) {
-        console.log('[Expand] Component unmounted, skipping check');
-        return;
-      }
-      
-      console.log('[Expand] Checking generation:', currentGenerationId);
-      
-      try {
-        const response = await fetch(`/api/generations/${currentGenerationId}`);
-        if (response.ok && isMounted) {
-          const generation = await response.json();
-          
-          // API возвращает output_urls (массив) или output_url
-          const outputUrl = generation.output_url || (generation.output_urls && generation.output_urls[0]);
-          console.log('[Expand] Generation status:', generation.status, 'outputUrl:', outputUrl ? 'yes' : 'no');
-          
-          // Проверяем оба варианта статуса (succeeded или completed)
-          if ((generation.status === 'succeeded' || generation.status === 'completed') && outputUrl) {
-            console.log('[Expand] ✅ Generation completed! Setting output image:', outputUrl);
-            setOutputImage(outputUrl);
-            setIsGenerating(false);
-            setCurrentGenerationId(null);
-            refreshGenerations(); // Обновить контекст
-          } else if (generation.status === 'failed' || generation.status === 'cancelled') {
-            console.log('[Expand] ❌ Generation failed or cancelled');
-            setIsGenerating(false);
-            setCurrentGenerationId(null);
-            console.error('Generation failed:', generation.error);
-          } else {
-            console.log('[Expand] ⏳ Still processing...');
-          }
-        } else {
-          console.log('[Expand] Response not ok or unmounted');
-        }
-      } catch (error) {
-        console.error('[Expand] Failed to check generation status:', error);
-      }
-    };
-
-    // Polling каждые 3 секунды (оптимизировано для Disk IO)
-    const interval = setInterval(checkGeneration, 3000);
-    checkGeneration(); // Сразу проверяем
-
-    return () => {
-      console.log('[Expand] Cleanup polling for:', currentGenerationId);
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [currentGenerationId, refreshGenerations]);
-
   // Синхронизируем ref с state
   useEffect(() => {
     expandRef.current = expand;
@@ -170,7 +106,7 @@ export function ExpandPageClient() {
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
       setImage(dataUrl);
-      setOutputImage(null);
+      setCurrentGenerationId(null); // Clear previous generation
       
       // Получаем размеры изображения - expand будет рассчитан в useEffect
       const img = new Image();
@@ -193,51 +129,6 @@ export function ExpandPageClient() {
       handleImageUpload(file);
     }
   }, [handleImageUpload]);
-
-  // Handle paste from clipboard
-  const handlePaste = useCallback(async (e?: ClipboardEvent) => {
-    if (e?.clipboardData?.items) {
-      for (const item of Array.from(e.clipboardData.items)) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
-            handleImageUpload(file);
-            return;
-          }
-        }
-      }
-    } else {
-      // Fallback for button click - use Clipboard API
-      try {
-        const items = await navigator.clipboard.read();
-        for (const item of items) {
-          const imageType = item.types.find(type => type.startsWith('image/'));
-          if (imageType) {
-            const blob = await item.getType(imageType);
-            const file = new File([blob], 'pasted-image.png', { type: imageType });
-            handleImageUpload(file);
-            return;
-          }
-        }
-      } catch (err) {
-        console.log('Clipboard read failed:', err);
-      }
-    }
-  }, [handleImageUpload]);
-
-  // Paste button handler
-  const handlePasteButtonClick = async () => {
-    await handlePaste();
-  };
-
-  // Listen for paste events when no image is uploaded
-  useEffect(() => {
-    if (image) return;
-    
-    const onPaste = (e: ClipboardEvent) => handlePaste(e);
-    document.addEventListener('paste', onPaste);
-    return () => document.removeEventListener('paste', onPaste);
-  }, [image, handlePaste]);
 
   // Выбор пресета формата
   const handleRatioSelect = useCallback((ratio: string) => {
@@ -370,7 +261,7 @@ export function ExpandPageClient() {
   const handleRemoveImage = useCallback(() => {
     setImage(null);
     setImageDimensions(null);
-    setOutputImage(null);
+    setCurrentGenerationId(null);
     setExpand({ top: 0, right: 0, bottom: 0, left: 0 });
     setSelectedRatio(null); // Не автоматически применять пресет
   }, []);
@@ -384,9 +275,16 @@ export function ExpandPageClient() {
 
   // Генерация
   const handleGenerate = async () => {
-    if (!image || !imageDimensions) return;
+    console.log('[Expand] handleGenerate called');
+    console.log('[Expand] image:', image ? 'exists' : 'null');
+    console.log('[Expand] imageDimensions:', imageDimensions);
     
-    setIsGenerating(true);
+    if (!image || !imageDimensions) {
+      console.log('[Expand] Missing image or dimensions, aborting');
+      return;
+    }
+    
+    setIsCreating(true);
     
     try {
       // Используем expand state напрямую (то что видит пользователь)
@@ -404,6 +302,7 @@ export function ExpandPageClient() {
       
       if (selectedModel === 'outpainter') {
         // Outpainter использует пиксели напрямую
+        // Параметры называются left, right, top, bottom (не extend_*)
         const extendLeft = Math.round(imageDimensions.width * (currentExpand.left / 100));
         const extendRight = Math.round(imageDimensions.width * (currentExpand.right / 100));
         const extendTop = Math.round(imageDimensions.height * (currentExpand.top / 100));
@@ -413,10 +312,10 @@ export function ExpandPageClient() {
         const clamp = (v: number) => Math.min(v, 2000);
         
         console.log('[Expand] Outpainter params:', {
-          extend_left: clamp(extendLeft),
-          extend_right: clamp(extendRight),
-          extend_top: clamp(extendTop),
-          extend_bottom: clamp(extendBottom),
+          left: clamp(extendLeft),
+          right: clamp(extendRight),
+          top: clamp(extendTop),
+          bottom: clamp(extendBottom),
           steps,
           guidance,
           prompt: finalPrompt
@@ -430,10 +329,10 @@ export function ExpandPageClient() {
           settings: {
             image: image,
             prompt: finalPrompt,
-            extend_left: clamp(extendLeft),
-            extend_right: clamp(extendRight),
-            extend_top: clamp(extendTop),
-            extend_bottom: clamp(extendBottom),
+            left: clamp(extendLeft),
+            right: clamp(extendRight),
+            top: clamp(extendTop),
+            bottom: clamp(extendBottom),
             steps,
             guidance,
           },
@@ -530,53 +429,58 @@ export function ExpandPageClient() {
       // Добавляем workspace_id
       requestBody.workspace_id = selectedWorkspaceId;
       
-      console.log('[Expand] Sending request:', requestBody);
+      console.log('[Expand] Sending request:', JSON.stringify(requestBody).substring(0, 500) + '...');
       
-      const response = await fetch('/api/generations/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
+      // Добавляем таймаут 60 секунд
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
       
-      if (!response.ok) {
-        throw new Error('Failed to create generation');
+      try {
+        const response = await fetch('/api/generations/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log('[Expand] Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Expand] API error:', errorText);
+          throw new Error(`API error: ${response.status} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('[Expand] Generation created:', result.id, 'status:', result.status);
+        addGeneration(result);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Запрос превысил время ожидания (60 сек)');
+        }
+        throw fetchError;
       }
       
-      const result = await response.json();
-      console.log('[Expand] Generation created:', result.id, 'status:', result.status);
-      addGeneration(result);
-      
-      // Сохраняем ID для отслеживания
+      // Сохраняем ID - OutputPanel будет отслеживать прогресс
       setCurrentGenerationId(result.id);
+      setIsCreating(false);
       console.log('[Expand] Set currentGenerationId:', result.id);
       
-      // Если результат уже есть (sync generation) - показываем сразу
-      if (result.output_url) {
-        console.log('[Expand] Result already available:', result.output_url);
-        setOutputImage(result.output_url);
-        setIsGenerating(false);
-        setCurrentGenerationId(null);
-      }
-      // Иначе продолжаем показывать shimmer и polling будет отслеживать
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Expand] Generation error:', error);
-      setIsGenerating(false);
+      alert(`Ошибка генерации: ${error.message || 'Неизвестная ошибка'}`);
       setCurrentGenerationId(null);
+      setIsCreating(false);
     }
-    // НЕ ставим setIsGenerating(false) в finally - это делает polling
   };
 
-  // Скачивание результата
-  const handleDownload = useCallback(() => {
-    const downloadUrl = outputImage || image;
-    if (!downloadUrl) return;
-    
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = `expand-${Date.now()}.png`;
-    link.click();
-  }, [outputImage, image]);
+  // Начать новую генерацию (сброс результата)
+  const handleNewGeneration = useCallback(() => {
+    setCurrentGenerationId(null);
+  }, []);
   // Вычисляем визуальные позиции для канваса
   const hasExpand = expand.top > 0 || expand.right > 0 || expand.bottom > 0 || expand.left > 0;
   
@@ -599,8 +503,9 @@ export function ExpandPageClient() {
     }
   }
   
-  // Общий размер (картинка + expand) должен помещаться в 90% канваса
-  const maxTotalSize = 90;
+  // Общий размер (картинка + expand) должен помещаться в 86% канваса
+  // (оставляем 7% с каждой стороны для ручек)
+  const maxTotalSize = 86;
   
   // Рассчитываем расширение в процентах от размера изображения
   const expandTopPx = (expand.top / 100) * imageHeightPercent;
@@ -624,10 +529,14 @@ export function ExpandPageClient() {
   const scaledExpandRight = expandRightPx * scale;
   
   // Позиции handles (на границе расширенной области)
-  const handleTop = 50 - scaledImageHeight/2 - scaledExpandTop;
-  const handleBottom = 50 + scaledImageHeight/2 + scaledExpandBottom;
-  const handleLeft = 50 - scaledImageWidth/2 - scaledExpandLeft;
-  const handleRight = 50 + scaledImageWidth/2 + scaledExpandRight;
+  // Минимальный отступ от края канваса (в процентах) чтобы ручки были видны
+  const handleMargin = 5;
+  
+  // Рассчитываем позиции и ограничиваем их границами канваса
+  const handleTop = Math.max(handleMargin, 50 - scaledImageHeight/2 - scaledExpandTop);
+  const handleBottom = Math.min(100 - handleMargin, 50 + scaledImageHeight/2 + scaledExpandBottom);
+  const handleLeft = Math.max(handleMargin, 50 - scaledImageWidth/2 - scaledExpandLeft);
+  const handleRight = Math.min(100 - handleMargin, 50 + scaledImageWidth/2 + scaledExpandRight);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#101010]">
@@ -639,7 +548,7 @@ export function ExpandPageClient() {
         <div className="w-[480px] flex flex-col pl-20 pr-0 relative">
           <div className="flex-1 flex flex-col py-8">
             {/* Header */}
-            <div className="mb-6 shrink-0">
+            <div className="mb-6 shrink-0 animate-fade-in-up">
               <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
                 INPUT
               </h2>
@@ -648,54 +557,25 @@ export function ExpandPageClient() {
             {/* Form fields */}
             <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2">
               {/* Модель */}
-              <ModelSelector
-                action="expand"
-                value={selectedModel}
-                onChange={setSelectedModel}
-              />
+              <div className="animate-fade-in-up animate-delay-100">
+                <ModelSelector
+                  action="expand"
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                />
+              </div>
               
               {/* Изображение */}
-              <div className="border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
+              <div className="animate-fade-in-up animate-delay-200 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Изображение" icon={ImageIcon} />
-                <div
-                  className="bg-[#101010] border border-dashed border-[#656565] rounded-lg p-4 flex flex-col items-center justify-center transition-colors hover:border-white/30"
-                >
-                  <ImageIcon className="w-6 h-6 text-[#959595] mb-2" />
-                  <p className="font-inter text-[13px] text-[#b7b7b7] text-center mb-3">
-                    PNG, JPG, WEBP
-                  </p>
-                  <div className="flex gap-2 w-full">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 px-3 py-2 rounded-lg bg-white font-inter font-medium text-xs text-black hover:bg-gray-200 transition-colors"
-                    >
-                      Выбрать
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handlePasteButtonClick}
-                      className="flex-1 px-3 py-2 rounded-lg border border-[#656565] hover:border-white text-white font-inter font-medium text-xs transition-colors flex items-center justify-center gap-1"
-                    >
-                      <Clipboard className="w-3 h-3" />
-                      Вставить
-                    </button>
-                  </div>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(file);
-                  }}
+                <ImageUploadArea 
+                  onFileSelect={handleImageUpload}
+                  disabled={!!image}
                 />
               </div>
               
               {/* Prompt */}
-              <div className="border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
+              <div className="animate-fade-in-up animate-delay-300 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Prompt" icon={Wand2} />
                 <Textarea
                   value={prompt}
@@ -706,7 +586,7 @@ export function ExpandPageClient() {
               </div>
               
               {/* Negative Prompt */}
-              <div className="border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
+              <div className="animate-fade-in-up animate-delay-400 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Negative Prompt" icon={Ban} />
                 <Textarea
                   value={negativePrompt}
@@ -718,7 +598,7 @@ export function ExpandPageClient() {
               
               {/* Настройки Outpainter (только если выбран) */}
               {selectedModel === 'outpainter' && (
-                <div className="border border-[#252525] rounded-2xl p-4 flex flex-col gap-4">
+                <div className="animate-fade-in-up animate-delay-500 border border-[#252525] rounded-2xl p-4 flex flex-col gap-4">
                   {/* Steps */}
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
@@ -759,7 +639,7 @@ export function ExpandPageClient() {
               )}
               
               {/* Формат (Aspect Ratio) */}
-              <div className="border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
+              <div className="animate-fade-in-up animate-delay-500 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Формат (Aspect Ratio)" />
                 <AspectRatioSelector
                   value={selectedRatio || '1:1'}
@@ -774,24 +654,35 @@ export function ExpandPageClient() {
           </div>
 
           {/* Sticky buttons */}
-          <div className="sticky bottom-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
+          <div className="animate-fade-in-up animate-delay-500 sticky bottom-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={isGenerating}
-                className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
-              >
-                Сбросить
-              </button>
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={!image || isGenerating}
-                className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isGenerating ? 'Генерация...' : 'Создать'}
-              </button>
+              {currentGenerationId ? (
+                <button
+                  type="button"
+                  onClick={handleNewGeneration}
+                  className="flex-1 h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors"
+                >
+                  Новая генерация
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  >
+                    Сбросить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={!image || isCreating}
+                    className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isCreating ? 'Создание...' : 'Создать'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -802,37 +693,32 @@ export function ExpandPageClient() {
         </div>
 
         {/* RIGHT PANEL - OUTPUT */}
-        <div className="flex-1 py-8 pl-0 pr-8 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-6">
+        <div className="flex-1 py-8 pl-0 pr-8 flex flex-col h-full overflow-y-auto">
+          <div className="animate-fade-in-up flex items-center justify-between mb-6">
             <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
               OUTPUT
             </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setOutputImage(null); }}
-                disabled={!outputImage}
-                className="w-8 h-8 border border-[#2f2f2f] rounded-md flex items-center justify-center hover:bg-white/5 disabled:opacity-50 transition-colors"
-              >
-                <RefreshCw className="w-4 h-4 text-white" />
-              </button>
-              <button
-                onClick={handleDownload}
-                disabled={!image && !outputImage}
-                className="w-8 h-8 border border-[#2f2f2f] rounded-md flex items-center justify-center hover:bg-white/5 disabled:opacity-50 transition-colors"
-              >
-                <Download className="w-4 h-4 text-white" />
-              </button>
-            </div>
           </div>
 
-          {/* Canvas Container - fills remaining space with 32px bottom padding */}
-          <div className="flex-1 pb-8 flex items-start justify-start">
-            {/* Canvas Area - square, max size that fits */}
+          {/* Show OutputPanel when generation is in progress, otherwise show canvas editor */}
+          {currentGenerationId ? (
+            <div className="animate-fade-in-up animate-delay-200 flex-1">
+              <OutputPanel generationId={currentGenerationId} />
+            </div>
+          ) : (
+          /* Canvas Container - fills remaining space with 32px bottom padding */
+          <div className="animate-fade-in-up animate-delay-200 flex-1 pb-8 flex items-start justify-start">
+            {/* Canvas Area - square, max size that fits, with padding for handles */}
             <div 
               ref={canvasRef}
-              style={{ width: 'min(100%, calc(100vh - 200px))', aspectRatio: '1/1' }}
-              className={`relative rounded-2xl border transition-colors overflow-hidden ${
-                isDraggingCanvas ? 'border-white/50 bg-white/5' : 'border-[#656565]'
+              style={{ 
+                width: 'min(100%, calc(100vh - 200px))', 
+                aspectRatio: '1/1',
+                backgroundImage: image ? 'radial-gradient(circle, #2a2a2a 1px, transparent 1px)' : 'none',
+                backgroundSize: '20px 20px',
+              }}
+              className={`relative rounded-2xl border transition-colors bg-[#101010] overflow-visible ${
+                isDraggingCanvas ? 'border-white/50' : 'border-[#2f2f2f]'
               }`}
             onDrop={handleDropCanvas}
             onDragOver={(e) => { e.preventDefault(); setIsDraggingCanvas(true); }}
@@ -841,194 +727,96 @@ export function ExpandPageClient() {
           >
             {!image ? (
               /* Empty state */
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <ImageIcon className="w-12 h-12 text-[#656565] mb-4" strokeWidth={1.5} />
-                <p className="font-inter text-lg font-medium text-white mb-1">Перетащите сюда</p>
-                <p className="font-inter text-sm text-[#959595] mb-5">или нажмите на кнопку</p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                    className="px-5 py-2.5 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors"
-                  >
-                    Выбрать
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); handlePasteButtonClick(); }}
-                    className="px-5 py-2.5 rounded-xl border border-[#656565] hover:border-white text-white font-inter font-medium text-sm transition-colors flex items-center gap-1.5"
-                  >
-                    <Clipboard className="w-4 h-4" />
-                    Вставить
-                  </button>
-                </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
+                <ImagePlus className="w-12 h-12 text-[#656565] mb-4" strokeWidth={1.5} />
+                <p className="font-inter text-sm text-white text-center mb-2">
+                  Перетащите или выберите на устройстве
+                </p>
+                <p className="font-inter text-xs text-[#959595] text-center">
+                  PNG, JPG, WEBP
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                  }}
+                />
               </div>
             ) : (
               /* Image loaded - interactive canvas */
               <>
-                {/* Grid lines - 3x3 grid внутри расширенной области */}
+                {/* Blue guide lines at expansion boundaries */}
                 <div className="absolute inset-0 pointer-events-none">
-                  {/* Vertical lines */}
-                  <div className="absolute w-px bg-[#3f3f3f] h-full" style={{ left: `${handleLeft}%` }} />
-                  <div className="absolute w-px bg-[#3f3f3f] h-full" style={{ left: `${(handleLeft + handleRight) / 2}%` }} />
-                  <div className="absolute w-px bg-[#3f3f3f] h-full" style={{ left: `${handleRight}%` }} />
+                  {/* Vertical lines at left/right handles - extend full height */}
+                  <div className="absolute w-px bg-[#4D7CFC] h-full" style={{ left: `${handleLeft}%` }} />
+                  <div className="absolute w-px bg-[#4D7CFC] h-full" style={{ left: `${handleRight}%` }} />
                   
-                  {/* Horizontal lines */}
-                  <div className="absolute h-px bg-[#3f3f3f] w-full" style={{ top: `${handleTop}%` }} />
-                  <div className="absolute h-px bg-[#3f3f3f] w-full" style={{ top: `${(handleTop + handleBottom) / 2}%` }} />
-                  <div className="absolute h-px bg-[#3f3f3f] w-full" style={{ top: `${handleBottom}%` }} />
+                  {/* Horizontal lines at top/bottom handles - extend full width */}
+                  <div className="absolute h-px bg-[#4D7CFC] w-full" style={{ top: `${handleTop}%` }} />
+                  <div className="absolute h-px bg-[#4D7CFC] w-full" style={{ top: `${handleBottom}%` }} />
                 </div>
                 
-                {/* Expanded gray areas (показывают области которые будут сгенерированы) */}
-                {hasExpand && !outputImage && (
-                  <>
-                    {/* Top expansion */}
-                    {expand.top > 0 && (
-                      <div 
-                        className="absolute bg-[#252525] pointer-events-none"
-                        style={{
-                          top: `${handleTop}%`,
-                          left: `${handleLeft}%`,
-                          right: `${100 - handleRight}%`,
-                          height: `${scaledExpandTop}%`,
-                        }}
-                      />
-                    )}
-                    {/* Bottom expansion */}
-                    {expand.bottom > 0 && (
-                      <div 
-                        className="absolute bg-[#252525] pointer-events-none"
-                        style={{
-                          bottom: `${100 - handleBottom}%`,
-                          left: `${handleLeft}%`,
-                          right: `${100 - handleRight}%`,
-                          height: `${scaledExpandBottom}%`,
-                        }}
-                      />
-                    )}
-                    {/* Left expansion */}
-                    {expand.left > 0 && (
-                      <div 
-                        className="absolute bg-[#252525] pointer-events-none"
-                        style={{
-                          top: `${handleTop + scaledExpandTop}%`,
-                          left: `${handleLeft}%`,
-                          width: `${scaledExpandLeft}%`,
-                          bottom: `${100 - handleBottom + scaledExpandBottom}%`,
-                        }}
-                      />
-                    )}
-                    {/* Right expansion */}
-                    {expand.right > 0 && (
-                      <div 
-                        className="absolute bg-[#252525] pointer-events-none"
-                        style={{
-                          top: `${handleTop + scaledExpandTop}%`,
-                          right: `${100 - handleRight}%`,
-                          width: `${scaledExpandRight}%`,
-                          bottom: `${100 - handleBottom + scaledExpandBottom}%`,
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-                
-                {/* Image or Result */}
-                {outputImage ? (
-                  /* Result - на весь канвас */
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
-                    <img
-                      src={outputImage}
-                      alt="Result"
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  /* Original image - в центре */
+                {/* Expanded area background - single dark rectangle that shows the total generation zone */}
+                {hasExpand && (
                   <div 
-                    className="absolute flex items-center justify-center"
-                    style={{
-                      top: `${50 - scaledImageHeight/2}%`,
-                      left: `${50 - scaledImageWidth/2}%`,
-                      width: `${scaledImageWidth}%`,
-                      height: `${scaledImageHeight}%`,
-                    }}
-                  >
-                    <img
-                      src={image}
-                      alt="Original"
-                      className="w-full h-full object-cover pointer-events-none"
-                    />
-                  </div>
-                )}
-                
-                {/* Shimmer effect during generation */}
-                {isGenerating && (
-                  <div 
-                    className="absolute overflow-hidden"
+                    className="absolute bg-[#212121] pointer-events-none z-0"
                     style={{
                       top: `${handleTop}%`,
                       left: `${handleLeft}%`,
                       right: `${100 - handleRight}%`,
                       bottom: `${100 - handleBottom}%`,
                     }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-                  </div>
+                  />
                 )}
                 
-                {/* Drag handles */}
-                {!outputImage && (
-                  <>
-                    {/* Corner handles - меняют 2 стороны */}
+                {/* Original image - в центре, z-10 чтобы быть ниже handles (z-30) */}
+                <div 
+                  className="absolute flex items-center justify-center z-10 pointer-events-none"
+                  style={{
+                    top: `${50 - scaledImageHeight/2}%`,
+                    left: `${50 - scaledImageWidth/2}%`,
+                    width: `${scaledImageWidth}%`,
+                    height: `${scaledImageHeight}%`,
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt="Original"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                {/* Corner handles only - square with blue border like Figma */}
+                <>
+                    {/* Top-Left corner */}
                     <div
                       onMouseDown={(e) => handleMouseDown('top-left', e)}
-                      className="absolute w-4 h-4 bg-white rounded-full cursor-nwse-resize shadow-lg z-30 hover:scale-110 transition-transform"
+                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nwse-resize z-50 hover:scale-125 transition-transform"
                       style={{ top: `${handleTop}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
                     />
+                    {/* Top-Right corner */}
                     <div
                       onMouseDown={(e) => handleMouseDown('top-right', e)}
-                      className="absolute w-4 h-4 bg-white rounded-full cursor-nesw-resize shadow-lg z-30 hover:scale-110 transition-transform"
+                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nesw-resize z-50 hover:scale-125 transition-transform"
                       style={{ top: `${handleTop}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
                     />
+                    {/* Bottom-Left corner */}
                     <div
                       onMouseDown={(e) => handleMouseDown('bottom-left', e)}
-                      className="absolute w-4 h-4 bg-white rounded-full cursor-nesw-resize shadow-lg z-30 hover:scale-110 transition-transform"
+                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nesw-resize z-50 hover:scale-125 transition-transform"
                       style={{ top: `${handleBottom}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
                     />
+                    {/* Bottom-Right corner */}
                     <div
                       onMouseDown={(e) => handleMouseDown('bottom-right', e)}
-                      className="absolute w-4 h-4 bg-white rounded-full cursor-nwse-resize shadow-lg z-30 hover:scale-110 transition-transform"
+                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nwse-resize z-50 hover:scale-125 transition-transform"
                       style={{ top: `${handleBottom}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
                     />
-                    
-                    {/* Side handles - меняют только 1 сторону */}
-                    {/* Top */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('top', e)}
-                      className="absolute w-8 h-3 bg-white/80 rounded-full cursor-ns-resize shadow-lg z-30 hover:bg-white transition-all"
-                      style={{ top: `${handleTop}%`, left: `${(handleLeft + handleRight) / 2}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                    {/* Bottom */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('bottom', e)}
-                      className="absolute w-8 h-3 bg-white/80 rounded-full cursor-ns-resize shadow-lg z-30 hover:bg-white transition-all"
-                      style={{ top: `${handleBottom}%`, left: `${(handleLeft + handleRight) / 2}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                    {/* Left */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('left', e)}
-                      className="absolute w-3 h-8 bg-white/80 rounded-full cursor-ew-resize shadow-lg z-30 hover:bg-white transition-all"
-                      style={{ top: `${(handleTop + handleBottom) / 2}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                    {/* Right */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('right', e)}
-                      className="absolute w-3 h-8 bg-white/80 rounded-full cursor-ew-resize shadow-lg z-30 hover:bg-white transition-all"
-                      style={{ top: `${(handleTop + handleBottom) / 2}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
-                    />
                   </>
-                )}
                 
                 {/* Remove image button */}
                 <button
@@ -1041,6 +829,7 @@ export function ExpandPageClient() {
             )}
             </div>
           </div>
+          )}
         </div>
       </main>
 
@@ -1048,17 +837,6 @@ export function ExpandPageClient() {
       <main className="flex lg:hidden flex-1 flex-col p-4">
         <p className="text-white text-center py-20">Используйте десктоп для работы с Expand</p>
       </main>
-
-      {/* Shimmer animation styles */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-shimmer {
-          animation: shimmer 1.5s infinite;
-        }
-      `}</style>
     </div>
   );
 }
