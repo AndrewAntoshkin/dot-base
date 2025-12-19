@@ -212,3 +212,5 @@ npm run build
 - [ ] Backup базы данных
 - [ ] SSL сертификат валиден
 - [ ] Environment variables в Vercel
+
+

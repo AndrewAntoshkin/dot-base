@@ -71,46 +71,6 @@ function parseDataUrl(dataUrl: string, index: number): ParsedFile {
   return { buffer, mimeType, size: buffer.length };
 }
 
-async function parseMultipartFiles(request: NextRequest): Promise<ParsedFile[]> {
-  const formData = await request.formData();
-  const fileEntries = formData.getAll('files');
-
-  if (fileEntries.length === 0) {
-    throw new Error('Поле files отсутствует или пустое');
-  }
-
-  if (fileEntries.length > MAX_FILES_PER_REQUEST) {
-    throw new Error('Максимум 14 файлов за раз');
-  }
-
-  const files: ParsedFile[] = [];
-
-  for (let i = 0; i < fileEntries.length; i++) {
-    const entry = fileEntries[i];
-    if (typeof entry === 'string') {
-      // поддерживаем legacy data url строку
-      files.push(parseDataUrl(entry, i));
-      continue;
-    }
-
-    const blob = entry as File;
-    validateMimeType(blob.type, i);
-
-    const arrayBuffer = await blob.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    ensureSize(buffer.length, i);
-
-    files.push({
-      buffer,
-      mimeType: blob.type,
-      originalName: blob.name,
-      size: buffer.length,
-    });
-  }
-
-  return files;
-}
-
 async function parseJsonFiles(request: NextRequest): Promise<ParsedFile[]> {
   let body: any;
   try {
@@ -139,26 +99,40 @@ async function parseJsonFiles(request: NextRequest): Promise<ParsedFile[]> {
   return files.map((file: string, index: number) => parseDataUrl(file, index));
 }
 
+// Supported buckets
+const ALLOWED_BUCKETS = ['generations', 'lora-training-images', 'lora-models'];
+
 async function uploadBuffers(
   userId: string,
-  files: ParsedFile[]
+  files: ParsedFile[],
+  bucket: string = 'generations'
 ): Promise<{ uploaded: string[]; errors: string[] }> {
   const supabase = createServiceRoleClient();
   const uploadedUrls: string[] = [];
   const errors: string[] = [];
 
+  // Validate bucket
+  if (!ALLOWED_BUCKETS.includes(bucket)) {
+    errors.push(`Недопустимый bucket: ${bucket}`);
+    return { uploaded: uploadedUrls, errors };
+  }
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    logger.debug(`Upload: Processing file ${i}, type: ${file.mimeType}, size: ${file.size} bytes`);
+    logger.debug(`Upload: Processing file ${i}, type: ${file.mimeType}, size: ${file.size} bytes, bucket: ${bucket}`);
 
     const extension = EXTENSION_MAP[file.mimeType] || 'bin';
     const filename = file.originalName
       ? `input-${userId}-${uuidv4()}-${file.originalName}`
       : `input-${userId}-${uuidv4()}.${extension}`;
-    const filePath = `inputs/${filename}`;
+    
+    // Different path structure for different buckets
+    const filePath = bucket === 'generations' 
+      ? `inputs/${filename}`
+      : `${userId}/${filename}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('generations')
+      .from(bucket)
       .upload(filePath, file.buffer, {
         contentType: file.mimeType,
         upsert: false,
@@ -181,7 +155,7 @@ async function uploadBuffers(
     }
 
     const { data: urlData } = supabase.storage
-      .from('generations')
+      .from(bucket)
       .getPublicUrl(filePath);
 
     if (urlData?.publicUrl) {
@@ -243,14 +217,55 @@ export async function POST(request: NextRequest) {
 
     const contentType = request.headers.get('content-type') || '';
     let parsedFiles: ParsedFile[];
+    let bucket = 'generations'; // Default bucket
 
     if (contentType.includes('multipart/form-data')) {
-      parsedFiles = await parseMultipartFiles(request);
+      const formData = await request.formData();
+      
+      // Get bucket from form data (optional)
+      const bucketField = formData.get('bucket');
+      if (bucketField && typeof bucketField === 'string') {
+        bucket = bucketField;
+      }
+      
+      // Parse files from already parsed formData
+      const fileEntries = formData.getAll('files');
+      
+      if (fileEntries.length === 0) {
+        throw new Error('Поле files отсутствует или пустое');
+      }
+
+      if (fileEntries.length > MAX_FILES_PER_REQUEST) {
+        throw new Error('Максимум 14 файлов за раз');
+      }
+
+      parsedFiles = [];
+      for (let i = 0; i < fileEntries.length; i++) {
+        const entry = fileEntries[i];
+        if (typeof entry === 'string') {
+          parsedFiles.push(parseDataUrl(entry, i));
+          continue;
+        }
+
+        const blob = entry as File;
+        validateMimeType(blob.type, i);
+
+        const arrayBuffer = await blob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        ensureSize(buffer.length, i);
+
+        parsedFiles.push({
+          buffer,
+          mimeType: blob.type,
+          originalName: blob.name,
+          size: buffer.length,
+        });
+      }
     } else {
       parsedFiles = await parseJsonFiles(request);
     }
 
-    const { uploaded, errors } = await uploadBuffers(user.id, parsedFiles);
+    const { uploaded, errors } = await uploadBuffers(user.id, parsedFiles, bucket);
 
     logger.debug('Upload: Complete. Uploaded:', uploaded.length, 'Errors:', errors.length);
 

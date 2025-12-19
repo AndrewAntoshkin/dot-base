@@ -268,9 +268,18 @@ export async function POST(request: NextRequest) {
           updateData.error_message = 'Не удалось получить результат генерации';
         } else {
           const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(replicateUrls, generation.id);
-          updateData.status = 'completed';
-          updateData.output_urls = savedUrls.length > 0 ? savedUrls : replicateUrls;
-          updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+          
+          // Для keyframe сегментов: если не удалось сохранить медиа - это критическая ошибка
+          // Временные URL Replicate истекут до merge и всё сломается
+          if (generation.is_keyframe_segment && savedUrls.length === 0) {
+            updateData.status = 'failed';
+            updateData.error_message = 'Не удалось сохранить видео сегмента. Попробуйте снова.';
+            logger.error('Keyframe segment media save failed:', generation.id);
+          } else {
+            updateData.status = 'completed';
+            updateData.output_urls = savedUrls.length > 0 ? savedUrls : replicateUrls;
+            updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+          }
         }
       }
 

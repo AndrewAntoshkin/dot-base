@@ -97,11 +97,26 @@ export async function saveMediaToStorage(
 ): Promise<{ url: string; thumbUrl?: string } | null> {
   try {
     const supabase = createServiceRoleClient();
+    
+    // Определяем, это видео или изображение (для настройки ретраев)
+    const lowercaseUrl = mediaUrl.toLowerCase();
+    const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+    const isLikelyVideo = videoExtensions.some(ext => lowercaseUrl.includes(ext));
+    
+    // Для видео: больше ретраев и дольше ждём (CDN пропагация медленнее)
+    const maxRetries = isLikelyVideo ? 5 : 3;
+    const retryDelay = isLikelyVideo ? 3000 : 2000;
+    const fetchTimeout = isLikelyVideo ? 60000 : 30000; // 60s для видео
+    
+    // Начальная задержка для пропагации CDN (особенно важно для видео)
+    const initialDelay = isLikelyVideo ? 3000 : 1000;
+    logger.debug(`Waiting ${initialDelay}ms for CDN propagation before fetching media ${index}...`);
+    await new Promise(resolve => setTimeout(resolve, initialDelay));
 
     // Скачать файл с ретраями
     const fetchMedia = async () => {
       const response = await fetch(mediaUrl, {
-        signal: AbortSignal.timeout(30000), // 30 секунд таймаут
+        signal: AbortSignal.timeout(fetchTimeout),
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -111,8 +126,8 @@ export async function saveMediaToStorage(
     
     const response = await withRetry(
       fetchMedia, 
-      3, 
-      2000, 
+      maxRetries, 
+      retryDelay, 
       `Fetch media ${index}`
     );
 
@@ -170,9 +185,16 @@ export async function saveMediaToStorage(
       }
     }
 
+    logger.info(`Successfully saved media ${index} for generation ${generationId}`);
     return { url: publicUrlData.publicUrl, thumbUrl };
   } catch (error: any) {
-    logger.error('Error saving media to storage after retries:', error.message);
+    // Логируем URL для отладки (без query params для безопасности)
+    const urlForLog = mediaUrl.split('?')[0];
+    logger.error(`Error saving media to storage after retries: ${error.message}`, {
+      generationId,
+      index,
+      url: urlForLog,
+    });
     return null;
   }
 }

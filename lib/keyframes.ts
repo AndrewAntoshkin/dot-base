@@ -6,18 +6,27 @@
 import { getReplicateClient } from '@/lib/replicate/client';
 import logger from '@/lib/logger';
 
+// Input type for keyframe parts
+export interface KeyframePartInput {
+  startImage: string;
+  endImage: string;
+  prompt: string;
+  duration?: number;
+  resolution?: string;
+}
+
 // Model configurations for keyframe generation
 export const KEYFRAME_MODELS = {
   'hailuo-02': {
     replicateModel: 'minimax/hailuo-02',
     modelId: 'hailuo-02-i2v',
     modelName: 'hailuo-02',
-    inputMapper: (part: { startImage: string; endImage: string; prompt: string }) => ({
+    inputMapper: (part: KeyframePartInput) => ({
       first_frame_image: part.startImage,
       last_frame_image: part.endImage,
       prompt: part.prompt,
-      duration: '6',
-      resolution: '1080p',
+      duration: String(part.duration || 6),
+      resolution: part.resolution || '1080p',
       prompt_optimizer: true,
     }),
   },
@@ -25,12 +34,36 @@ export const KEYFRAME_MODELS = {
     replicateModel: 'bytedance/seedance-1-pro',
     modelId: 'seedance-1-pro',
     modelName: 'seedance-1-pro',
-    inputMapper: (part: { startImage: string; endImage: string; prompt: string }) => ({
+    inputMapper: (part: KeyframePartInput) => ({
       image: part.startImage,
       last_frame_image: part.endImage,
       prompt: part.prompt,
-      duration: 6,
-      resolution: '1080p',
+      duration: part.duration || 5,
+      resolution: part.resolution || '1080p',
+    }),
+  },
+  'luma-ray-2': {
+    replicateModel: 'luma/ray-2-720p',
+    modelId: 'luma-ray-2',
+    modelName: 'luma-ray-2',
+    inputMapper: (part: KeyframePartInput) => ({
+      start_image: part.startImage,
+      end_image: part.endImage,
+      prompt: part.prompt,
+      duration: part.duration || 5,
+      // Luma Ray 2 has 540p and 720p variants, select based on resolution
+    }),
+  },
+  'veo-3': {
+    replicateModel: 'google/veo-3',
+    modelId: 'veo-3',
+    modelName: 'veo-3',
+    inputMapper: (part: KeyframePartInput) => ({
+      image: part.startImage,
+      end_image: part.endImage,
+      prompt: part.prompt,
+      duration: part.duration || 8,
+      resolution: part.resolution || '720p',
     }),
   },
 } as const;

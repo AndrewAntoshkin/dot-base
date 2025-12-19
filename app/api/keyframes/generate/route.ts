@@ -11,10 +11,12 @@ export const dynamic = 'force-dynamic';
 
 const partSchema = z.object({
   id: z.string(),
-  model: z.enum(['hailuo-02', 'seedance-1-pro']),
+  model: z.enum(['hailuo-02', 'seedance-1-pro', 'luma-ray-2', 'veo-3']),
   startImage: z.string().url(),
   endImage: z.string().url(),
   prompt: z.string().min(1),
+  duration: z.number().optional(),
+  resolution: z.string().optional(),
 });
 
 const requestSchema = z.object({
@@ -88,12 +90,16 @@ export async function POST(request: NextRequest) {
             keyframe_index: i,
             keyframe_total: parts.length,
             last_frame_image: part.endImage,
+            duration: part.duration,
+            resolution: part.resolution,
             // Store original input for potential restart
             keyframe_input: {
               model: part.model,
               startImage: part.startImage,
               endImage: part.endImage,
               prompt: part.prompt,
+              duration: part.duration,
+              resolution: part.resolution,
             },
           },
           status: 'pending',
@@ -104,7 +110,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (error || !generation) {
-        logger.error('Failed to create segment generation:', error);
+        logger.error('Failed to create segment generation:', error?.message, error?.code);
         return NextResponse.json({ error: 'Failed to create generation' }, { status: 500 });
       }
 

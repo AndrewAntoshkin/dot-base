@@ -231,7 +231,8 @@ export class ReplicateClient {
         };
       } catch (error: any) {
         lastError = error;
-        logger.error('Replicate attempt failed:', attempt, error.message);
+        logger.error('Replicate attempt failed:', attempt, 'Model:', options.model, 'Error:', error.message);
+        logger.error('Full error:', JSON.stringify(error, null, 2));
 
         await this.tokenPool.reportTokenError(tokenData.id, error.message || 'Unknown error');
 

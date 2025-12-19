@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "npx ts-node tests/run-all-tests.ts",
+    "test:api": "npx ts-node tests/api/api-test.ts",
+    "test:load": "npx ts-node tests/load/load-test.ts",
+    "test:e2e": "npx playwright test --config=tests/playwright.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/alumni-sans": "^5.2.8",
@@ -54,4 +58,6 @@
     "typescript": "^5.6.3"
   }
 }
+
+
 
