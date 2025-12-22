@@ -31,10 +31,10 @@ const alumniSans = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.basecraft.ru'),
-  title: '.base — Один инструмент для работы с генеративными моделями',
-  description: 'Создавайте изображения, редактируйте, увеличивайте разрешение и удаляйте фон с помощью ИИ. Все генеративные модели в одном месте.',
-  keywords: ['ИИ', 'генерация изображений', 'искусственный интеллект', 'нейросети', 'AI', 'image generation', 'upscale', 'remove background'],
-  authors: [{ name: '.base' }],
+  title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
+  description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов. Все лучшие генеративные модели в одном месте.',
+  keywords: ['ИИ', 'генерация изображений', 'генерация видео', 'искусственный интеллект', 'нейросети', 'AI', 'image generation', 'video generation', 'upscale', 'BASECRAFT'],
+  authors: [{ name: 'BASECRAFT!' }],
   icons: {
     icon: [
       { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
@@ -43,16 +43,16 @@ export const metadata: Metadata = {
     apple: '/favicon.png',
   },
   openGraph: {
-    title: '.base — Один инструмент для работы с генеративными моделями',
-    description: 'Создавайте изображения, редактируйте, увеличивайте разрешение и удаляйте фон с помощью ИИ. Все генеративные модели в одном месте.',
+    title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
+    description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов. Все лучшие генеративные модели в одном месте.',
     url: 'https://www.basecraft.ru',
-    siteName: '.base',
+    siteName: 'BASECRAFT!',
     images: [
       {
         url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: '.base — Один инструмент для работы с генеративными моделями',
+        width: 1920,
+        height: 1080,
+        alt: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
       },
     ],
     locale: 'ru_RU',
@@ -60,8 +60,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: '.base — Один инструмент для работы с генеративными моделями',
-    description: 'Создавайте изображения, редактируйте, увеличивайте разрешение и удаляйте фон с помощью ИИ.',
+    title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
+    description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов.',
     images: ['/og-image.png'],
   },
   robots: {
