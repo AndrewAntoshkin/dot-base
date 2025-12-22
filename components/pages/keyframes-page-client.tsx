@@ -528,7 +528,7 @@ function PartCard({
   );
 }
 
-// Timeline компонент
+// Timeline компонент - по дизайну Figma
 function VideoTimeline({
   parts,
   segments,
@@ -538,13 +538,10 @@ function VideoTimeline({
   segments: GenerationSegment[];
   totalDuration: number;
 }) {
-  // Генерируем временные метки
+  // Генерируем временные метки каждые 5 секунд
   const timeMarks: number[] = [];
-  for (let t = 0; t <= totalDuration; t += 5) {
+  for (let t = 0; t <= Math.max(totalDuration, 30); t += 5) {
     timeMarks.push(t);
-  }
-  if (timeMarks[timeMarks.length - 1] !== totalDuration) {
-    timeMarks.push(totalDuration);
   }
 
   const formatTime = (seconds: number) => {
@@ -553,73 +550,122 @@ function VideoTimeline({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Рассчитываем позиции сегментов
-  let currentTime = 0;
-  const segmentPositions = parts.map((part, index) => {
-    const segment = segments.find(s => s.partId === part.id);
-    const start = currentTime;
-    const duration = part.duration;
-    currentTime += duration;
-    return { part, segment, start, duration, index };
-  });
+  // Статус бейджа
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <div className="px-1.5 py-0.5 rounded-md bg-[#72FC44]">
+            <span className="text-[8px] font-medium text-[#020617]">Готово</span>
+          </div>
+        );
+      case 'processing':
+        return (
+          <div className="px-1.5 py-0.5 rounded-md bg-[#FCB944]">
+            <span className="text-[8px] font-medium text-[#020617]">В работе</span>
+          </div>
+        );
+      case 'failed':
+        return (
+          <div className="px-1.5 py-0.5 rounded-md bg-red-500">
+            <span className="text-[8px] font-medium text-white">Ошибка</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="px-1.5 py-0.5 rounded-md bg-[#303030]">
+            <span className="text-[8px] font-medium text-[#959595]">Очередь</span>
+          </div>
+        );
+    }
+  };
 
   return (
-    <div className="bg-[#191919] rounded-2xl p-4">
-      {/* Time marks */}
-      <div className="flex items-center gap-3 mb-3">
+    <div className="bg-[#191919] rounded-2xl p-4 flex flex-col gap-4">
+      {/* Time marks - горизонтальная шкала */}
+      <div className="flex items-center gap-3 w-full">
         {timeMarks.map((time, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="text-[8px] text-[#b1b1b1] font-mono">{formatTime(time)}</span>
+          <div key={i} className="flex items-center gap-3 shrink-0">
+            <span className="text-[8px] text-[#b1b1b1] font-normal">{formatTime(time)}</span>
             {i < timeMarks.length - 1 && (
-              <div className="flex-1 h-0 border-t-2 border-dashed border-[#717171] min-w-[60px]" />
+              <div 
+                className="h-0 border-t-2 border-dashed border-[#717171]" 
+                style={{ width: '80px' }}
+              />
             )}
           </div>
         ))}
       </div>
 
-      {/* Segments */}
-      <div className="flex gap-1">
-        {segmentPositions.map(({ part, segment, index }) => {
-          const status = segment?.status || 'pending';
-          const hasThumb = segment?.thumbUrl || segment?.videoUrl;
-          
-          return (
-            <div
-              key={part.id}
-              className={`relative rounded-lg overflow-hidden transition-all ${
-                status === 'processing' ? 'ring-2 ring-yellow-500' :
-                status === 'completed' ? 'ring-1 ring-green-500/50' :
-                status === 'failed' ? 'ring-1 ring-red-500/50' :
-                'ring-1 ring-[#2f2f2f]'
-              }`}
-              style={{ flex: part.duration }}
-            >
-              {hasThumb ? (
-                <div className="relative h-16 bg-[#101010]">
-                  <Image
-                    src={segment?.thumbUrl || segment?.videoUrl || ''}
-                    alt={`Part ${index + 1}`}
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute bottom-1 right-1 bg-black/70 px-1.5 py-0.5 rounded text-[10px] text-white">
-                    {part.duration}s
+      {/* Segments - горизонтально скроллящийся контейнер */}
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
+          {parts.map((part, index) => {
+            const segment = segments.find(s => s.partId === part.id);
+            const status = segment?.status || 'pending';
+
+            return (
+              <div
+                key={part.id}
+                className="w-[260px] shrink-0 bg-[#070707] rounded-xl p-1.5 flex flex-col gap-2"
+              >
+                {/* Заголовок + статус */}
+                <div className="bg-[#171717] rounded-lg px-2 py-1 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    {status === 'processing' && (
+                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    <span className="text-[10px] font-medium text-[#717171] uppercase">
+                      Часть {index + 1}
+                    </span>
                   </div>
+                  {getStatusBadge(status)}
                 </div>
-              ) : (
-                <div className="h-16 bg-[#101010] flex items-center justify-center">
-                  {status === 'processing' ? (
-                    <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                  ) : status === 'failed' ? (
-                    <span className="text-red-500 text-xs">✗</span>
-                  ) : (
-                    <span className="text-[#959595] text-[10px]">{part.duration}s</span>
-                  )}
+
+                {/* Промпт текст */}
+                <div className="bg-[#151515] rounded-lg p-2 min-h-[48px]">
+                  <p className="text-[8px] text-[#a59e9e] line-clamp-3">
+                    {part.prompt || 'Промпт не задан'}
+                  </p>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {/* Превью изображений (если есть и режим i2v) */}
+                {part.mode === 'i2v' && (part.startImage || part.endImage) && (
+                  <div className="flex gap-1">
+                    {part.startImage && (
+                      <div className="relative w-1/2 h-12 bg-[#101010] rounded overflow-hidden">
+                        <Image
+                          src={part.startImage}
+                          alt="Start"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+                    {part.endImage && (
+                      <div className="relative w-1/2 h-12 bg-[#101010] rounded overflow-hidden">
+                        <Image
+                          src={part.endImage}
+                          alt="End"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Кнопка добавления части - пунктирная граница */}
+          <div
+            className="w-[80px] shrink-0 bg-[#191919] rounded-lg border border-dashed border-[#545454] flex items-center justify-center cursor-pointer hover:border-[#717171] transition-colors"
+            style={{ minHeight: parts.length > 0 ? 'auto' : '100px' }}
+          >
+            <Plus className="w-6 h-6 text-[#959595]" />
+          </div>
+        </div>
       </div>
     </div>
   );
