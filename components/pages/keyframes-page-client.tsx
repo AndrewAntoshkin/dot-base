@@ -2,58 +2,75 @@
 
 import { useState, useRef, Suspense, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
-import { ImagePlus, ArrowRight, Wand2, Plus, RefreshCw, Download, Play, Trash2, ChevronDown } from 'lucide-react';
+import { ImagePlus, Wand2, Plus, RefreshCw, Download, Play, Pause, Trash2, ChevronDown, Film, ArrowLeftRight } from 'lucide-react';
 import Image from 'next/image';
 
 // Конфигурация моделей
 const MODEL_CONFIG = {
+  'kling-2.0': {
+    name: 'Kling 2.0',
+    durations: [5, 10],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+    supportsImages: true,
+  },
   'hailuo-02': {
     name: 'Hailuo 02',
     durations: [6, 10],
-    resolutions: ['720p', '1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 6,
-    defaultResolution: '1080p',
+    defaultAspectRatio: '16:9',
+    supportsImages: true,
   },
   'seedance-1-pro': {
     name: 'Seedance 1 Pro',
     durations: [5, 8, 10],
-    resolutions: ['1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 5,
-    defaultResolution: '1080p',
+    defaultAspectRatio: '16:9',
+    supportsImages: false, // Без изображений
   },
   'luma-ray-2': {
     name: 'Luma Ray 2',
     durations: [5, 9],
-    resolutions: ['540p', '720p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 5,
-    defaultResolution: '720p',
+    defaultAspectRatio: '16:9',
+    supportsImages: true,
   },
   'veo-3': {
     name: 'Google Veo 3',
     durations: [5, 8],
-    resolutions: ['720p', '1080p'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 8,
-    defaultResolution: '720p',
+    defaultAspectRatio: '16:9',
+    supportsImages: false, // Без изображений
   },
 } as const;
 
 type ModelId = keyof typeof MODEL_CONFIG;
+type PartMode = 'start-end' | 'no-images';
 
 // Типы
 interface KeyframePart {
   id: string;
   model: ModelId;
+  mode: PartMode;
   startImage: string | null;
   endImage: string | null;
   prompt: string;
   duration: number;
-  resolution: string;
+  aspectRatio: string;
+  isCollapsed: boolean;
 }
 
 interface GenerationSegment {
   partId: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   videoUrl?: string;
+  thumbUrl?: string;
+  duration?: number;
   error?: string;
 }
 
@@ -73,7 +90,7 @@ interface KeyframeGeneration {
   currentSegmentIndex?: number;
 }
 
-// Компонент загрузки изображения
+// Компонент загрузки изображения (компактный)
 function ImageUploadBox({
   label,
   imageUrl,
@@ -86,7 +103,6 @@ function ImageUploadBox({
   onRemove: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -107,14 +123,7 @@ function ImageUploadBox({
       if (response.ok) {
         const result = await response.json();
         const url = result.urls?.[0] || result.url;
-        if (url) {
-          onUpload(url);
-        } else {
-          console.error('No URL in response:', result);
-        }
-      } else {
-        const error = await response.json();
-        console.error('Upload failed:', error);
+        if (url) onUpload(url);
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -128,7 +137,6 @@ function ImageUploadBox({
     if (file) uploadFile(file);
   };
 
-  // Handle paste from clipboard
   const handlePaste = useCallback(async (e: ClipboardEvent) => {
     if (!isFocused || imageUrl) return;
     
@@ -146,7 +154,6 @@ function ImageUploadBox({
     }
   }, [isFocused, imageUrl, uploadFile]);
 
-  // Listen for paste events when focused
   useEffect(() => {
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
@@ -154,7 +161,7 @@ function ImageUploadBox({
 
   if (imageUrl) {
     return (
-      <div className="relative w-[52px] h-[52px] rounded-xl overflow-hidden group">
+      <div className="relative flex-1 h-[72px] rounded-lg overflow-hidden group bg-[#101010] border border-[#2f2f2f]">
         <Image
           src={imageUrl}
           alt={label}
@@ -173,7 +180,6 @@ function ImageUploadBox({
 
   return (
     <div
-      ref={containerRef}
       onMouseEnter={() => setIsFocused(true)}
       onMouseLeave={() => setIsFocused(false)}
       onFocus={() => setIsFocused(true)}
@@ -191,39 +197,39 @@ function ImageUploadBox({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={isUploading}
-        className={`w-full flex flex-col items-center gap-1 p-3 bg-[#101010] border border-dashed rounded-lg transition-colors ${
-          isFocused ? 'border-white/50' : 'border-[#545454] hover:border-white/30'
+        className={`w-full h-[72px] flex flex-col items-center justify-center gap-1 bg-[#101010] border border-dashed rounded-lg transition-colors ${
+          isFocused ? 'border-white/50' : 'border-[#2f2f2f] hover:border-white/30'
         }`}
       >
         <ImagePlus className="w-5 h-5 text-[#959595]" />
         <span className="text-[#959595] text-xs">
           {isUploading ? 'Загрузка...' : label}
         </span>
-        <span className="text-[#555] text-[10px]">или ⌘V</span>
       </button>
     </div>
   );
 }
 
-// Компонент части (сегмента)
+// Компонент части (сворачиваемый)
 function PartCard({
   part,
   index,
   onChange,
   onRemove,
   canRemove,
+  segment,
 }: {
   part: KeyframePart;
   index: number;
   onChange: (updated: KeyframePart) => void;
   onRemove: () => void;
   canRemove: boolean;
+  segment?: GenerationSegment;
 }) {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modelConfig = MODEL_CONFIG[part.model];
   
-  // Закрываем dropdown при клике вне
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -234,377 +240,397 @@ function PartCard({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  // При смене модели — обновляем duration/resolution на дефолтные если текущие недоступны
   const handleModelChange = (newModel: ModelId) => {
     const newConfig = MODEL_CONFIG[newModel];
     const newDuration = (newConfig.durations as readonly number[]).includes(part.duration) 
       ? part.duration 
       : newConfig.defaultDuration;
-    const newResolution = (newConfig.resolutions as readonly string[]).includes(part.resolution)
-      ? part.resolution
-      : newConfig.defaultResolution;
+    const newAspectRatio = (newConfig.aspectRatios as readonly string[]).includes(part.aspectRatio)
+      ? part.aspectRatio
+      : newConfig.defaultAspectRatio;
+    
+    // Если модель не поддерживает изображения - переключаем в режим без изображений
+    const newMode = newConfig.supportsImages ? part.mode : 'no-images';
     
     onChange({ 
       ...part, 
       model: newModel,
+      mode: newMode,
       duration: newDuration,
-      resolution: newResolution,
+      aspectRatio: newAspectRatio,
     });
     setIsModelDropdownOpen(false);
   };
 
+  const toggleCollapse = () => {
+    onChange({ ...part, isCollapsed: !part.isCollapsed });
+  };
+
+  const swapImages = () => {
+    onChange({ ...part, startImage: part.endImage, endImage: part.startImage });
+  };
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <p className="font-inter font-medium text-xs text-[#959595] uppercase">
-          часть {index + 1}
-        </p>
-        {canRemove && (
-          <button
-            onClick={onRemove}
-            className="text-[#959595] hover:text-red-400 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-      
-      <div className="border border-[#2f2f2f] rounded-2xl p-4 flex flex-col gap-6">
-        {/* Модель - выпадающий список */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-[#959595]">
-            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4h8M2 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="text-[10px] font-medium uppercase tracking-wider">Модель</span>
-          </div>
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-              className="w-full h-10 px-4 bg-[#1a1a1a] rounded-lg flex items-center justify-between text-[13px] text-white hover:bg-[#222] transition-colors"
-            >
-              <span>{modelConfig.name}</span>
-              <ChevronDown className={`w-4 h-4 text-[#959595] transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {isModelDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-[#2f2f2f] rounded-lg overflow-hidden z-20 shadow-xl">
-                {(Object.keys(MODEL_CONFIG) as ModelId[]).map((modelId) => (
-                  <button
-                    key={modelId}
-                    onClick={() => handleModelChange(modelId)}
-                    className={`w-full h-10 px-4 text-left text-[13px] transition-colors ${
-                      part.model === modelId
-                        ? 'bg-white/10 text-white'
-                        : 'text-white/70 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    {MODEL_CONFIG[modelId].name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Изображения */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-[#959595]">
-            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4h8M2 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="text-[10px] font-medium uppercase tracking-wider">
-              {part.startImage && part.endImage ? 'начало – конец' : 'изображения'}
+    <div className="border border-[#2f2f2f] rounded-2xl overflow-hidden">
+      {/* Header - всегда видим */}
+      <button
+        onClick={toggleCollapse}
+        className="w-full flex items-center justify-between gap-2 p-4 hover:bg-white/5 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Film className="w-4 h-4 text-white" />
+          <span className="text-xs font-medium text-[#959595] uppercase">
+            часть {index + 1}
+          </span>
+          {segment && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+              segment.status === 'completed' ? 'bg-green-500/20 text-green-500' :
+              segment.status === 'processing' ? 'bg-yellow-500/20 text-yellow-500' :
+              segment.status === 'failed' ? 'bg-red-500/20 text-red-500' :
+              'bg-white/10 text-white/50'
+            }`}>
+              {segment.status === 'completed' ? '✓' :
+               segment.status === 'processing' ? '⏳' :
+               segment.status === 'failed' ? '✗' : ''}
             </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ImageUploadBox
-              label="Начало"
-              imageUrl={part.startImage}
-              onUpload={(url) => onChange({ ...part, startImage: url })}
-              onRemove={() => onChange({ ...part, startImage: null })}
-            />
-            <ArrowRight className="w-4 h-4 text-[#9f9999] shrink-0" />
-            <ImageUploadBox
-              label="Конец"
-              imageUrl={part.endImage}
-              onUpload={(url) => onChange({ ...part, endImage: url })}
-              onRemove={() => onChange({ ...part, endImage: null })}
-            />
-          </div>
+          )}
         </div>
-
-        {/* Промпт */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-[#959595]">
-            <Wand2 className="w-3 h-3" />
-            <span className="text-[10px] font-medium uppercase tracking-wider">Prompt</span>
-          </div>
-          <textarea
-            value={part.prompt}
-            onChange={(e) => onChange({ ...part, prompt: e.target.value })}
-            placeholder="Напишите запрос"
-            className="w-full h-20 min-h-[80px] bg-[#212121] rounded-lg px-3 py-2 text-sm text-white placeholder-[#959595] resize-y focus:outline-none focus:ring-1 focus:ring-white/20"
-          />
+        <div className="flex items-center gap-2">
+          {canRemove && !part.isCollapsed && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove(); }}
+              className="p-1 text-[#959595] hover:text-red-400 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <ChevronDown className={`w-5 h-5 text-white transition-transform ${part.isCollapsed ? '' : 'rotate-180'}`} />
         </div>
+      </button>
 
-        {/* Длительность */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-[#959595]">
-            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4h8M2 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span className="text-[10px] font-medium uppercase tracking-wider">Длительность</span>
-          </div>
-          <div className="flex gap-2">
-            {modelConfig.durations.map((dur) => (
+      {/* Content - видим только если не свёрнут */}
+      {!part.isCollapsed && (
+        <div className="px-4 pb-4 flex flex-col gap-4">
+          {/* Mode Switcher - только для моделей с поддержкой изображений */}
+          {modelConfig.supportsImages && (
+            <div className="flex gap-2">
               <button
-                key={dur}
-                onClick={() => onChange({ ...part, duration: dur })}
-                className={`h-9 px-4 rounded-full text-[13px] transition-colors ${
-                  part.duration === dur
-                    ? 'bg-[#212121] border border-white text-white'
-                    : 'bg-[#212121] text-white/70 hover:text-white'
+                onClick={() => onChange({ ...part, mode: 'start-end' })}
+                className={`flex-1 h-[42px] px-4 rounded-2xl text-[13px] transition-colors ${
+                  part.mode === 'start-end'
+                    ? 'bg-[#171717] border border-white text-white'
+                    : 'bg-[#171717] text-white/70 hover:text-white'
                 }`}
               >
-                {dur} сек
+                Начало – Конец
               </button>
-            ))}
-          </div>
-        </div>
+              <button
+                onClick={() => onChange({ ...part, mode: 'no-images' })}
+                className={`flex-1 h-[42px] px-4 rounded-2xl text-[13px] transition-colors ${
+                  part.mode === 'no-images'
+                    ? 'bg-[#171717] border border-white text-white'
+                    : 'bg-[#171717] text-white/70 hover:text-white'
+                }`}
+              >
+                Без изображений
+              </button>
+            </div>
+          )}
 
-        {/* Качество (только если несколько вариантов) */}
-        {modelConfig.resolutions.length > 1 && (
+          {/* Модель */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1 text-[#959595]">
-              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                <path d="M2 4h8M2 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <svg className="w-3 h-3" viewBox="0 0 12 10" fill="none">
+                <path d="M1.5 2.5h9M1.5 7.5h9" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
               </svg>
-              <span className="text-[10px] font-medium uppercase tracking-wider">Качество</span>
+              <span className="text-[10px] font-medium uppercase tracking-wider">Модель</span>
+            </div>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                className="w-full h-10 px-3 bg-[#171717] rounded-lg flex items-center justify-between text-sm text-white hover:bg-[#1f1f1f] transition-colors"
+              >
+                <span>{modelConfig.name}</span>
+                <ChevronDown className={`w-5 h-5 text-white transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isModelDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[#171717] border border-[#2f2f2f] rounded-lg overflow-hidden z-20 shadow-xl">
+                  {(Object.keys(MODEL_CONFIG) as ModelId[]).map((modelId) => (
+                    <button
+                      key={modelId}
+                      onClick={() => handleModelChange(modelId)}
+                      className={`w-full h-10 px-3 text-left text-sm transition-colors flex items-center justify-between ${
+                        part.model === modelId
+                          ? 'bg-white/10 text-white'
+                          : 'text-white/70 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <span>{MODEL_CONFIG[modelId].name}</span>
+                      {!MODEL_CONFIG[modelId].supportsImages && (
+                        <span className="text-[10px] text-[#959595]">без картинок</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Изображения - только для режима start-end */}
+          {part.mode === 'start-end' && modelConfig.supportsImages && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1 text-[#959595]">
+                <svg className="w-3 h-3" viewBox="0 0 12 10" fill="none">
+                  <path d="M1.5 2.5h9M1.5 7.5h9" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+                <span className="text-[10px] font-medium uppercase tracking-wider">Изображения</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ImageUploadBox
+                  label="Начало"
+                  imageUrl={part.startImage}
+                  onUpload={(url) => onChange({ ...part, startImage: url })}
+                  onRemove={() => onChange({ ...part, startImage: null })}
+                />
+                <button
+                  onClick={swapImages}
+                  className="shrink-0 w-8 h-8 flex items-center justify-center text-white/50 hover:text-white transition-colors"
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                </button>
+                <ImageUploadBox
+                  label="Конец"
+                  imageUrl={part.endImage}
+                  onUpload={(url) => onChange({ ...part, endImage: url })}
+                  onRemove={() => onChange({ ...part, endImage: null })}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Промпт */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1 text-[#959595]">
+              <Wand2 className="w-3 h-3" />
+              <span className="text-[10px] font-medium uppercase tracking-wider">Prompt</span>
+            </div>
+            <textarea
+              value={part.prompt}
+              onChange={(e) => onChange({ ...part, prompt: e.target.value })}
+              placeholder="Опишите что должно происходить в этой части видео"
+              className="w-full h-24 min-h-[96px] bg-[#171717] rounded-lg px-3 py-2 text-sm text-white placeholder-[#959595] resize-y focus:outline-none focus:ring-1 focus:ring-white/20"
+            />
+          </div>
+
+          {/* Длительность */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1 text-[#959595]">
+              <svg className="w-3 h-3" viewBox="0 0 12 10" fill="none">
+                <path d="M1.5 2.5h9M1.5 7.5h9" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+              </svg>
+              <span className="text-[10px] font-medium uppercase tracking-wider">Длительность</span>
             </div>
             <div className="flex gap-2">
-              {modelConfig.resolutions.map((res) => (
+              {modelConfig.durations.map((dur) => (
                 <button
-                  key={res}
-                  onClick={() => onChange({ ...part, resolution: res })}
-                  className={`h-9 px-4 rounded-full text-[13px] transition-colors ${
-                    part.resolution === res
-                      ? 'bg-[#212121] border border-white text-white'
-                      : 'bg-[#212121] text-white/70 hover:text-white'
+                  key={dur}
+                  onClick={() => onChange({ ...part, duration: dur })}
+                  className={`h-9 px-4 rounded-lg text-[13px] transition-colors ${
+                    part.duration === dur
+                      ? 'bg-[#171717] border border-white text-white'
+                      : 'bg-[#171717] text-white/70 hover:text-white'
                   }`}
                 >
-                  {res.replace('p', '')}
+                  {dur} сек
                 </button>
               ))}
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-// Timeline компонент с прогрессом
-function Timeline({
-  parts,
-  segments,
-  progress,
-  isMerging,
-}: {
-  parts: KeyframePart[];
-  segments: GenerationSegment[];
-  progress?: { completed: number; total: number; percent: number; isMerging: boolean };
-  isMerging?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Общий прогресс */}
-      {progress && progress.total > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[#959595]">
-              {isMerging || progress.isMerging 
-                ? 'Объединение видео...' 
-                : `Генерация части ${progress.completed + 1} из ${progress.total}`}
-            </span>
-            <span className="text-white font-medium">{progress.percent}%</span>
-          </div>
-          <div className="h-1.5 bg-[#2f2f2f] rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${progress.percent}%` }}
-            />
+          {/* Соотношение сторон */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1 text-[#959595]">
+              <svg className="w-3 h-3" viewBox="0 0 12 10" fill="none">
+                <path d="M1.5 2.5h9M1.5 7.5h9" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+              </svg>
+              <span className="text-[10px] font-medium uppercase tracking-wider">Соотношение</span>
+            </div>
+            <div className="flex gap-2">
+              {modelConfig.aspectRatios.map((ar) => (
+                <button
+                  key={ar}
+                  onClick={() => onChange({ ...part, aspectRatio: ar })}
+                  className={`h-9 px-4 rounded-lg text-[13px] transition-colors ${
+                    part.aspectRatio === ar
+                      ? 'bg-[#171717] border border-white text-white'
+                      : 'bg-[#171717] text-white/70 hover:text-white'
+                  }`}
+                >
+                  {ar}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
-      
-      {/* Сегменты */}
-      <div className="flex gap-2">
-        {parts.map((part, index) => {
-          const segment = segments.find(s => s.partId === part.id);
+    </div>
+  );
+}
+
+// Timeline компонент
+function VideoTimeline({
+  parts,
+  segments,
+  totalDuration,
+}: {
+  parts: KeyframePart[];
+  segments: GenerationSegment[];
+  totalDuration: number;
+}) {
+  // Генерируем временные метки
+  const timeMarks: number[] = [];
+  for (let t = 0; t <= totalDuration; t += 5) {
+    timeMarks.push(t);
+  }
+  if (timeMarks[timeMarks.length - 1] !== totalDuration) {
+    timeMarks.push(totalDuration);
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Рассчитываем позиции сегментов
+  let currentTime = 0;
+  const segmentPositions = parts.map((part, index) => {
+    const segment = segments.find(s => s.partId === part.id);
+    const start = currentTime;
+    const duration = part.duration;
+    currentTime += duration;
+    return { part, segment, start, duration, index };
+  });
+
+  return (
+    <div className="bg-[#191919] rounded-2xl p-4">
+      {/* Time marks */}
+      <div className="flex items-center gap-3 mb-3">
+        {timeMarks.map((time, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <span className="text-[8px] text-[#b1b1b1] font-mono">{formatTime(time)}</span>
+            {i < timeMarks.length - 1 && (
+              <div className="flex-1 h-0 border-t-2 border-dashed border-[#717171] min-w-[60px]" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Segments */}
+      <div className="flex gap-1">
+        {segmentPositions.map(({ part, segment, index }) => {
           const status = segment?.status || 'pending';
+          const hasThumb = segment?.thumbUrl || segment?.videoUrl;
           
           return (
-            <div key={part.id} className="flex-1 flex flex-col gap-1.5">
-              <div className="relative">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    status === 'completed' ? 'bg-green-500' :
-                    status === 'processing' ? 'bg-yellow-500' :
-                    status === 'failed' ? 'bg-red-500' :
-                    'bg-[#2f2f2f]'
-                  }`}
-                />
-                {status === 'processing' && (
-                  <div className="absolute inset-0 h-2 rounded-full bg-yellow-500/50 animate-pulse" />
-                )}
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className={`font-medium ${
-                  status === 'completed' ? 'text-green-500' :
-                  status === 'processing' ? 'text-yellow-500' :
-                  status === 'failed' ? 'text-red-500' :
-                  'text-[#959595]'
-                }`}>
-                  {status === 'completed' ? '✓' : status === 'failed' ? '✗' : ''} ЧАСТЬ {index + 1}
-                </span>
-                <span className="text-[#959595]">
-                  {status === 'processing' ? '⏳' : status === 'completed' ? '✓' : ''}
-                </span>
-              </div>
+            <div
+              key={part.id}
+              className={`relative rounded-lg overflow-hidden transition-all ${
+                status === 'processing' ? 'ring-2 ring-yellow-500' :
+                status === 'completed' ? 'ring-1 ring-green-500/50' :
+                status === 'failed' ? 'ring-1 ring-red-500/50' :
+                'ring-1 ring-[#2f2f2f]'
+              }`}
+              style={{ flex: part.duration }}
+            >
+              {hasThumb ? (
+                <div className="relative h-16 bg-[#101010]">
+                  <Image
+                    src={segment?.thumbUrl || segment?.videoUrl || ''}
+                    alt={`Part ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute bottom-1 right-1 bg-black/70 px-1.5 py-0.5 rounded text-[10px] text-white">
+                    {part.duration}s
+                  </div>
+                </div>
+              ) : (
+                <div className="h-16 bg-[#101010] flex items-center justify-center">
+                  {status === 'processing' ? (
+                    <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                  ) : status === 'failed' ? (
+                    <span className="text-red-500 text-xs">✗</span>
+                  ) : (
+                    <span className="text-[#959595] text-[10px]">{part.duration}s</span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
-        
-        {/* Merge indicator */}
-        {parts.length > 1 && (
-          <div className="flex-1 flex flex-col gap-1.5 max-w-[100px]">
-            <div className="relative">
-              <div
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  isMerging ? 'bg-blue-500' :
-                  progress?.percent === 100 ? 'bg-green-500' :
-                  'bg-[#2f2f2f]'
-                }`}
-              />
-              {isMerging && (
-                <div className="absolute inset-0 h-2 rounded-full bg-blue-500/50 animate-pulse" />
-              )}
-            </div>
-            <div className="flex items-center justify-between text-[10px]">
-              <span className={`font-medium ${
-                progress?.percent === 100 ? 'text-green-500' :
-                isMerging ? 'text-blue-500' :
-                'text-[#959595]'
-              }`}>
-                {progress?.percent === 100 ? '✓' : ''} MERGE
-              </span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-// Generating Output - показывает прогресс генерации
-function GeneratingOutput({
-  status,
-  progress,
-  error,
+// Video Player Controls
+function VideoControls({
+  videoRef,
+  currentTime,
+  duration,
+  isPlaying,
+  onPlayPause,
 }: {
-  status: string;
-  progress?: { completed: number; total: number; percent: number; isMerging: boolean };
-  error?: string;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  currentTime: number;
+  duration: number;
+  isPlaying: boolean;
+  onPlayPause: () => void;
 }) {
-  if (status === 'failed') {
-    return (
-      <div className="bg-[#050505] rounded-2xl h-[660px] flex items-center justify-center px-16">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-            <span className="text-3xl">✕</span>
-          </div>
-          <p className="text-xl font-medium text-white">Генерация не удалась</p>
-          <p className="text-sm text-[#959595] max-w-md">{error || 'Произошла ошибка. Попробуйте снова.'}</p>
-        </div>
-      </div>
-    );
-  }
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
-  const isMerging = status === 'merging' || progress?.isMerging;
-  
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    videoRef.current.currentTime = percent * duration;
+  };
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
-    <div className="bg-[#050505] rounded-2xl h-[660px] flex items-center justify-center px-16">
-      <div className="flex flex-col items-center gap-6 text-center">
-        {/* Animated loader */}
-        <div className="relative w-24 h-24">
-          <div className="absolute inset-0 rounded-full border-4 border-[#2f2f2f]" />
-          <div 
-            className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"
-            style={{ animationDuration: '1.5s' }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">
-              {progress?.percent || 0}%
-            </span>
-          </div>
-        </div>
-        
-        {/* Status text */}
-        <div className="flex flex-col gap-2">
-          <p className="text-xl font-medium text-white">
-            {isMerging 
-              ? 'Объединение видео...' 
-              : progress 
-                ? `Генерация части ${progress.completed + 1} из ${progress.total}` 
-                : 'Подготовка...'}
-          </p>
-          <p className="text-sm text-[#959595]">
-            {isMerging 
-              ? 'Финальный этап — склеиваем все части вместе' 
-              : 'Видео генерируется. Это может занять несколько минут.'}
-          </p>
-        </div>
-
-        {/* Progress bar */}
-        {progress && (
-          <div className="w-64">
-            <div className="h-2 bg-[#2f2f2f] rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${progress.percent}%` }}
-              />
-            </div>
-          </div>
+    <div className="bg-[#191919] rounded-xl px-3 py-2 flex items-center gap-3">
+      <button
+        onClick={onPlayPause}
+        className="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+      >
+        {isPlaying ? (
+          <Pause className="w-4 h-4 text-white" />
+        ) : (
+          <Play className="w-4 h-4 text-white ml-0.5" />
         )}
+      </button>
+      
+      <div className="flex items-center gap-2 text-xs text-[#959595]">
+        <span className="font-mono">{formatTime(currentTime)}</span>
+        <span>/</span>
+        <span className="font-mono">{formatTime(duration)}</span>
       </div>
-    </div>
-  );
-}
 
-// Пустой Output
-function EmptyOutput() {
-  return (
-    <div className="bg-[#050505] rounded-2xl h-[660px] flex items-center justify-center px-16">
-      <div className="flex gap-12">
-        <div className="flex flex-col items-start py-2">
-          <span className="text-6xl font-light text-[#959595]/30">1</span>
-          <p className="text-base font-medium text-white mt-6">
-            Выберите действие и модель для начала генерации
-          </p>
-        </div>
-        <div className="flex flex-col items-start py-2">
-          <span className="text-6xl font-light text-[#959595]/30">2</span>
-          <p className="text-base font-medium text-white mt-6">
-            Опишите что вы хотите создать или изменить
-          </p>
-        </div>
-        <div className="flex flex-col items-start py-2">
-          <span className="text-6xl font-light text-[#959595]/30">3</span>
-          <p className="text-base font-medium text-white mt-6">
-            Настройте параметры генерации для лучшего результата
-          </p>
-        </div>
+      <div
+        className="flex-1 h-1.5 bg-[#2f2f2f] rounded-full cursor-pointer"
+        onClick={handleSeek}
+      >
+        <div
+          className="h-full bg-white rounded-full transition-all"
+          style={{ width: `${progress}%` }}
+        />
       </div>
     </div>
   );
@@ -614,6 +640,8 @@ function EmptyOutput() {
 function VideoPlayer({ videoUrl }: { videoUrl: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -627,38 +655,142 @@ function VideoPlayer({ videoUrl }: { videoUrl: string }) {
   };
 
   return (
-    <div className="relative bg-[#050505] rounded-2xl overflow-hidden h-[660px]">
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        className="w-full h-full object-contain"
-        preload="metadata"
-        onEnded={() => setIsPlaying(false)}
+    <div className="flex flex-col gap-3">
+      <div className="relative bg-[#050505] rounded-2xl overflow-hidden aspect-video">
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="w-full h-full object-contain"
+          preload="metadata"
+          onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
+          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+          onEnded={() => setIsPlaying(false)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+        />
+        {!isPlaying && (
+          <button
+            onClick={togglePlay}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-colors"
+          >
+            <Play className="w-7 h-7 text-white fill-white ml-1" />
+          </button>
+        )}
+      </div>
+      
+      <VideoControls
+        videoRef={videoRef}
+        currentTime={currentTime}
+        duration={duration}
+        isPlaying={isPlaying}
+        onPlayPause={togglePlay}
       />
-      {!isPlaying && (
-        <button
-          onClick={togglePlay}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-white/50 rounded-full flex items-center justify-center hover:bg-white/70 transition-colors"
-        >
-          <Play className="w-9 h-9 text-white fill-white ml-1" />
-        </button>
-      )}
+    </div>
+  );
+}
+
+// Generating Output
+function GeneratingOutput({
+  status,
+  progress,
+  error,
+}: {
+  status: string;
+  progress?: { completed: number; total: number; percent: number; isMerging: boolean };
+  error?: string;
+}) {
+  if (status === 'failed') {
+    return (
+      <div className="bg-[#050505] rounded-2xl aspect-video flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center px-8">
+          <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+            <span className="text-3xl">✕</span>
+          </div>
+          <p className="text-xl font-medium text-white">Генерация не удалась</p>
+          <p className="text-sm text-[#959595] max-w-md">{error || 'Произошла ошибка. Попробуйте снова.'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isMerging = status === 'merging' || progress?.isMerging;
+  
+  return (
+    <div className="bg-[#050505] rounded-2xl aspect-video flex items-center justify-center">
+      <div className="flex flex-col items-center gap-6 text-center">
+        <div className="relative w-20 h-20">
+          <div className="absolute inset-0 rounded-full border-4 border-[#2f2f2f]" />
+          <div 
+            className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"
+            style={{ animationDuration: '1.5s' }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xl font-bold text-white">
+              {progress?.percent || 0}%
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex flex-col gap-2">
+          <p className="text-lg font-medium text-white">
+            {isMerging 
+              ? 'Объединение видео...' 
+              : progress 
+                ? `Генерация части ${progress.completed + 1} из ${progress.total}` 
+                : 'Подготовка...'}
+          </p>
+          <p className="text-sm text-[#959595]">
+            {isMerging 
+              ? 'Склеиваем все части вместе' 
+              : 'Это может занять несколько минут'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Пустой Output
+function EmptyOutput() {
+  return (
+    <div className="bg-[#050505] rounded-2xl aspect-video flex items-center justify-center px-16">
+      <div className="flex gap-12">
+        <div className="flex flex-col items-start py-2">
+          <span className="text-5xl font-light text-[#4c4c4c]">1</span>
+          <p className="text-sm font-medium text-white mt-4 max-w-[180px]">
+            Выберите модель для начала генерации
+          </p>
+        </div>
+        <div className="flex flex-col items-start py-2">
+          <span className="text-5xl font-light text-[#4c4c4c]">2</span>
+          <p className="text-sm font-medium text-white mt-4 max-w-[180px]">
+            Опишите что хотите создать
+          </p>
+        </div>
+        <div className="flex flex-col items-start py-2">
+          <span className="text-5xl font-light text-[#4c4c4c]">3</span>
+          <p className="text-sm font-medium text-white mt-4 max-w-[180px]">
+            Настройте параметры генерации
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
 // Основной компонент
 function KeyframesContent() {
-  // Состояния
   const [parts, setParts] = useState<KeyframePart[]>([
     {
       id: crypto.randomUUID(),
-      model: 'hailuo-02',
+      model: 'kling-2.0',
+      mode: 'start-end',
       startImage: null,
       endImage: null,
       prompt: '',
-      duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
-      resolution: MODEL_CONFIG['hailuo-02'].defaultResolution,
+      duration: MODEL_CONFIG['kling-2.0'].defaultDuration,
+      aspectRatio: MODEL_CONFIG['kling-2.0'].defaultAspectRatio,
+      isCollapsed: false,
     },
   ]);
   
@@ -670,18 +802,22 @@ function KeyframesContent() {
   
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Функции
+  const totalDuration = parts.reduce((sum, p) => sum + p.duration, 0);
+
   const addPart = () => {
-    setParts([
-      ...parts,
+    // Сворачиваем все существующие части
+    setParts(prev => [
+      ...prev.map(p => ({ ...p, isCollapsed: true })),
       {
         id: crypto.randomUUID(),
-        model: 'hailuo-02',
+        model: 'kling-2.0',
+        mode: 'start-end' as PartMode,
         startImage: null,
         endImage: null,
         prompt: '',
-        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
-        resolution: MODEL_CONFIG['hailuo-02'].defaultResolution,
+        duration: MODEL_CONFIG['kling-2.0'].defaultDuration,
+        aspectRatio: MODEL_CONFIG['kling-2.0'].defaultAspectRatio,
+        isCollapsed: false,
       },
     ]);
   };
@@ -698,12 +834,14 @@ function KeyframesContent() {
     setParts([
       {
         id: crypto.randomUUID(),
-        model: 'hailuo-02',
+        model: 'kling-2.0',
+        mode: 'start-end',
         startImage: null,
         endImage: null,
         prompt: '',
-        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
-        resolution: MODEL_CONFIG['hailuo-02'].defaultResolution,
+        duration: MODEL_CONFIG['kling-2.0'].defaultDuration,
+        aspectRatio: MODEL_CONFIG['kling-2.0'].defaultAspectRatio,
+        isCollapsed: false,
       },
     ]);
     setGeneration({
@@ -713,14 +851,20 @@ function KeyframesContent() {
     });
   };
 
-  const canGenerate = parts.every(p => p.startImage && p.endImage && p.prompt.trim());
+  // Проверка готовности к генерации
+  const canGenerate = parts.every(p => {
+    const config = MODEL_CONFIG[p.model];
+    if (p.mode === 'start-end' && config.supportsImages) {
+      return p.startImage && p.endImage && p.prompt.trim();
+    }
+    return p.prompt.trim();
+  });
 
   const handleGenerate = async () => {
     if (!canGenerate) return;
     
     setIsGenerating(true);
     
-    // Инициализируем generation
     const newGeneration: KeyframeGeneration = {
       id: '',
       status: 'generating',
@@ -740,11 +884,12 @@ function KeyframesContent() {
           parts: parts.map(p => ({
             id: p.id,
             model: p.model,
-            startImage: p.startImage,
-            endImage: p.endImage,
+            mode: p.mode,
+            startImage: p.mode === 'start-end' ? p.startImage : null,
+            endImage: p.mode === 'start-end' ? p.endImage : null,
             prompt: p.prompt,
             duration: p.duration,
-            resolution: p.resolution,
+            aspectRatio: p.aspectRatio,
           })),
         }),
       });
@@ -756,13 +901,11 @@ function KeyframesContent() {
       
       const result = await response.json();
       
-      // Update with keyframeGroupId
       setGeneration(prev => ({
         ...prev,
         id: result.keyframeGroupId,
       }));
       
-      // Начинаем polling статуса
       pollStatus(result.keyframeGroupId);
       
     } catch (error: any) {
@@ -789,11 +932,12 @@ function KeyframesContent() {
         
         const status = await response.json();
         
-        // Map API segments to our format, matching by index
         const mappedSegments = status.segments?.map((s: any) => ({
           partId: parts[s.index]?.id || s.id,
           status: s.status,
           videoUrl: s.videoUrl,
+          thumbUrl: s.thumbUrl,
+          duration: s.duration,
           error: s.error,
         })) || [];
         
@@ -814,13 +958,11 @@ function KeyframesContent() {
           return;
         }
         
-        // Continue polling - faster during active generation
         const pollInterval = status.status === 'merging' ? 2000 : 3000;
         setTimeout(poll, pollInterval);
         
       } catch (error) {
         console.error('Status polling error:', error);
-        // Don't stop on network errors, retry
         setTimeout(poll, 5000);
       }
     };
@@ -844,36 +986,35 @@ function KeyframesContent() {
       <Header />
 
       {/* Desktop Layout */}
-      <main className="hidden lg:flex flex-1 gap-6">
-        {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0 relative">
-          {/* Top content area */}
-          <div className="flex-1 flex flex-col py-8 overflow-y-auto pb-32">
+      <main className="hidden lg:flex flex-1">
+        {/* LEFT PANEL - INPUT */}
+        <div className="w-[400px] flex flex-col border-r border-[#2f2f2f]">
+          <div className="flex-1 flex flex-col p-6 overflow-y-auto pb-32">
             {/* Header */}
-            <div className="mb-6 shrink-0 animate-fade-in-up">
+            <div className="mb-4 shrink-0">
               <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
                 INPUT
               </h2>
             </div>
 
             {/* Parts */}
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
               {parts.map((part, index) => (
-                <div key={part.id} className="animate-fade-in-up" style={{ animationDelay: `${index * 100}ms` }}>
-                  <PartCard
-                    part={part}
-                    index={index}
-                    onChange={(updated) => updatePart(part.id, updated)}
-                    onRemove={() => removePart(part.id)}
-                    canRemove={parts.length > 1}
-                  />
-                </div>
+                <PartCard
+                  key={part.id}
+                  part={part}
+                  index={index}
+                  onChange={(updated) => updatePart(part.id, updated)}
+                  onRemove={() => removePart(part.id)}
+                  canRemove={parts.length > 1}
+                  segment={generation.segments.find(s => s.partId === part.id)}
+                />
               ))}
               
               {/* Добавить часть */}
               <button
                 onClick={addPart}
-                className="h-12 bg-[#212121] rounded-2xl flex items-center justify-center gap-2 text-[13px] text-white hover:bg-[#2a2a2a] transition-colors"
+                className="h-11 bg-[#212121] rounded-2xl flex items-center justify-center gap-2 text-[13px] text-white/70 hover:text-white hover:bg-[#2a2a2a] transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Добавить часть
@@ -881,14 +1022,14 @@ function KeyframesContent() {
             </div>
           </div>
 
-          {/* Sticky buttons at bottom */}
-          <div className="sticky bottom-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
+          {/* Sticky buttons */}
+          <div className="sticky bottom-0 bg-[#101010] p-6 pt-4 border-t border-[#1f1f1f]">
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={reset}
                 disabled={isGenerating}
-                className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
               >
                 Сбросить
               </button>
@@ -896,11 +1037,11 @@ function KeyframesContent() {
                 type="button"
                 onClick={handleGenerate}
                 disabled={isGenerating || !canGenerate}
-                className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50"
+                className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black hover:bg-gray-200 transition-colors disabled:opacity-50"
               >
                 {isGenerating 
                   ? generation.progress 
-                    ? `${generation.progress.percent}% — ${generation.status === 'merging' ? 'Merge' : `Часть ${generation.progress.completed + 1}/${generation.progress.total}`}`
+                    ? `${generation.progress.percent}%`
                     : 'Запуск...'
                   : 'Создать'}
               </button>
@@ -908,15 +1049,10 @@ function KeyframesContent() {
           </div>
         </div>
 
-        {/* DIVIDER (64px) */}
-        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
-          <div className="w-px h-full bg-[#2f2f2f]" />
-        </div>
-
         {/* RIGHT PANEL - OUTPUT */}
-        <div className="flex-1 py-8 pl-0 pr-20 overflow-y-auto flex flex-col gap-6">
+        <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4">
           {/* Header + Actions */}
-          <div className="flex items-center justify-between animate-fade-in-up">
+          <div className="flex items-center justify-between">
             <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
               OUTPUT
             </h2>
@@ -926,13 +1062,13 @@ function KeyframesContent() {
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="p-2 border border-[#2f2f2f] rounded-md hover:bg-[#1f1f1f] transition-colors"
+                  className="p-2 border border-[#2f2f2f] rounded-lg hover:bg-[#1f1f1f] transition-colors"
                 >
                   <RefreshCw className="w-4 h-4 text-white" />
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="p-2 border border-[#2f2f2f] rounded-md hover:bg-[#1f1f1f] transition-colors"
+                  className="p-2 border border-[#2f2f2f] rounded-lg hover:bg-[#1f1f1f] transition-colors"
                 >
                   <Download className="w-4 h-4 text-white" />
                 </button>
@@ -941,38 +1077,31 @@ function KeyframesContent() {
           </div>
 
           {/* Output Content */}
-          <div className="animate-fade-in-up animate-delay-200">
-            {generation.finalVideoUrl ? (
-              <VideoPlayer videoUrl={generation.finalVideoUrl} />
-            ) : generation.status !== 'idle' ? (
-              <GeneratingOutput 
-                status={generation.status}
-                progress={generation.progress}
-                error={generation.error}
-              />
-            ) : (
-              <EmptyOutput />
-            )}
-          </div>
-
-          {/* Timeline (показываем когда есть генерация) */}
-          {(generation.status !== 'idle' || parts.some(p => p.startImage || p.endImage)) && (
-            <div className="animate-fade-in-up animate-delay-300">
-              <Timeline 
-                parts={parts} 
-                segments={generation.segments} 
-                progress={generation.progress}
-                isMerging={generation.status === 'merging'}
-              />
-            </div>
+          {generation.finalVideoUrl ? (
+            <VideoPlayer videoUrl={generation.finalVideoUrl} />
+          ) : generation.status !== 'idle' ? (
+            <GeneratingOutput 
+              status={generation.status}
+              progress={generation.progress}
+              error={generation.error}
+            />
+          ) : (
+            <EmptyOutput />
           )}
+
+          {/* Timeline */}
+          <VideoTimeline
+            parts={parts}
+            segments={generation.segments}
+            totalDuration={totalDuration}
+          />
         </div>
       </main>
 
-      {/* Mobile Layout - упрощённая версия */}
+      {/* Mobile */}
       <main className="flex lg:hidden flex-1 flex-col p-4 pb-24">
         <p className="text-center text-[#959595] py-8">
-          Keyframes генерация пока доступна только на десктопе
+          Keyframes доступны только на десктопе
         </p>
       </main>
     </div>
@@ -990,5 +1119,3 @@ export default function KeyframesPageClient() {
     </Suspense>
   );
 }
-
-
