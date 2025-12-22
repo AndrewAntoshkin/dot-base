@@ -272,19 +272,35 @@ function PartCard({
   };
 
   const handleModelChange = (newModelId: string) => {
-    const models = part.mode === 'i2v' ? I2V_MODELS : T2V_MODELS;
-    const newConfig = models[newModelId as keyof typeof models];
-    const newDuration = (newConfig.durations as readonly number[]).includes(part.duration)
-      ? part.duration
-      : newConfig.defaultDuration;
-    const newAspectRatio = (newConfig.aspectRatios as readonly string[]).includes(part.aspectRatio)
-      ? part.aspectRatio
-      : newConfig.defaultAspectRatio;
+    let newDuration = part.duration;
+    let newAspectRatio = part.aspectRatio;
+    
+    if (part.mode === 'i2v') {
+      const newConfig = I2V_MODELS[newModelId as I2VModelId];
+      if (newConfig) {
+        newDuration = newConfig.durations.includes(part.duration as typeof newConfig.durations[number])
+          ? part.duration
+          : newConfig.defaultDuration;
+        newAspectRatio = newConfig.aspectRatios.includes(part.aspectRatio as typeof newConfig.aspectRatios[number])
+          ? part.aspectRatio
+          : newConfig.defaultAspectRatio;
+      }
+    } else {
+      const newConfig = T2V_MODELS[newModelId as T2VModelId];
+      if (newConfig) {
+        newDuration = newConfig.durations.includes(part.duration as typeof newConfig.durations[number])
+          ? part.duration
+          : newConfig.defaultDuration;
+        newAspectRatio = newConfig.aspectRatios.includes(part.aspectRatio as typeof newConfig.aspectRatios[number])
+          ? part.aspectRatio
+          : newConfig.defaultAspectRatio;
+      }
+    }
 
     onChange({
       ...part,
-      ...(part.mode === 'i2v' 
-        ? { i2vModel: newModelId as I2VModelId } 
+      ...(part.mode === 'i2v'
+        ? { i2vModel: newModelId as I2VModelId }
         : { t2vModel: newModelId as T2VModelId }),
       duration: newDuration,
       aspectRatio: newAspectRatio,
