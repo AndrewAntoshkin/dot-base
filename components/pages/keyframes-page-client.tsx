@@ -278,20 +278,20 @@ function PartCard({
     if (part.mode === 'i2v') {
       const newConfig = I2V_MODELS[newModelId as I2VModelId];
       if (newConfig) {
-        newDuration = newConfig.durations.includes(part.duration as typeof newConfig.durations[number])
+        newDuration = (newConfig.durations as readonly number[]).includes(part.duration)
           ? part.duration
           : newConfig.defaultDuration;
-        newAspectRatio = newConfig.aspectRatios.includes(part.aspectRatio as typeof newConfig.aspectRatios[number])
+        newAspectRatio = (newConfig.aspectRatios as readonly string[]).includes(part.aspectRatio)
           ? part.aspectRatio
           : newConfig.defaultAspectRatio;
       }
     } else {
       const newConfig = T2V_MODELS[newModelId as T2VModelId];
       if (newConfig) {
-        newDuration = newConfig.durations.includes(part.duration as typeof newConfig.durations[number])
+        newDuration = (newConfig.durations as readonly number[]).includes(part.duration)
           ? part.duration
           : newConfig.defaultDuration;
-        newAspectRatio = newConfig.aspectRatios.includes(part.aspectRatio as typeof newConfig.aspectRatios[number])
+        newAspectRatio = (newConfig.aspectRatios as readonly string[]).includes(part.aspectRatio)
           ? part.aspectRatio
           : newConfig.defaultAspectRatio;
       }
