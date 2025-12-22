@@ -510,13 +510,22 @@ export default function BrainstormPageClient() {
       
       try {
         // Default settings for models that require them
-        const defaultSettings: Record<string, any> = {
-          aspect_ratio: '1:1',
-        };
+        const defaultSettings: Record<string, any> = {};
         
-        // Recraft models require 'size' parameter
+        // Model-specific settings
         if (modelId.includes('recraft')) {
+          // Recraft models require 'size' parameter
           defaultSettings.size = '1024x1024';
+        } else if (modelId.includes('seedream')) {
+          // SeeDream uses 'size' parameter (2K, 4K, custom)
+          defaultSettings.size = '2K';
+        } else if (modelId === 'nano-banana-pro') {
+          // Nano Banana Pro uses 'resolution' and 'aspect_ratio'
+          defaultSettings.resolution = '2K';
+          defaultSettings.aspect_ratio = '1:1';
+        } else {
+          // Default for other models
+          defaultSettings.aspect_ratio = '1:1';
         }
         
         const response = await fetch('/api/generations/create', {
