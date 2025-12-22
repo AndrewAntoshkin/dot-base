@@ -529,8 +529,9 @@ export default function BrainstormPageClient() {
           defaultSettings.size = '1024x1024';
           defaultSettings.style = 'any';
         } else if (modelId.includes('seedream')) {
-          // SeeDream: size parameter (2K, 4K, custom)
+          // SeeDream: size + aspect_ratio
           defaultSettings.size = '2K';
+          defaultSettings.aspect_ratio = '1:1';
         } else if (modelId === 'nano-banana-pro') {
           // Nano Banana Pro: resolution + aspect_ratio
           defaultSettings.resolution = '2K';
