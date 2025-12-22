@@ -18,7 +18,7 @@ export function WaitingForProjectPage() {
           src="/waiting-bg.png"
           alt="Background"
           fill
-          className="object-cover"
+          className="object-cover -scale-x-100"
           priority
         />
         <div className="absolute inset-0 bg-black/30" />
@@ -29,14 +29,16 @@ export function WaitingForProjectPage() {
         <div className="flex max-w-[640px] flex-col gap-16">
           {/* Logo and text */}
           <div className="flex flex-col gap-11">
-            {/* Logo */}
-            <Image
-              src="/baseCRLogo.svg"
-              alt="BASECRAFT!"
-              width={136}
-              height={28}
-              className="h-7 w-auto"
-            />
+            {/* Logo - aligned left */}
+            <div className="flex justify-start">
+              <Image
+                src="/baseCRLogo.svg"
+                alt="BASECRAFT!"
+                width={136}
+                height={28}
+                className="h-7 w-auto"
+              />
+            </div>
 
             {/* Heading */}
             <div className="flex flex-col gap-4">
