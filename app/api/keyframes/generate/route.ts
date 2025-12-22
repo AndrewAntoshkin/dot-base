@@ -11,12 +11,18 @@ export const dynamic = 'force-dynamic';
 
 const partSchema = z.object({
   id: z.string(),
-  model: z.enum(['hailuo-02', 'seedance-1-pro', 'luma-ray-2', 'veo-3']),
-  startImage: z.string().url(),
-  endImage: z.string().url(),
+  model: z.enum([
+    // I2V модели (Начало – Конец)
+    'hailuo-02', 'seedance-1-pro', 'kling-v2.1', 'veo-3.1-fast',
+    // T2V модели (Без изображений)
+    'veo-3.1-fast-t2v', 'kling-v2.5-turbo-pro', 'hailuo-2.3', 'wan-2.5-t2v'
+  ]),
+  mode: z.enum(['i2v', 't2v']),
+  startImage: z.string().url().nullable().optional(),
+  endImage: z.string().url().nullable().optional(),
   prompt: z.string().min(1),
   duration: z.number().optional(),
-  resolution: z.string().optional(),
+  aspectRatio: z.string().optional(),
 });
 
 const requestSchema = z.object({
@@ -74,32 +80,35 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const modelConfig = KEYFRAME_MODELS[part.model];
-      
+      const isI2V = part.mode === 'i2v';
+
       const { data: generation, error } = await (supabase
         .from('generations') as any)
         .insert({
           user_id: userId,
-          action: 'video_i2v',
+          action: isI2V ? 'video_i2v' : 'video_create',
           model_id: modelConfig.modelId,
           model_name: modelConfig.modelName,
           replicate_model: modelConfig.replicateModel,
           prompt: part.prompt,
-          input_image_url: part.startImage,
+          input_image_url: isI2V ? part.startImage : null,
           settings: {
             keyframe_group_id: keyframeGroupId,
             keyframe_index: i,
             keyframe_total: parts.length,
-            last_frame_image: part.endImage,
+            keyframe_mode: part.mode,
+            last_frame_image: isI2V ? part.endImage : null,
             duration: part.duration,
-            resolution: part.resolution,
+            aspect_ratio: part.aspectRatio,
             // Store original input for potential restart
             keyframe_input: {
               model: part.model,
+              mode: part.mode,
               startImage: part.startImage,
               endImage: part.endImage,
               prompt: part.prompt,
               duration: part.duration,
-              resolution: part.resolution,
+              aspectRatio: part.aspectRatio,
             },
           },
           status: 'pending',

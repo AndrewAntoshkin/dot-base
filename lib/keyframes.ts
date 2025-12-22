@@ -8,15 +8,16 @@ import logger from '@/lib/logger';
 
 // Input type for keyframe parts
 export interface KeyframePartInput {
-  startImage: string;
-  endImage: string;
+  startImage?: string | null;
+  endImage?: string | null;
   prompt: string;
   duration?: number;
-  resolution?: string;
+  aspectRatio?: string;
+  mode?: 'i2v' | 't2v';
 }
 
-// Model configurations for keyframe generation
-export const KEYFRAME_MODELS = {
+// I2V Model configurations (Начало – Конец)
+export const I2V_KEYFRAME_MODELS = {
   'hailuo-02': {
     replicateModel: 'minimax/hailuo-02',
     modelId: 'hailuo-02-i2v',
@@ -26,7 +27,6 @@ export const KEYFRAME_MODELS = {
       last_frame_image: part.endImage,
       prompt: part.prompt,
       duration: String(part.duration || 6),
-      resolution: part.resolution || '1080p',
       prompt_optimizer: true,
     }),
   },
@@ -39,33 +39,82 @@ export const KEYFRAME_MODELS = {
       last_frame_image: part.endImage,
       prompt: part.prompt,
       duration: part.duration || 5,
-      resolution: part.resolution || '1080p',
     }),
   },
-  'luma-ray-2': {
-    replicateModel: 'luma/ray-2-720p',
-    modelId: 'luma-ray-2',
-    modelName: 'luma-ray-2',
+  'kling-v2.1': {
+    replicateModel: 'kwaivgi/kling-v2.1',
+    modelId: 'kling-v2.1-i2v',
+    modelName: 'kling-v2.1',
     inputMapper: (part: KeyframePartInput) => ({
       start_image: part.startImage,
       end_image: part.endImage,
       prompt: part.prompt,
       duration: part.duration || 5,
-      // Luma Ray 2 has 540p and 720p variants, select based on resolution
+      aspect_ratio: part.aspectRatio || '16:9',
     }),
   },
-  'veo-3': {
-    replicateModel: 'google/veo-3',
-    modelId: 'veo-3',
-    modelName: 'veo-3',
+  'veo-3.1-fast': {
+    replicateModel: 'google/veo-3.1-fast',
+    modelId: 'veo-3.1-fast-i2v',
+    modelName: 'veo-3.1-fast',
     inputMapper: (part: KeyframePartInput) => ({
       image: part.startImage,
       end_image: part.endImage,
       prompt: part.prompt,
       duration: part.duration || 8,
-      resolution: part.resolution || '720p',
+      aspect_ratio: part.aspectRatio || '16:9',
     }),
   },
+} as const;
+
+// T2V Model configurations (Без изображений)
+export const T2V_KEYFRAME_MODELS = {
+  'veo-3.1-fast-t2v': {
+    replicateModel: 'google/veo-3.1-fast',
+    modelId: 'veo-3.1-fast-t2v',
+    modelName: 'veo-3.1-fast',
+    inputMapper: (part: KeyframePartInput) => ({
+      prompt: part.prompt,
+      duration: part.duration || 8,
+      aspect_ratio: part.aspectRatio || '16:9',
+    }),
+  },
+  'kling-v2.5-turbo-pro': {
+    replicateModel: 'kwaivgi/kling-v2.5-turbo-pro',
+    modelId: 'kling-v2.5-turbo-pro-t2v',
+    modelName: 'kling-v2.5-turbo-pro',
+    inputMapper: (part: KeyframePartInput) => ({
+      prompt: part.prompt,
+      duration: part.duration || 5,
+      aspect_ratio: part.aspectRatio || '16:9',
+    }),
+  },
+  'hailuo-2.3': {
+    replicateModel: 'minimax/hailuo-2.3',
+    modelId: 'hailuo-2.3-t2v',
+    modelName: 'hailuo-2.3',
+    inputMapper: (part: KeyframePartInput) => ({
+      prompt: part.prompt,
+      duration: String(part.duration || 6),
+      prompt_optimizer: true,
+    }),
+  },
+  'wan-2.5-t2v': {
+    replicateModel: 'wan-video/wan-2.5-t2v',
+    modelId: 'wan-2.5-t2v',
+    modelName: 'wan-2.5-t2v',
+    inputMapper: (part: KeyframePartInput) => ({
+      prompt: part.prompt,
+      duration: part.duration || 5,
+      aspect_ratio: part.aspectRatio || '16:9',
+    }),
+  },
+} as const;
+
+// Combined models for backwards compatibility
+export const KEYFRAME_MODELS = {
+  ...I2V_KEYFRAME_MODELS,
+  ...T2V_KEYFRAME_MODELS,
 } as const;
 
 export type KeyframeModelId = keyof typeof KEYFRAME_MODELS;

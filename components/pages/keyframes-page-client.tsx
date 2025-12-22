@@ -5,15 +5,14 @@ import { Header } from '@/components/header';
 import { ImagePlus, Wand2, Plus, RefreshCw, Download, Play, Pause, Trash2, ChevronDown, Film, ArrowLeftRight } from 'lucide-react';
 import Image from 'next/image';
 
-// Конфигурация моделей
-const MODEL_CONFIG = {
+// Модели для режима "Начало – Конец" (I2V с первым и последним кадром)
+const I2V_MODELS = {
   'hailuo-02': {
     name: 'Hailuo 02',
     durations: [6, 10],
     aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 6,
     defaultAspectRatio: '16:9',
-    supportsImages: true,
   },
   'seedance-1-pro': {
     name: 'Seedance 1 Pro',
@@ -21,34 +20,65 @@ const MODEL_CONFIG = {
     aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 5,
     defaultAspectRatio: '16:9',
-    supportsImages: false, // Без изображений
   },
-  'luma-ray-2': {
-    name: 'Luma Ray 2',
-    durations: [5, 9],
+  'kling-v2.1': {
+    name: 'Kling v2.1',
+    durations: [5, 10],
     aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 5,
     defaultAspectRatio: '16:9',
-    supportsImages: true,
   },
-  'veo-3': {
-    name: 'Google Veo 3',
+  'veo-3.1-fast': {
+    name: 'Veo 3.1 Fast',
     durations: [5, 8],
     aspectRatios: ['16:9', '9:16', '1:1'],
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
-    supportsImages: false, // Без изображений
   },
 } as const;
 
-type ModelId = keyof typeof MODEL_CONFIG;
-type PartMode = 'start-end' | 'no-images';
+// Модели для режима "Без картинок" (T2V - text to video)
+const T2V_MODELS = {
+  'veo-3.1-fast-t2v': {
+    name: 'Veo 3.1 Fast',
+    durations: [5, 8],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultDuration: 8,
+    defaultAspectRatio: '16:9',
+  },
+  'kling-v2.5-turbo-pro': {
+    name: 'Kling v2.5 Turbo Pro',
+    durations: [5, 10],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+  },
+  'hailuo-2.3': {
+    name: 'Hailuo 2.3',
+    durations: [6, 10],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultDuration: 6,
+    defaultAspectRatio: '16:9',
+  },
+  'wan-2.5-t2v': {
+    name: 'Wan 2.5 T2V',
+    durations: [5, 10],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+  },
+} as const;
+
+type I2VModelId = keyof typeof I2V_MODELS;
+type T2VModelId = keyof typeof T2V_MODELS;
+type PartMode = 'i2v' | 't2v';
 
 // Типы
 interface KeyframePart {
   id: string;
-  model: ModelId;
   mode: PartMode;
+  i2vModel: I2VModelId;
+  t2vModel: T2VModelId;
   startImage: string | null;
   endImage: string | null;
   prompt: string;
@@ -220,8 +250,14 @@ function PartCard({
 }) {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const modelConfig = MODEL_CONFIG[part.model];
   
+  // Получаем конфиг текущей модели в зависимости от режима
+  const modelConfig = part.mode === 'i2v' 
+    ? I2V_MODELS[part.i2vModel] 
+    : T2V_MODELS[part.t2vModel];
+  const currentModelId = part.mode === 'i2v' ? part.i2vModel : part.t2vModel;
+  const currentModels = part.mode === 'i2v' ? I2V_MODELS : T2V_MODELS;
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -231,23 +267,32 @@ function PartCard({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
-  const handleModelChange = (newModel: ModelId) => {
-    const newConfig = MODEL_CONFIG[newModel];
-    const newDuration = (newConfig.durations as readonly number[]).includes(part.duration) 
-      ? part.duration 
+
+  const handleModeChange = (newMode: PartMode) => {
+    const newConfig = newMode === 'i2v' ? I2V_MODELS[part.i2vModel] : T2V_MODELS[part.t2vModel];
+    onChange({
+      ...part,
+      mode: newMode,
+      duration: newConfig.defaultDuration,
+      aspectRatio: newConfig.defaultAspectRatio,
+    });
+  };
+
+  const handleModelChange = (newModelId: string) => {
+    const models = part.mode === 'i2v' ? I2V_MODELS : T2V_MODELS;
+    const newConfig = models[newModelId as keyof typeof models];
+    const newDuration = (newConfig.durations as readonly number[]).includes(part.duration)
+      ? part.duration
       : newConfig.defaultDuration;
     const newAspectRatio = (newConfig.aspectRatios as readonly string[]).includes(part.aspectRatio)
       ? part.aspectRatio
       : newConfig.defaultAspectRatio;
-    
-    // Если модель не поддерживает изображения - переключаем в режим без изображений
-    const newMode = newConfig.supportsImages ? part.mode : 'no-images';
-    
-    onChange({ 
-      ...part, 
-      model: newModel,
-      mode: newMode,
+
+    onChange({
+      ...part,
+      ...(part.mode === 'i2v' 
+        ? { i2vModel: newModelId as I2VModelId } 
+        : { t2vModel: newModelId as T2VModelId }),
       duration: newDuration,
       aspectRatio: newAspectRatio,
     });
@@ -303,31 +348,29 @@ function PartCard({
       {/* Content - видим только если не свёрнут */}
       {!part.isCollapsed && (
         <div className="px-4 pb-4 flex flex-col gap-4">
-          {/* Mode Switcher - только для моделей с поддержкой изображений */}
-          {modelConfig.supportsImages && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => onChange({ ...part, mode: 'start-end' })}
-                className={`flex-1 h-[42px] px-4 rounded-2xl text-[13px] transition-colors ${
-                  part.mode === 'start-end'
-                    ? 'bg-[#171717] border border-white text-white'
-                    : 'bg-[#171717] text-white/70 hover:text-white'
-                }`}
-              >
-                Начало – Конец
-              </button>
-              <button
-                onClick={() => onChange({ ...part, mode: 'no-images' })}
-                className={`flex-1 h-[42px] px-4 rounded-2xl text-[13px] transition-colors ${
-                  part.mode === 'no-images'
-                    ? 'bg-[#171717] border border-white text-white'
-                    : 'bg-[#171717] text-white/70 hover:text-white'
-                }`}
-              >
-                Без изображений
-              </button>
-            </div>
-          )}
+          {/* Mode Switcher */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleModeChange('i2v')}
+              className={`flex-1 h-[42px] px-4 rounded-2xl text-[13px] transition-colors ${
+                part.mode === 'i2v'
+                  ? 'bg-[#171717] border border-white text-white'
+                  : 'bg-[#171717] text-white/70 hover:text-white'
+              }`}
+            >
+              Начало – Конец
+            </button>
+            <button
+              onClick={() => handleModeChange('t2v')}
+              className={`flex-1 h-[42px] px-4 rounded-2xl text-[13px] transition-colors ${
+                part.mode === 't2v'
+                  ? 'bg-[#171717] border border-white text-white'
+                  : 'bg-[#171717] text-white/70 hover:text-white'
+              }`}
+            >
+              Без изображений
+            </button>
+          </div>
 
           {/* Модель */}
           <div className="flex flex-col gap-2">
@@ -345,23 +388,20 @@ function PartCard({
                 <span>{modelConfig.name}</span>
                 <ChevronDown className={`w-5 h-5 text-white transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {isModelDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-[#171717] border border-[#2f2f2f] rounded-lg overflow-hidden z-20 shadow-xl">
-                  {(Object.keys(MODEL_CONFIG) as ModelId[]).map((modelId) => (
+                  {Object.keys(currentModels).map((modelId) => (
                     <button
                       key={modelId}
                       onClick={() => handleModelChange(modelId)}
                       className={`w-full h-10 px-3 text-left text-sm transition-colors flex items-center justify-between ${
-                        part.model === modelId
+                        currentModelId === modelId
                           ? 'bg-white/10 text-white'
                           : 'text-white/70 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      <span>{MODEL_CONFIG[modelId].name}</span>
-                      {!MODEL_CONFIG[modelId].supportsImages && (
-                        <span className="text-[10px] text-[#959595]">без картинок</span>
-                      )}
+                      <span>{currentModels[modelId as keyof typeof currentModels].name}</span>
                     </button>
                   ))}
                 </div>
@@ -369,8 +409,8 @@ function PartCard({
             </div>
           </div>
 
-          {/* Изображения - только для режима start-end */}
-          {part.mode === 'start-end' && modelConfig.supportsImages && (
+          {/* Изображения - только для режима i2v */}
+          {part.mode === 'i2v' && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1 text-[#959595]">
                 <svg className="w-3 h-3" viewBox="0 0 12 10" fill="none">
@@ -775,13 +815,14 @@ function KeyframesContent() {
   const [parts, setParts] = useState<KeyframePart[]>([
     {
       id: crypto.randomUUID(),
-      model: 'hailuo-02',
-      mode: 'start-end',
+      mode: 'i2v',
+      i2vModel: 'hailuo-02',
+      t2vModel: 'veo-3.1-fast-t2v',
       startImage: null,
       endImage: null,
       prompt: '',
-      duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
-      aspectRatio: MODEL_CONFIG['hailuo-02'].defaultAspectRatio,
+      duration: I2V_MODELS['hailuo-02'].defaultDuration,
+      aspectRatio: I2V_MODELS['hailuo-02'].defaultAspectRatio,
       isCollapsed: false,
     },
   ]);
@@ -802,13 +843,14 @@ function KeyframesContent() {
       ...prev.map(p => ({ ...p, isCollapsed: true })),
       {
         id: crypto.randomUUID(),
-        model: 'hailuo-02',
-        mode: 'start-end' as PartMode,
+        mode: 'i2v' as PartMode,
+        i2vModel: 'hailuo-02' as I2VModelId,
+        t2vModel: 'veo-3.1-fast-t2v' as T2VModelId,
         startImage: null,
         endImage: null,
         prompt: '',
-        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
-        aspectRatio: MODEL_CONFIG['hailuo-02'].defaultAspectRatio,
+        duration: I2V_MODELS['hailuo-02'].defaultDuration,
+        aspectRatio: I2V_MODELS['hailuo-02'].defaultAspectRatio,
         isCollapsed: false,
       },
     ]);
@@ -826,13 +868,14 @@ function KeyframesContent() {
     setParts([
       {
         id: crypto.randomUUID(),
-        model: 'hailuo-02',
-        mode: 'start-end',
+        mode: 'i2v',
+        i2vModel: 'hailuo-02',
+        t2vModel: 'veo-3.1-fast-t2v',
         startImage: null,
         endImage: null,
         prompt: '',
-        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
-        aspectRatio: MODEL_CONFIG['hailuo-02'].defaultAspectRatio,
+        duration: I2V_MODELS['hailuo-02'].defaultDuration,
+        aspectRatio: I2V_MODELS['hailuo-02'].defaultAspectRatio,
         isCollapsed: false,
       },
     ]);
@@ -845,10 +888,11 @@ function KeyframesContent() {
 
   // Проверка готовности к генерации
   const canGenerate = parts.every(p => {
-    const config = MODEL_CONFIG[p.model];
-    if (p.mode === 'start-end' && config.supportsImages) {
+    if (p.mode === 'i2v') {
+      // I2V режим требует начальное и конечное изображение + промпт
       return p.startImage && p.endImage && p.prompt.trim();
     }
+    // T2V режим требует только промпт
     return p.prompt.trim();
   });
 
@@ -875,10 +919,10 @@ function KeyframesContent() {
         body: JSON.stringify({
           parts: parts.map(p => ({
             id: p.id,
-            model: p.model,
+            model: p.mode === 'i2v' ? p.i2vModel : p.t2vModel,
             mode: p.mode,
-            startImage: p.mode === 'start-end' ? p.startImage : null,
-            endImage: p.mode === 'start-end' ? p.endImage : null,
+            startImage: p.mode === 'i2v' ? p.startImage : null,
+            endImage: p.mode === 'i2v' ? p.endImage : null,
             prompt: p.prompt,
             duration: p.duration,
             aspectRatio: p.aspectRatio,
