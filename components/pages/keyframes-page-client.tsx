@@ -66,6 +66,15 @@ type I2VModelId = keyof typeof I2V_MODELS;
 type T2VModelId = keyof typeof T2V_MODELS;
 type PartMode = 'i2v' | 't2v';
 
+// Общий тип для конфигурации модели
+interface ModelConfig {
+  name: string;
+  durations: readonly number[];
+  aspectRatios: readonly string[];
+  defaultDuration: number;
+  defaultAspectRatio: string;
+}
+
 // Типы
 interface KeyframePart {
   id: string;
@@ -245,11 +254,11 @@ function PartCard({
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   // Получаем конфиг текущей модели в зависимости от режима
-  const modelConfig = part.mode === 'i2v' 
-    ? I2V_MODELS[part.i2vModel] 
+  const modelConfig: ModelConfig = part.mode === 'i2v'
+    ? I2V_MODELS[part.i2vModel]
     : T2V_MODELS[part.t2vModel];
   const currentModelId = part.mode === 'i2v' ? part.i2vModel : part.t2vModel;
-  const currentModels = part.mode === 'i2v' ? I2V_MODELS : T2V_MODELS;
+  const currentModels: Record<string, ModelConfig> = part.mode === 'i2v' ? I2V_MODELS : T2V_MODELS;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -262,7 +271,7 @@ function PartCard({
   }, []);
 
   const handleModeChange = (newMode: PartMode) => {
-    const newConfig = newMode === 'i2v' ? I2V_MODELS[part.i2vModel] : T2V_MODELS[part.t2vModel];
+    const newConfig: ModelConfig = newMode === 'i2v' ? I2V_MODELS[part.i2vModel] : T2V_MODELS[part.t2vModel];
     onChange({
       ...part,
       mode: newMode,
