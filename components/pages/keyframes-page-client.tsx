@@ -602,7 +602,7 @@ function VideoTimeline({
   return (
     <div className="bg-[#191919] rounded-2xl p-4 flex flex-col gap-2">
       {/* Time marks - горизонтальная шкала */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <div className="flex items-center" style={{ width: timelineWidth }}>
           {timeMarks.map((time, i) => {
             const nextTime = timeMarks[i + 1];
@@ -624,7 +624,7 @@ function VideoTimeline({
       </div>
 
       {/* Segments - горизонтально скроллящийся контейнер с пропорциональными ширинами */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <div className="flex gap-1" style={{ width: timelineWidth }}>
           {partPositions.map(({ part, index }) => {
             const segment = segments.find(s => s.partId === part.id);
