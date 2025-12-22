@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     siteName: 'BASECRAFT!',
     images: [
       {
-        url: '/og-image.png',
+        url: '/og-image.png?v=2',
         width: 1920,
         height: 1080,
         alt: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
     description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов.',
-    images: ['/og-image.png'],
+    images: ['/og-image.png?v=2'],
   },
   robots: {
     index: true,
