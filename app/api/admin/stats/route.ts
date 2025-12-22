@@ -7,6 +7,7 @@ import { convertToRubWithMarkup } from '@/lib/pricing';
  * GET /api/admin/stats
  * Get admin dashboard statistics with optional filters
  * Uses RPC functions to properly aggregate data (no 1000 row limit)
+ * Supports workspace, user, and date range filtering
  */
 export async function GET(request: NextRequest) {
   try {
@@ -24,6 +25,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const workspaceId = searchParams.get('workspaceId');
     const userId = searchParams.get('userId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     
     const supabase = createServiceRoleClient();
     
@@ -45,16 +48,20 @@ export async function GET(request: NextRequest) {
         ? supabase.from('workspace_members').select('user_id', { count: 'exact', head: true }).eq('workspace_id', workspaceId)
         : supabase.from('users').select('id', { count: 'exact', head: true }),
       
-      // 3. Total stats via RPC
-      (supabase.rpc as any)('get_dashboard_totals', {
+      // 3. Total stats via RPC (with date range support)
+      (supabase.rpc as any)('get_dashboard_totals_v2', {
         p_workspace_id: workspaceId || null,
-        p_user_id: userId || null
+        p_user_id: userId || null,
+        p_start_date: startDate || null,
+        p_end_date: endDate || null,
       }) as Promise<{ data: DashboardTotals[] | null; error: Error | null }>,
       
-      // 4. Today stats via RPC
-      (supabase.rpc as any)('get_dashboard_today_stats', {
+      // 4. Today stats via RPC (with date range support)
+      (supabase.rpc as any)('get_dashboard_today_stats_v2', {
         p_workspace_id: workspaceId || null,
-        p_user_id: userId || null
+        p_user_id: userId || null,
+        p_start_date: startDate || null,
+        p_end_date: endDate || null,
       }) as Promise<{ data: TodayStats[] | null; error: Error | null }>,
     ]);
     
@@ -72,26 +79,32 @@ export async function GET(request: NextRequest) {
       totalCostUsd = totals.total_cost_usd || 0;
       totalFailed = totals.total_failed || 0;
     } else if (totalsResult.error) {
-      // Fallback if RPC not available
-      console.warn('RPC get_dashboard_totals not available, using fallback');
+      // Fallback if RPC not available - apply filters manually
+      console.warn('RPC get_dashboard_totals_v2 not available, using fallback');
       
-      const { count: genCount } = await supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true });
+      let genQuery = supabase.from('generations').select('id', { count: 'exact', head: true });
+      if (workspaceId) genQuery = genQuery.eq('workspace_id', workspaceId);
+      if (userId) genQuery = genQuery.eq('user_id', userId);
+      if (startDate) genQuery = genQuery.gte('created_at', startDate);
+      if (endDate) genQuery = genQuery.lte('created_at', endDate);
+      const { count: genCount } = await genQuery;
       totalGenerations = genCount || 0;
       
-      const { count: failedCount } = await supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'failed');
+      let failedQuery = supabase.from('generations').select('id', { count: 'exact', head: true }).eq('status', 'failed');
+      if (workspaceId) failedQuery = failedQuery.eq('workspace_id', workspaceId);
+      if (userId) failedQuery = failedQuery.eq('user_id', userId);
+      if (startDate) failedQuery = failedQuery.gte('created_at', startDate);
+      if (endDate) failedQuery = failedQuery.lte('created_at', endDate);
+      const { count: failedCount } = await failedQuery;
       totalFailed = failedCount || 0;
       
-      // Cost requires fetching all rows (limited to 1000)
-      const { data: costData } = await supabase
-        .from('generations')
-        .select('cost_usd')
-        .eq('status', 'completed')
-        .not('cost_usd', 'is', null);
+      // Cost requires fetching rows (limited to 1000 but better than nothing)
+      let costQuery = supabase.from('generations').select('cost_usd').eq('status', 'completed').not('cost_usd', 'is', null);
+      if (workspaceId) costQuery = costQuery.eq('workspace_id', workspaceId);
+      if (userId) costQuery = costQuery.eq('user_id', userId);
+      if (startDate) costQuery = costQuery.gte('created_at', startDate);
+      if (endDate) costQuery = costQuery.lte('created_at', endDate);
+      const { data: costData } = await costQuery;
       totalCostUsd = (costData || []).reduce((sum, row: { cost_usd: number }) => sum + (row.cost_usd || 0), 0);
     }
     
@@ -101,13 +114,16 @@ export async function GET(request: NextRequest) {
       costTodayUsd = today.cost_today_usd || 0;
       failedToday = today.failed_today || 0;
     } else if (todayResult.error) {
-      // Fallback
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Fallback - today stats with filters
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartStr = todayStart.toISOString();
       
-      const { count: todayCount } = await supabase
-        .from('generations')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', oneDayAgo);
+      let todayQuery = supabase.from('generations').select('id', { count: 'exact', head: true }).gte('created_at', todayStartStr);
+      if (workspaceId) todayQuery = todayQuery.eq('workspace_id', workspaceId);
+      if (userId) todayQuery = todayQuery.eq('user_id', userId);
+      // Note: For "today" we still want today's data even if date filter is set
+      const { count: todayCount } = await todayQuery;
       generationsToday = todayCount || 0;
     }
     

@@ -114,10 +114,36 @@ export async function GET() {
       }
     }
 
-    // ОПТИМИЗАЦИЯ: Не грузим counts при первоначальной загрузке
-    // Это убирает N дополнительных запросов к БД
-    // Если нужны точные counts - можно добавить отдельный endpoint
+    // Загружаем количество генераций для каждого workspace через RPC
     const generationsCountMap: Record<string, number> = {};
+    
+    if (workspaceIds.length > 0) {
+      // Используем RPC функцию для подсчёта (обходит лимит 1000 строк)
+      type WorkspaceGenCount = { workspace_id: string; generations_count: number };
+      
+      const { data: genCounts, error: rpcError } = await (adminClient.rpc as any)(
+        'get_workspaces_generation_counts',
+        { p_workspace_ids: workspaceIds }
+      ) as { data: WorkspaceGenCount[] | null; error: Error | null };
+      
+      if (!rpcError && genCounts) {
+        genCounts.forEach((g) => {
+          generationsCountMap[g.workspace_id] = g.generations_count || 0;
+        });
+      } else {
+        // Fallback: подсчёт по одному (медленнее, но работает без RPC)
+        console.warn('RPC get_workspaces_generation_counts not available, using fallback');
+        for (const wsId of workspaceIds) {
+          const { count } = await adminClient
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('workspace_id', wsId)
+            .neq('is_keyframe_segment', true);
+          
+          generationsCountMap[wsId] = count || 0;
+        }
+      }
+    }
 
     // Форматируем ответ
     const formattedWorkspaces = workspaces?.map((ws: any) => {

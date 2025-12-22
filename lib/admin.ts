@@ -213,8 +213,9 @@ export async function getAdminUsers(options?: {
     throw new Error(error.message);
   }
   
-  // Get generation counts for each user (TOTAL - without date filters)
+  // Get generation counts for each user
   // Using RPC function to avoid Supabase 1000 row limit
+  // Now supports date filtering - shows stats FOR THE SELECTED PERIOD
   const fetchUserIds = users?.map(u => u.id) || [];
   
   if (fetchUserIds.length > 0) {
@@ -224,46 +225,34 @@ export async function getAdminUsers(options?: {
     let countsByUser: Record<string, { count: number; credits: number; costUsd: number }> = {};
     let hasFilteredGenerations: Record<string, boolean> = {};
     
-    // Try RPC function
+    // Determine if we need date-filtered stats
+    const hasDateFilter = !!(options?.startDate || options?.endDate);
+    
+    // Try new RPC function with date range support
     const { data: rpcStats, error: rpcError } = await (supabase
-      .rpc as any)('get_user_generation_stats', { p_user_ids: fetchUserIds }) as { data: UserStats[] | null; error: Error | null };
+      .rpc as any)('get_user_generation_stats_filtered', { 
+        p_user_ids: fetchUserIds,
+        p_workspace_id: options?.workspaceId || null,
+        p_start_date: options?.startDate || null,
+        p_end_date: options?.endDate || null,
+      }) as { data: UserStats[] | null; error: Error | null };
     
     if (!rpcError && rpcStats) {
-      // Use RPC results
+      // Use RPC results - already filtered by date if specified
       rpcStats.forEach(stat => {
         countsByUser[stat.user_id] = {
           count: stat.generations_count || 0,
           credits: 0,
           costUsd: stat.total_cost_usd || 0
         };
+        // Mark users that have generations in the filtered period
+        if (stat.generations_count > 0) {
+          hasFilteredGenerations[stat.user_id] = true;
+        }
       });
-      
-      // For date filtering, we still need to check which users have generations in the date range
-      if (options?.startDate || options?.endDate) {
-        // Query just to check date range (minimal data)
-        let dateQuery = supabase
-          .from('generations')
-          .select('user_id, created_at')
-          .in('user_id', fetchUserIds);
-        
-        if (options.workspaceId) {
-          dateQuery = dateQuery.eq('workspace_id', options.workspaceId);
-        }
-        if (options.startDate) {
-          dateQuery = dateQuery.gte('created_at', options.startDate);
-        }
-        if (options.endDate) {
-          dateQuery = dateQuery.lte('created_at', options.endDate);
-        }
-        
-        const { data: filteredGens } = await dateQuery;
-        filteredGens?.forEach((g: { user_id: string }) => {
-          hasFilteredGenerations[g.user_id] = true;
-        });
-      }
     } else {
       // Fallback: count individually for each user (slower but works without RPC)
-      console.warn('RPC function not available, using fallback count method');
+      console.warn('RPC function get_user_generation_stats_filtered not available, using fallback count method');
       
       for (const userId of fetchUserIds) {
         let countQuery = supabase
@@ -274,18 +263,31 @@ export async function getAdminUsers(options?: {
         if (options?.workspaceId) {
           countQuery = countQuery.eq('workspace_id', options.workspaceId);
         }
+        if (options?.startDate) {
+          countQuery = countQuery.gte('created_at', options.startDate);
+        }
+        if (options?.endDate) {
+          countQuery = countQuery.lte('created_at', options.endDate);
+        }
         
         const { count } = await countQuery;
         
-        // Get cost sum
+        // Get cost sum with same filters
         let costQuery = supabase
           .from('generations')
           .select('cost_usd')
           .eq('user_id', userId)
+          .eq('status', 'completed')
           .not('cost_usd', 'is', null);
         
         if (options?.workspaceId) {
           costQuery = costQuery.eq('workspace_id', options.workspaceId);
+        }
+        if (options?.startDate) {
+          costQuery = costQuery.gte('created_at', options.startDate);
+        }
+        if (options?.endDate) {
+          costQuery = costQuery.lte('created_at', options.endDate);
         }
         
         const { data: costData } = await costQuery;
@@ -296,24 +298,9 @@ export async function getAdminUsers(options?: {
           credits: 0,
           costUsd: totalCost
         };
-      }
-      
-      // Date filtering for fallback
-      if (options?.startDate || options?.endDate) {
-        for (const userId of fetchUserIds) {
-          let dateQuery = supabase
-            .from('generations')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId);
-          
-          if (options.workspaceId) dateQuery = dateQuery.eq('workspace_id', options.workspaceId);
-          if (options.startDate) dateQuery = dateQuery.gte('created_at', options.startDate);
-          if (options.endDate) dateQuery = dateQuery.lte('created_at', options.endDate);
-          
-          const { count } = await dateQuery;
-          if (count && count > 0) {
-            hasFilteredGenerations[userId] = true;
-          }
+        
+        if (count && count > 0) {
+          hasFilteredGenerations[userId] = true;
         }
       }
     }
@@ -332,7 +319,7 @@ export async function getAdminUsers(options?: {
     }) || [];
     
     // Если есть фильтр по датам - показываем только пользователей с генерациями В ЭТОТ ПЕРИОД
-    if (options?.startDate || options?.endDate) {
+    if (hasDateFilter) {
       return usersWithStats.filter(u => hasFilteredGenerations[u.id]);
     }
     
