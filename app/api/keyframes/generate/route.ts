@@ -12,9 +12,9 @@ export const dynamic = 'force-dynamic';
 const partSchema = z.object({
   id: z.string(),
   model: z.enum([
-    // I2V модели (Начало – Конец)
-    'hailuo-02', 'seedance-1-pro', 'kling-v2.1', 'veo-3.1-fast',
-    // T2V модели (Без изображений)
+    // I2V модели (Начало – Конец) - поддерживают first+last frame
+    'hailuo-02', 'seedance-1-pro', 'veo-3.1-fast',
+    // T2V модели (Без изображений) - только промпт
     'veo-3.1-fast-t2v', 'kling-v2.5-turbo-pro', 'hailuo-2.3', 'wan-2.5-t2v'
   ]),
   mode: z.enum(['i2v', 't2v']),

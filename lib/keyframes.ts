@@ -16,7 +16,7 @@ export interface KeyframePartInput {
   mode?: 'i2v' | 't2v';
 }
 
-// I2V Model configurations (Начало – Конец)
+// I2V Model configurations (Начало – Конец) - модели с поддержкой first+last frame
 export const I2V_KEYFRAME_MODELS = {
   'hailuo-02': {
     replicateModel: 'minimax/hailuo-02',
@@ -26,7 +26,7 @@ export const I2V_KEYFRAME_MODELS = {
       first_frame_image: part.startImage,
       last_frame_image: part.endImage,
       prompt: part.prompt,
-      duration: String(part.duration || 6),
+      duration: String(part.duration || 6), // Hailuo expects string: "6" or "10"
       prompt_optimizer: true,
     }),
   },
@@ -41,25 +41,13 @@ export const I2V_KEYFRAME_MODELS = {
       duration: part.duration || 5,
     }),
   },
-  'kling-v2.1': {
-    replicateModel: 'kwaivgi/kling-v2.1',
-    modelId: 'kling-v2.1-i2v',
-    modelName: 'kling-v2.1',
-    inputMapper: (part: KeyframePartInput) => ({
-      start_image: part.startImage,
-      end_image: part.endImage,
-      prompt: part.prompt,
-      duration: part.duration || 5,
-      aspect_ratio: part.aspectRatio || '16:9',
-    }),
-  },
   'veo-3.1-fast': {
     replicateModel: 'google/veo-3.1-fast',
     modelId: 'veo-3.1-fast-i2v',
     modelName: 'veo-3.1-fast',
     inputMapper: (part: KeyframePartInput) => ({
       image: part.startImage,
-      end_image: part.endImage,
+      last_frame: part.endImage, // Veo uses "last_frame" not "end_image"
       prompt: part.prompt,
       duration: part.duration || 8,
       aspect_ratio: part.aspectRatio || '16:9',
@@ -95,7 +83,7 @@ export const T2V_KEYFRAME_MODELS = {
     modelName: 'hailuo-2.3',
     inputMapper: (part: KeyframePartInput) => ({
       prompt: part.prompt,
-      duration: String(part.duration || 6),
+      duration: part.duration || 6, // Hailuo 2.3 accepts integer (6 or 10)
       prompt_optimizer: true,
     }),
   },
@@ -106,7 +94,8 @@ export const T2V_KEYFRAME_MODELS = {
     inputMapper: (part: KeyframePartInput) => ({
       prompt: part.prompt,
       duration: part.duration || 5,
-      aspect_ratio: part.aspectRatio || '16:9',
+      size: part.aspectRatio === '9:16' ? '720*1280' : '1280*720', // Wan uses "size" not "aspect_ratio"
+      enable_prompt_expansion: true,
     }),
   },
 } as const;

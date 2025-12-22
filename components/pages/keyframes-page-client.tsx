@@ -21,17 +21,10 @@ const I2V_MODELS = {
     defaultDuration: 5,
     defaultAspectRatio: '16:9',
   },
-  'kling-v2.1': {
-    name: 'Kling v2.1',
-    durations: [5, 10],
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    defaultDuration: 5,
-    defaultAspectRatio: '16:9',
-  },
   'veo-3.1-fast': {
     name: 'Veo 3.1 Fast',
-    durations: [5, 8],
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    durations: [4, 6, 8],
+    aspectRatios: ['16:9', '9:16'],
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
   },
@@ -41,8 +34,8 @@ const I2V_MODELS = {
 const T2V_MODELS = {
   'veo-3.1-fast-t2v': {
     name: 'Veo 3.1 Fast',
-    durations: [5, 8],
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    durations: [4, 6, 8],
+    aspectRatios: ['16:9', '9:16'],
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
   },
@@ -63,7 +56,7 @@ const T2V_MODELS = {
   'wan-2.5-t2v': {
     name: 'Wan 2.5 T2V',
     durations: [5, 10],
-    aspectRatios: ['16:9', '9:16', '1:1'],
+    aspectRatios: ['16:9', '9:16'],
     defaultDuration: 5,
     defaultAspectRatio: '16:9',
   },
