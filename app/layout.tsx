@@ -32,7 +32,7 @@ const alumniSans = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.basecraft.ru'),
   title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
-  description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов. Все лучшие генеративные модели в одном месте.',
+  description: 'Создавайте изображения, видео, редактируйте и анализируйте. Все лучшие генеративные модели в одном месте.',
   keywords: ['ИИ', 'генерация изображений', 'генерация видео', 'искусственный интеллект', 'нейросети', 'AI', 'image generation', 'video generation', 'upscale', 'BASECRAFT'],
   authors: [{ name: 'BASECRAFT!' }],
   icons: {
@@ -44,12 +44,12 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
-    description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов. Все лучшие генеративные модели в одном месте.',
+    description: 'Создавайте изображения, видео, редактируйте и анализируйте. Все лучшие генеративные модели в одном месте.',
     url: 'https://www.basecraft.ru',
     siteName: 'BASECRAFT!',
     images: [
       {
-        url: '/og-image.png?v=2',
+        url: '/og-image.png?v=3',
         width: 1920,
         height: 1080,
         alt: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
@@ -61,8 +61,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'BASECRAFT! — Все лучшие генеративные модели в одном месте',
-    description: 'Создавайте изображения, видео, редактируйте и анализируйте — без подписок и лимитов.',
-    images: ['/og-image.png?v=2'],
+    description: 'Создавайте изображения, видео, редактируйте и анализируйте. Все лучшие генеративные модели в одном месте.',
+    images: ['/og-image.png?v=3'],
   },
   robots: {
     index: true,
