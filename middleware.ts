@@ -5,8 +5,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 // Имя cookie для кэширования сессии
 const SESSION_CHECK_COOKIE = 'session_checked';
 const USER_ROLE_COOKIE = 'user_role';
+const WORKSPACE_CHECK_COOKIE = 'has_workspace';
 const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 const SESSION_CHECK_TTL = 60 * 1000; // 1 минута - для быстрой проверки сессии
+const WORKSPACE_CHECK_TTL = 60 * 1000; // 1 минута - для проверки workspace
 
 /**
  * Быстрая проверка наличия сессии по cookie
@@ -84,6 +86,63 @@ async function getUserRole(
 
 function isAdminRole(role: string | null | undefined): boolean {
   return role === 'admin' || role === 'super_admin';
+}
+
+/**
+ * Проверить есть ли у пользователя workspace с кэшированием
+ */
+async function checkUserHasWorkspace(
+  userId: string,
+  request: NextRequest,
+  response: NextResponse
+): Promise<boolean> {
+  // Проверяем кэш в cookie
+  const cachedCheck = request.cookies.get(WORKSPACE_CHECK_COOKIE)?.value;
+  if (cachedCheck) {
+    const [hasWorkspace, cachedUserId, timestamp] = cachedCheck.split(':');
+    const age = Date.now() - parseInt(timestamp || '0');
+    
+    if (cachedUserId === userId && age < WORKSPACE_CHECK_TTL) {
+      return hasWorkspace === 'true';
+    }
+  }
+  
+  // Запрашиваем из БД
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+    
+    const { data } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+    
+    const hasWorkspace = !!data;
+    
+    // Кэшируем в cookie
+    const cacheValue = `${hasWorkspace}:${userId}:${Date.now()}`;
+    response.cookies.set(WORKSPACE_CHECK_COOKIE, cacheValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60, // 1 минута
+      path: '/',
+    });
+    
+    return hasWorkspace;
+  } catch {
+    return false;
+  }
 }
 
 // Protected routes that require auth check
@@ -211,6 +270,43 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
+  }
+
+  // For protected routes (not admin), check if user has workspace
+  // Users without workspace should be redirected to home (where they see waiting page)
+  if (needsAuthCheck(pathname) && user && !isAdminPath) {
+    // Get user ID from our users table
+    try {
+      const serviceSupabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
+      
+      const { data: dbUser } = await serviceSupabase
+        .from('users')
+        .select('id')
+        .eq('email', user.email?.toLowerCase())
+        .single();
+      
+      if (dbUser) {
+        const hasWorkspace = await checkUserHasWorkspace(dbUser.id, request, supabaseResponse);
+        
+        if (!hasWorkspace) {
+          // Redirect to home page where waiting page will be shown
+          const url = request.nextUrl.clone();
+          url.pathname = '/';
+          return NextResponse.redirect(url);
+        }
+      }
+    } catch (error) {
+      console.error('[Middleware] Error checking workspace:', error);
+    }
   }
 
   return supabaseResponse;
