@@ -538,10 +538,26 @@ function VideoTimeline({
   segments: GenerationSegment[];
   totalDuration: number;
 }) {
-  // Генерируем временные метки каждые 5 секунд
+  // Пиксели на секунду для пропорциональной ширины
+  const PIXELS_PER_SECOND = 40;
+  
+  // Рассчитываем накопленное время для каждой части
+  const partPositions = parts.reduce((acc, part, index) => {
+    const startTime = index === 0 ? 0 : acc[index - 1].endTime;
+    const endTime = startTime + part.duration;
+    acc.push({ part, startTime, endTime, index });
+    return acc;
+  }, [] as { part: KeyframePart; startTime: number; endTime: number; index: number }[]);
+
+  // Генерируем временные метки каждые 5 секунд до общей длительности
+  const maxTime = Math.max(totalDuration, 10);
   const timeMarks: number[] = [];
-  for (let t = 0; t <= Math.max(totalDuration, 30); t += 5) {
+  for (let t = 0; t <= maxTime; t += 5) {
     timeMarks.push(t);
+  }
+  // Добавляем конечную метку если она не кратна 5
+  if (timeMarks[timeMarks.length - 1] < maxTime) {
+    timeMarks.push(maxTime);
   }
 
   const formatTime = (seconds: number) => {
@@ -580,34 +596,47 @@ function VideoTimeline({
     }
   };
 
+  // Общая ширина таймлайна
+  const timelineWidth = maxTime * PIXELS_PER_SECOND;
+
   return (
-    <div className="bg-[#191919] rounded-2xl p-4 flex flex-col gap-4">
+    <div className="bg-[#191919] rounded-2xl p-4 flex flex-col gap-2">
       {/* Time marks - горизонтальная шкала */}
-      <div className="flex items-center gap-3 w-full">
-        {timeMarks.map((time, i) => (
-          <div key={i} className="flex items-center gap-3 shrink-0">
-            <span className="text-[8px] text-[#b1b1b1] font-normal">{formatTime(time)}</span>
-            {i < timeMarks.length - 1 && (
-              <div 
-                className="h-0 border-t-2 border-dashed border-[#717171]" 
-                style={{ width: '80px' }}
-              />
-            )}
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <div className="flex items-center" style={{ width: timelineWidth }}>
+          {timeMarks.map((time, i) => {
+            const nextTime = timeMarks[i + 1];
+            const gapWidth = nextTime !== undefined ? (nextTime - time) * PIXELS_PER_SECOND : 0;
+            
+            return (
+              <div key={i} className="flex items-center shrink-0">
+                <span className="text-[8px] text-[#b1b1b1] font-normal whitespace-nowrap">{formatTime(time)}</span>
+                {i < timeMarks.length - 1 && (
+                  <div 
+                    className="h-0 border-t-2 border-dashed border-[#717171] mx-2" 
+                    style={{ width: Math.max(gapWidth - 40, 20) }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Segments - горизонтально скроллящийся контейнер */}
+      {/* Segments - горизонтально скроллящийся контейнер с пропорциональными ширинами */}
       <div className="overflow-x-auto">
-        <div className="flex gap-1 min-w-max">
-          {parts.map((part, index) => {
+        <div className="flex gap-1" style={{ width: timelineWidth }}>
+          {partPositions.map(({ part, index }) => {
             const segment = segments.find(s => s.partId === part.id);
             const status = segment?.status || 'pending';
+            // Ширина пропорциональна длительности
+            const partWidth = part.duration * PIXELS_PER_SECOND - 4; // -4 для gap
 
             return (
               <div
                 key={part.id}
-                className="w-[260px] shrink-0 bg-[#070707] rounded-xl p-1.5 flex flex-col gap-2"
+                className="shrink-0 bg-[#070707] rounded-xl p-1.5 flex flex-col gap-2"
+                style={{ width: Math.max(partWidth, 120) }}
               >
                 {/* Заголовок + статус */}
                 <div className="bg-[#171717] rounded-lg px-2 py-1 flex items-center justify-between">
@@ -623,7 +652,7 @@ function VideoTimeline({
                 </div>
 
                 {/* Промпт текст */}
-                <div className="bg-[#151515] rounded-lg p-2 min-h-[48px]">
+                <div className="bg-[#151515] rounded-lg p-2 flex-1 min-h-[32px]">
                   <p className="text-[8px] text-[#a59e9e] line-clamp-3">
                     {part.prompt || 'Промпт не задан'}
                   </p>
@@ -633,7 +662,7 @@ function VideoTimeline({
                 {part.mode === 'i2v' && (part.startImage || part.endImage) && (
                   <div className="flex gap-1">
                     {part.startImage && (
-                      <div className="relative w-1/2 h-12 bg-[#101010] rounded overflow-hidden">
+                      <div className="relative w-1/2 h-10 bg-[#101010] rounded overflow-hidden">
                         <Image
                           src={part.startImage}
                           alt="Start"
@@ -643,7 +672,7 @@ function VideoTimeline({
                       </div>
                     )}
                     {part.endImage && (
-                      <div className="relative w-1/2 h-12 bg-[#101010] rounded overflow-hidden">
+                      <div className="relative w-1/2 h-10 bg-[#101010] rounded overflow-hidden">
                         <Image
                           src={part.endImage}
                           alt="End"
@@ -660,10 +689,9 @@ function VideoTimeline({
 
           {/* Кнопка добавления части - пунктирная граница */}
           <div
-            className="w-[80px] shrink-0 bg-[#191919] rounded-lg border border-dashed border-[#545454] flex items-center justify-center cursor-pointer hover:border-[#717171] transition-colors"
-            style={{ minHeight: parts.length > 0 ? 'auto' : '100px' }}
+            className="w-[60px] shrink-0 bg-[#191919] rounded-lg border border-dashed border-[#545454] flex items-center justify-center cursor-pointer hover:border-[#717171] transition-colors self-stretch"
           >
-            <Plus className="w-6 h-6 text-[#959595]" />
+            <Plus className="w-5 h-5 text-[#959595]" />
           </div>
         </div>
       </div>
