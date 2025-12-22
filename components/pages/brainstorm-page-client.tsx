@@ -520,52 +520,23 @@ export default function BrainstormPageClient() {
           continue;
         }
         
-        // Default settings for models that require them
-        const defaultSettings: Record<string, any> = {};
+        // Default settings - aspect_ratio for all models as base
+        const defaultSettings: Record<string, any> = {
+          aspect_ratio: '1:1',
+        };
         
-        // Model-specific settings based on Replicate API requirements
+        // Add model-specific settings ON TOP of defaults
         if (modelId.includes('recraft')) {
-          // Recraft models: size + style required
           defaultSettings.size = '1024x1024';
           defaultSettings.style = 'any';
         } else if (modelId.includes('seedream')) {
-          // SeeDream: size + aspect_ratio
           defaultSettings.size = '2K';
-          defaultSettings.aspect_ratio = '1:1';
         } else if (modelId === 'nano-banana-pro') {
-          // Nano Banana Pro: resolution + aspect_ratio
           defaultSettings.resolution = '2K';
-          defaultSettings.aspect_ratio = '1:1';
-        } else if (modelId === 'imagen-4-ultra') {
-          // Imagen 4 Ultra: aspect_ratio + safety_filter_level
-          defaultSettings.aspect_ratio = '1:1';
-          defaultSettings.safety_filter_level = 'block_only_high';
         } else if (modelId === 'z-image-turbo') {
-          // Z-Image Turbo: uses width/height instead of aspect_ratio
           defaultSettings.width = 1024;
           defaultSettings.height = 1024;
           defaultSettings.num_inference_steps = 8;
-        } else if (modelId.includes('flux-2') || modelId.includes('flux-1')) {
-          // FLUX models: aspect_ratio
-          defaultSettings.aspect_ratio = '1:1';
-        } else if (modelId === 'flux-kontext-max') {
-          // FLUX Kontext Max: aspect_ratio
-          defaultSettings.aspect_ratio = '1:1';
-        } else if (modelId.includes('sd-') || modelId.includes('stable-diffusion')) {
-          // Stable Diffusion: aspect_ratio
-          defaultSettings.aspect_ratio = '1:1';
-        } else if (modelId.includes('ideogram')) {
-          // Ideogram: aspect_ratio
-          defaultSettings.aspect_ratio = '1:1';
-        } else if (modelId === 'minimax-image-01') {
-          // MiniMax: aspect_ratio
-          defaultSettings.aspect_ratio = '1:1';
-        } else if (modelId === 'reve-create') {
-          // Reve: aspect_ratio
-          defaultSettings.aspect_ratio = '1:1';
-        } else {
-          // Default for other models
-          defaultSettings.aspect_ratio = '1:1';
         }
         
         const response = await fetch('/api/generations/create', {
