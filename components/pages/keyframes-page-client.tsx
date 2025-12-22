@@ -7,14 +7,6 @@ import Image from 'next/image';
 
 // Конфигурация моделей
 const MODEL_CONFIG = {
-  'kling-2.0': {
-    name: 'Kling 2.0',
-    durations: [5, 10],
-    aspectRatios: ['16:9', '9:16', '1:1'],
-    defaultDuration: 5,
-    defaultAspectRatio: '16:9',
-    supportsImages: true,
-  },
   'hailuo-02': {
     name: 'Hailuo 02',
     durations: [6, 10],
@@ -783,13 +775,13 @@ function KeyframesContent() {
   const [parts, setParts] = useState<KeyframePart[]>([
     {
       id: crypto.randomUUID(),
-      model: 'kling-2.0',
+      model: 'hailuo-02',
       mode: 'start-end',
       startImage: null,
       endImage: null,
       prompt: '',
-      duration: MODEL_CONFIG['kling-2.0'].defaultDuration,
-      aspectRatio: MODEL_CONFIG['kling-2.0'].defaultAspectRatio,
+      duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
+      aspectRatio: MODEL_CONFIG['hailuo-02'].defaultAspectRatio,
       isCollapsed: false,
     },
   ]);
@@ -810,13 +802,13 @@ function KeyframesContent() {
       ...prev.map(p => ({ ...p, isCollapsed: true })),
       {
         id: crypto.randomUUID(),
-        model: 'kling-2.0',
+        model: 'hailuo-02',
         mode: 'start-end' as PartMode,
         startImage: null,
         endImage: null,
         prompt: '',
-        duration: MODEL_CONFIG['kling-2.0'].defaultDuration,
-        aspectRatio: MODEL_CONFIG['kling-2.0'].defaultAspectRatio,
+        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
+        aspectRatio: MODEL_CONFIG['hailuo-02'].defaultAspectRatio,
         isCollapsed: false,
       },
     ]);
@@ -834,13 +826,13 @@ function KeyframesContent() {
     setParts([
       {
         id: crypto.randomUUID(),
-        model: 'kling-2.0',
+        model: 'hailuo-02',
         mode: 'start-end',
         startImage: null,
         endImage: null,
         prompt: '',
-        duration: MODEL_CONFIG['kling-2.0'].defaultDuration,
-        aspectRatio: MODEL_CONFIG['kling-2.0'].defaultAspectRatio,
+        duration: MODEL_CONFIG['hailuo-02'].defaultDuration,
+        aspectRatio: MODEL_CONFIG['hailuo-02'].defaultAspectRatio,
         isCollapsed: false,
       },
     ]);
@@ -986,10 +978,10 @@ function KeyframesContent() {
       <Header />
 
       {/* Desktop Layout */}
-      <main className="hidden lg:flex flex-1">
+      <main className="hidden lg:flex flex-1 gap-6">
         {/* LEFT PANEL - INPUT */}
-        <div className="w-[400px] flex flex-col border-r border-[#2f2f2f]">
-          <div className="flex-1 flex flex-col p-6 overflow-y-auto pb-32">
+        <div className="w-[480px] flex flex-col pl-20 pr-0 relative">
+          <div className="flex-1 flex flex-col py-8 overflow-y-auto pb-32">
             {/* Header */}
             <div className="mb-4 shrink-0">
               <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
@@ -1023,7 +1015,7 @@ function KeyframesContent() {
           </div>
 
           {/* Sticky buttons */}
-          <div className="sticky bottom-0 bg-[#101010] p-6 pt-4 border-t border-[#1f1f1f]">
+          <div className="sticky bottom-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
             <div className="flex gap-3">
               <button
                 type="button"
@@ -1049,8 +1041,13 @@ function KeyframesContent() {
           </div>
         </div>
 
+        {/* DIVIDER */}
+        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
+          <div className="w-px h-full bg-[#2f2f2f]" />
+        </div>
+
         {/* RIGHT PANEL - OUTPUT */}
-        <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4">
+        <div className="flex-1 py-8 pl-0 pr-20 overflow-y-auto flex flex-col gap-6">
           {/* Header + Actions */}
           <div className="flex items-center justify-between">
             <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
