@@ -35,7 +35,7 @@ export const CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'minimax-image-01', displayName: 'MiniMax Image-01', description: 'Дешевая генерация с поддержкой референса лица', action: 'create' },
   { id: 'reve-create', displayName: 'Reve Create', description: 'Генерация от Reve', action: 'create' },
   { id: 'z-image-turbo', displayName: 'Z-Image Turbo', description: 'Супербыстрая генерация (8 шагов)', action: 'create' },
-  { id: 'gen4-image-turbo', displayName: 'Gen4 Image Turbo', description: 'Runway - быстрая генерация с референсами', action: 'create' },
+  // gen4-image-turbo removed - requires reference_images (can't work in brainstorm)
 ];
 
 export const EDIT_MODELS_LITE: ModelLite[] = [

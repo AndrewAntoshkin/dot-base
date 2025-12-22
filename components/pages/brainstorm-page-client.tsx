@@ -509,6 +509,17 @@ export default function BrainstormPageClient() {
       const tempId = newGenerations[i].id;
       
       try {
+        // Skip models that require reference images (can't work in brainstorm without them)
+        if (modelId === 'gen4-image-turbo') {
+          setGenerations(prev => prev.map(g => {
+            if (g.id === tempId) {
+              return { ...g, status: 'failed' as const, error: 'Требуются референсы' };
+            }
+            return g;
+          }));
+          continue;
+        }
+        
         // Default settings for models that require them
         const defaultSettings: Record<string, any> = {};
         
@@ -528,14 +539,28 @@ export default function BrainstormPageClient() {
           // Imagen 4 Ultra: aspect_ratio + safety_filter_level
           defaultSettings.aspect_ratio = '1:1';
           defaultSettings.safety_filter_level = 'block_only_high';
-        } else if (modelId.includes('flux-2')) {
-          // FLUX 2 models: aspect_ratio
+        } else if (modelId === 'z-image-turbo') {
+          // Z-Image Turbo: uses width/height instead of aspect_ratio
+          defaultSettings.width = 1024;
+          defaultSettings.height = 1024;
+          defaultSettings.num_inference_steps = 8;
+        } else if (modelId.includes('flux-2') || modelId.includes('flux-1')) {
+          // FLUX models: aspect_ratio
+          defaultSettings.aspect_ratio = '1:1';
+        } else if (modelId === 'flux-kontext-max') {
+          // FLUX Kontext Max: aspect_ratio
           defaultSettings.aspect_ratio = '1:1';
         } else if (modelId.includes('sd-') || modelId.includes('stable-diffusion')) {
           // Stable Diffusion: aspect_ratio
           defaultSettings.aspect_ratio = '1:1';
         } else if (modelId.includes('ideogram')) {
           // Ideogram: aspect_ratio
+          defaultSettings.aspect_ratio = '1:1';
+        } else if (modelId === 'minimax-image-01') {
+          // MiniMax: aspect_ratio
+          defaultSettings.aspect_ratio = '1:1';
+        } else if (modelId === 'reve-create') {
+          // Reve: aspect_ratio
           defaultSettings.aspect_ratio = '1:1';
         } else {
           // Default for other models
