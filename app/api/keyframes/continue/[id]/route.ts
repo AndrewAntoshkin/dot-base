@@ -137,10 +137,10 @@ export async function POST(
         .from('generations') as any)
         .insert({
           user_id: completedGen.user_id,
-          action: 'video_merge',
+          action: 'video_edit',
           model_id: 'video-merge',
-          model_name: 'Video Merge',
-          replicate_model: 'fofr/video-to-video:53afdce37ffa38fbd2b1c6e2c6e8b93b5cb3a0ce4dfb3c79a5ebb6cbe0c2d9cc',
+          model_name: 'video-merge',
+          replicate_model: 'lucataco/video-merge',
           settings: {
             keyframe_group_id: keyframeGroupId,
             keyframe_merge: true,
@@ -148,6 +148,10 @@ export async function POST(
           },
           status: 'pending',
           cost_credits: 1,
+          replicate_input: {
+            video_files: videoUrls,
+            keep_audio: true,
+          },
         })
         .select()
         .single();
@@ -165,11 +169,11 @@ export async function POST(
         : undefined;
 
       const { prediction, tokenId } = await replicateClient.run({
-        model: 'fofr/video-merge',
+        model: 'lucataco/video-merge',
+        version: '65c81d0d0689d8608af8c2f59728135925419f4b5e62065c37fc350130fed67a',
         input: {
-          video_files: videoUrls.join('\n'),
-          transition: 'crossfade',
-          transition_duration: 0.5,
+          video_files: videoUrls,
+          keep_audio: true,
         },
         webhook: webhookUrl,
         webhook_events_filter: webhookUrl ? ['completed'] : undefined,
