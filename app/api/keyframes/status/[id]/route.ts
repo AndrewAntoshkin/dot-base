@@ -3,8 +3,86 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { getReplicateClient } from '@/lib/replicate/client';
 
 export const dynamic = 'force-dynamic';
+
+// Check Replicate status directly and update DB if webhook failed
+async function checkAndSyncReplicateStatus(
+  generation: any,
+  supabase: any
+): Promise<any> {
+  if (!generation.replicate_prediction_id) return generation;
+  if (generation.status !== 'processing') return generation;
+  
+  // Only check if processing for more than 30 seconds
+  const startedAt = new Date(generation.started_at).getTime();
+  const now = Date.now();
+  const processingTime = now - startedAt;
+  
+  if (processingTime < 30000) return generation;
+  
+  try {
+    const replicateClient = getReplicateClient();
+    const prediction = await replicateClient.getPrediction(generation.replicate_prediction_id);
+    
+    if (!prediction) return generation;
+    
+    // If Replicate shows completed but our DB shows processing - sync it
+    if (prediction.status === 'succeeded' && generation.status === 'processing') {
+      logger.info(`Fallback sync: Generation ${generation.id} completed on Replicate but webhook missed`);
+      
+      const outputUrls = Array.isArray(prediction.output) 
+        ? prediction.output 
+        : prediction.output ? [prediction.output] : [];
+      
+      const { data: updated } = await (supabase
+        .from('generations') as any)
+        .update({
+          status: 'completed',
+          output_urls: outputUrls,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', generation.id)
+        .select()
+        .single();
+      
+      // Trigger next segment or merge
+      if (updated?.is_keyframe_segment) {
+        try {
+          await fetch(`${process.env.NEXTAUTH_URL}/api/keyframes/continue/${generation.id}`, {
+            method: 'POST',
+          });
+        } catch (e) {
+          logger.error('Failed to trigger continue:', e);
+        }
+      }
+      
+      return updated || { ...generation, status: 'completed', output_urls: outputUrls };
+    }
+    
+    if (prediction.status === 'failed') {
+      logger.info(`Fallback sync: Generation ${generation.id} failed on Replicate`);
+      
+      const { data: updated } = await (supabase
+        .from('generations') as any)
+        .update({
+          status: 'failed',
+          error_message: prediction.error || 'Generation failed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', generation.id)
+        .select()
+        .single();
+      
+      return updated || { ...generation, status: 'failed' };
+    }
+  } catch (error) {
+    logger.error('Replicate status check error:', error);
+  }
+  
+  return generation;
+}
 
 export async function GET(
   request: NextRequest,
@@ -12,6 +90,8 @@ export async function GET(
 ) {
   try {
     const { id: keyframeGroupId } = await params;
+    const { searchParams } = new URL(request.url);
+    const checkReplicate = searchParams.get('checkReplicate') === 'true';
     
     // Auth check
     const cookieStore = await cookies();
@@ -45,12 +125,31 @@ export async function GET(
     const supabase = createServiceRoleClient();
 
     // Get all generations for this keyframe group using JSONB containment
-    const { data: generations, error } = await (supabase
+    let { data: generations, error } = await (supabase
       .from('generations') as any)
       .select('*')
       .eq('user_id', user.id)
       .contains('settings', { keyframe_group_id: keyframeGroupId })
       .order('created_at', { ascending: true });
+    
+    // Fallback: check Replicate status directly if requested and there are processing segments
+    if (checkReplicate && generations) {
+      const processingGenerations = generations.filter((g: any) => g.status === 'processing');
+      for (const gen of processingGenerations) {
+        const synced = await checkAndSyncReplicateStatus(gen, supabase);
+        if (synced.status !== gen.status) {
+          // Re-fetch all generations after sync
+          const { data: refreshed } = await (supabase
+            .from('generations') as any)
+            .select('*')
+            .eq('user_id', user.id)
+            .contains('settings', { keyframe_group_id: keyframeGroupId })
+            .order('created_at', { ascending: true });
+          generations = refreshed;
+          break;
+        }
+      }
+    }
 
     if (error) {
       logger.error('Error fetching keyframe generations:', error);

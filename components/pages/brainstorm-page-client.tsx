@@ -503,10 +503,10 @@ export default function BrainstormPageClient() {
     
     setGenerations(prev => [...prev, ...newGenerations]);
     
-    // Start all generations in parallel
-    for (let i = 0; i < selectedModels.length; i++) {
-      const modelId = selectedModels[i];
-      const tempId = newGenerations[i].id;
+    // Helper function to create a single generation with retry
+    const createGeneration = async (modelId: string, tempId: string, retryCount = 0): Promise<void> => {
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY = 2000; // 2 seconds
       
       try {
         // Skip models that require reference images (can't work in brainstorm without them)
@@ -517,7 +517,7 @@ export default function BrainstormPageClient() {
             }
             return g;
           }));
-          continue;
+          return;
         }
         
         // Default settings - aspect_ratio for all models as base
@@ -537,6 +537,8 @@ export default function BrainstormPageClient() {
           defaultSettings.width = 1024;
           defaultSettings.height = 1024;
           defaultSettings.num_inference_steps = 8;
+        } else if (modelId === 'imagen-4-ultra') {
+          defaultSettings.safety_filter_level = 'block_only_high';
         }
         
         const response = await fetch('/api/generations/create', {
@@ -577,11 +579,17 @@ export default function BrainstormPageClient() {
             created_at: new Date().toISOString(),
             viewed: false,
           });
+        } else if (response.status === 429 && retryCount < MAX_RETRIES) {
+          // Rate limit - wait and retry
+          console.log(`Rate limit hit for ${modelId}, retrying in ${RETRY_DELAY}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+          return createGeneration(modelId, tempId, retryCount + 1);
         } else {
           // Mark as failed
+          const errorData = await response.json().catch(() => ({}));
           setGenerations(prev => prev.map(g => {
             if (g.id === tempId) {
-              return { ...g, status: 'failed' as const, error: 'Ошибка при создании' };
+              return { ...g, status: 'failed' as const, error: errorData.error || 'Ошибка при создании' };
             }
             return g;
           }));
@@ -595,8 +603,24 @@ export default function BrainstormPageClient() {
           return g;
         }));
       }
+    };
+    
+    // Start generations with staggered delays to avoid rate limiting
+    const STAGGER_DELAY = 500; // 500ms between each request
+    
+    for (let i = 0; i < selectedModels.length; i++) {
+      const modelId = selectedModels[i];
+      const tempId = newGenerations[i].id;
+      
+      // Add delay between requests to avoid hitting rate limit
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, STAGGER_DELAY));
+      }
+      
+      // Don't await - start in background so UI updates faster
+      createGeneration(modelId, tempId);
     }
-  }, [prompt, selectedModels, generations, addGeneration]);
+  }, [prompt, selectedModels, generations, addGeneration, selectedWorkspaceId]);
   
   const handleClear = useCallback(() => {
     setGenerations([]);

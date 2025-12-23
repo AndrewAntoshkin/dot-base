@@ -1048,9 +1048,21 @@ function KeyframesContent() {
   };
 
   const pollStatus = async (keyframeGroupId: string) => {
+    let pollCount = 0;
+    let lastProgressPercent = 0;
+    let stuckCount = 0;
+    
     const poll = async () => {
+      pollCount++;
+      
       try {
-        const response = await fetch(`/api/keyframes/status/${keyframeGroupId}`, {
+        // After 10 polls (30+ seconds) with no progress, enable Replicate fallback check
+        const checkReplicate = stuckCount >= 3;
+        const url = checkReplicate 
+          ? `/api/keyframes/status/${keyframeGroupId}?checkReplicate=true`
+          : `/api/keyframes/status/${keyframeGroupId}`;
+        
+        const response = await fetch(url, {
           credentials: 'include',
         });
         
@@ -1059,6 +1071,14 @@ function KeyframesContent() {
         }
         
         const status = await response.json();
+        
+        // Track if progress is stuck
+        if (status.progress?.percent === lastProgressPercent && status.status === 'generating') {
+          stuckCount++;
+        } else {
+          stuckCount = 0;
+          lastProgressPercent = status.progress?.percent || 0;
+        }
         
         const mappedSegments = status.segments?.map((s: any) => ({
           partId: parts[s.index]?.id || s.id,
@@ -1086,7 +1106,8 @@ function KeyframesContent() {
           return;
         }
         
-        const pollInterval = status.status === 'merging' ? 2000 : 3000;
+        // Faster polling if using fallback, otherwise normal interval
+        const pollInterval = checkReplicate ? 5000 : (status.status === 'merging' ? 2000 : 3000);
         setTimeout(poll, pollInterval);
         
       } catch (error) {
