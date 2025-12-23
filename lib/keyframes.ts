@@ -211,8 +211,8 @@ export async function startNextKeyframeSegment(
   const completedSegments = allSegments.filter((s: any) => s.status === 'completed');
   
   if (completedSegments.length === totalSegments) {
-    // All segments done - start merge
-    logger.info(`All ${totalSegments} segments completed, starting merge...`);
+    // All segments done
+    logger.info(`All ${totalSegments} segments completed`);
     
     const segmentVideos = completedSegments
       .sort((a: any, b: any) => a.settings.keyframe_index - b.settings.keyframe_index)
@@ -221,6 +221,12 @@ export async function startNextKeyframeSegment(
 
     if (segmentVideos.length !== totalSegments) {
       logger.error('Missing video URLs for some segments');
+      return { started: false };
+    }
+    
+    // If only 1 segment - no merge needed
+    if (totalSegments === 1) {
+      logger.info('Only 1 segment, no merge needed');
       return { started: false };
     }
 

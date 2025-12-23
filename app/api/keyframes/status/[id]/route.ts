@@ -199,6 +199,9 @@ export async function GET(
     const allSegmentsCompleted = completedSegments === totalSegments;
     const anySegmentFailed = segments.some((s: any) => s.status === 'failed');
 
+    // Get first completed segment video for fallback
+    const firstCompletedVideo = sortedSegments.find((s: any) => s.status === 'completed' && s.output_urls?.[0])?.output_urls?.[0];
+    
     if (anySegmentFailed) {
       overallStatus = 'failed';
       currentStep = 'segment';
@@ -207,16 +210,30 @@ export async function GET(
         overallStatus = 'completed';
         currentStep = 'done';
       } else if (mergeGeneration.status === 'failed') {
-        overallStatus = 'failed';
-        currentStep = 'merge';
+        // Merge failed - but if we have segments, show them as result
+        if (totalSegments === 1 && firstCompletedVideo) {
+          // Only 1 segment, no merge needed - treat as completed
+          overallStatus = 'completed';
+          currentStep = 'done';
+        } else {
+          overallStatus = 'failed';
+          currentStep = 'merge';
+        }
       } else {
         overallStatus = 'merging';
         currentStep = 'merge';
       }
     } else if (allSegmentsCompleted) {
-      // Merge should start soon via webhook
-      overallStatus = 'merging';
-      currentStep = 'merge';
+      // All segments done
+      if (totalSegments === 1) {
+        // Only 1 segment - no merge needed, completed!
+        overallStatus = 'completed';
+        currentStep = 'done';
+      } else {
+        // Merge should start soon via webhook
+        overallStatus = 'merging';
+        currentStep = 'merge';
+      }
     }
 
     // Calculate overall progress percentage
@@ -230,6 +247,13 @@ export async function GET(
       progressPercent = Math.round((completedSegments / totalSegments) * 90);
     }
 
+    // Determine final video URL
+    // Priority: merge result > single segment (if only 1) > first segment (fallback)
+    let finalVideoUrl = mergeGeneration?.output_urls?.[0];
+    if (!finalVideoUrl && totalSegments === 1 && firstCompletedVideo) {
+      finalVideoUrl = firstCompletedVideo;
+    }
+    
     return NextResponse.json({
       id: keyframeGroupId,
       status: overallStatus,
@@ -242,10 +266,12 @@ export async function GET(
         percent: progressPercent,
         isMerging: currentStep === 'merge',
       },
-      finalVideoUrl: mergeGeneration?.output_urls?.[0],
+      finalVideoUrl,
       mergeGenerationId: mergeGeneration?.id,
       mergeStatus: mergeGeneration?.status,
-      error: mergeGeneration?.error_message || segments.find((s: any) => s.error_message)?.error_message,
+      error: overallStatus === 'failed' 
+        ? (mergeGeneration?.error_message || segments.find((s: any) => s.error_message)?.error_message)
+        : undefined,
     });
 
   } catch (error: any) {
