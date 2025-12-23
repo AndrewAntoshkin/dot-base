@@ -103,6 +103,7 @@ interface KeyframeGeneration {
   status: 'idle' | 'generating' | 'merging' | 'completed' | 'failed';
   segments: GenerationSegment[];
   finalVideoUrl?: string;
+  allVideoUrls?: string[]; // All segment videos for multi-part playback
   mergeGenerationId?: string;
   error?: string;
   progress?: {
@@ -761,11 +762,16 @@ function VideoControls({
 }
 
 // Видеоплеер
-function VideoPlayer({ videoUrl }: { videoUrl: string }) {
+function VideoPlayer({ videoUrls }: { videoUrls: string[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [videoDurations, setVideoDurations] = useState<number[]>([]);
+
+  const currentVideoUrl = videoUrls[currentVideoIndex] || videoUrls[0];
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -778,17 +784,56 @@ function VideoPlayer({ videoUrl }: { videoUrl: string }) {
     }
   };
 
+  const handleVideoEnded = () => {
+    // Move to next video if available
+    if (currentVideoIndex < videoUrls.length - 1) {
+      setCurrentVideoIndex(currentVideoIndex + 1);
+      // Auto-play next video
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.play();
+        }
+      }, 100);
+    } else {
+      setIsPlaying(false);
+      setCurrentVideoIndex(0);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    const videoDuration = videoRef.current?.duration || 0;
+    setDuration(videoDuration);
+    
+    // Track individual video durations for total calculation
+    setVideoDurations(prev => {
+      const newDurations = [...prev];
+      newDurations[currentVideoIndex] = videoDuration;
+      const total = newDurations.reduce((sum, d) => sum + (d || 0), 0);
+      setTotalDuration(total);
+      return newDurations;
+    });
+  };
+
+  // Calculate cumulative time across all videos
+  const getCumulativeTime = () => {
+    let cumulative = 0;
+    for (let i = 0; i < currentVideoIndex; i++) {
+      cumulative += videoDurations[i] || 0;
+    }
+    return cumulative + currentTime;
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="relative bg-[#050505] rounded-2xl overflow-hidden aspect-video">
         <video
           ref={videoRef}
-          src={videoUrl}
+          src={currentVideoUrl}
           className="w-full h-full object-contain"
           preload="metadata"
           onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
-          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
-          onEnded={() => setIsPlaying(false)}
+          onLoadedMetadata={handleLoadedMetadata}
+          onEnded={handleVideoEnded}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
         />
@@ -800,12 +845,19 @@ function VideoPlayer({ videoUrl }: { videoUrl: string }) {
             <Play className="w-7 h-7 text-white fill-white ml-1" />
           </button>
         )}
+        
+        {/* Video counter badge */}
+        {videoUrls.length > 1 && (
+          <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs text-white">
+            {currentVideoIndex + 1} / {videoUrls.length}
+          </div>
+        )}
       </div>
-      
+
       <VideoControls
         videoRef={videoRef}
-        currentTime={currentTime}
-        duration={duration}
+        currentTime={videoUrls.length > 1 ? getCumulativeTime() : currentTime}
+        duration={videoUrls.length > 1 ? totalDuration : duration}
         isPlaying={isPlaying}
         onPlayPause={togglePlay}
       />
@@ -1095,6 +1147,7 @@ function KeyframesContent() {
           status: status.status,
           segments: mappedSegments.length > 0 ? mappedSegments : prev.segments,
           finalVideoUrl: status.finalVideoUrl,
+          allVideoUrls: status.allVideoUrls,
           mergeGenerationId: status.mergeGenerationId,
           error: status.error,
           progress: status.progress,
@@ -1231,8 +1284,8 @@ function KeyframesContent() {
           </div>
 
           {/* Output Content */}
-          {generation.finalVideoUrl ? (
-            <VideoPlayer videoUrl={generation.finalVideoUrl} />
+          {(generation.allVideoUrls && generation.allVideoUrls.length > 0) || generation.finalVideoUrl ? (
+            <VideoPlayer videoUrls={generation.allVideoUrls?.length ? generation.allVideoUrls : [generation.finalVideoUrl!]} />
           ) : generation.status !== 'idle' ? (
             <GeneratingOutput 
               status={generation.status}

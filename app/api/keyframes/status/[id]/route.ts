@@ -199,20 +199,22 @@ export async function GET(
     const allSegmentsCompleted = completedSegments === totalSegments;
     const anySegmentFailed = segments.some((s: any) => s.status === 'failed');
 
-    // Get first completed segment video for fallback
-    const firstCompletedVideo = sortedSegments.find((s: any) => s.status === 'completed' && s.output_urls?.[0])?.output_urls?.[0];
+    // Get all completed segment videos
+    const completedVideos = sortedSegments
+      .filter((s: any) => s.status === 'completed' && s.output_urls?.[0])
+      .map((s: any) => s.output_urls[0]);
     
     if (anySegmentFailed) {
       overallStatus = 'failed';
       currentStep = 'segment';
     } else if (mergeGeneration) {
+      // Legacy merge support
       if (mergeGeneration.status === 'completed') {
         overallStatus = 'completed';
         currentStep = 'done';
       } else if (mergeGeneration.status === 'failed') {
-        // Merge failed - but if we have segments, show them as result
-        if (totalSegments === 1 && firstCompletedVideo) {
-          // Only 1 segment, no merge needed - treat as completed
+        // Merge failed - but if we have all segments, treat as completed
+        if (allSegmentsCompleted && completedVideos.length > 0) {
           overallStatus = 'completed';
           currentStep = 'done';
         } else {
@@ -224,16 +226,9 @@ export async function GET(
         currentStep = 'merge';
       }
     } else if (allSegmentsCompleted) {
-      // All segments done
-      if (totalSegments === 1) {
-        // Only 1 segment - no merge needed, completed!
-        overallStatus = 'completed';
-        currentStep = 'done';
-      } else {
-        // Merge should start soon via webhook
-        overallStatus = 'merging';
-        currentStep = 'merge';
-      }
+      // All segments done - completed! (no merge needed)
+      overallStatus = 'completed';
+      currentStep = 'done';
     }
 
     // Calculate overall progress percentage
@@ -248,11 +243,14 @@ export async function GET(
     }
 
     // Determine final video URL
-    // Priority: merge result > single segment (if only 1) > first segment (fallback)
+    // Priority: merge result > first completed segment
     let finalVideoUrl = mergeGeneration?.output_urls?.[0];
-    if (!finalVideoUrl && totalSegments === 1 && firstCompletedVideo) {
-      finalVideoUrl = firstCompletedVideo;
+    if (!finalVideoUrl && completedVideos.length > 0) {
+      finalVideoUrl = completedVideos[0];
     }
+    
+    // All segment video URLs for multi-part playback
+    const allVideoUrls = completedVideos;
     
     return NextResponse.json({
       id: keyframeGroupId,
@@ -267,6 +265,7 @@ export async function GET(
         isMerging: currentStep === 'merge',
       },
       finalVideoUrl,
+      allVideoUrls, // All segment videos for multi-part playback
       mergeGenerationId: mergeGeneration?.id,
       mergeStatus: mergeGeneration?.status,
       error: overallStatus === 'failed' 

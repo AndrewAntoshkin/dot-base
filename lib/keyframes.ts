@@ -207,93 +207,13 @@ export async function startNextKeyframeSegment(
     }
   }
 
-  // All segments completed - check if we need to start merge
+  // All segments completed - no merge for now (show segments separately)
   const completedSegments = allSegments.filter((s: any) => s.status === 'completed');
   
   if (completedSegments.length === totalSegments) {
-    // All segments done
-    logger.info(`All ${totalSegments} segments completed`);
-    
-    const segmentVideos = completedSegments
-      .sort((a: any, b: any) => a.settings.keyframe_index - b.settings.keyframe_index)
-      .map((s: any) => s.output_urls?.[0])
-      .filter(Boolean);
-
-    if (segmentVideos.length !== totalSegments) {
-      logger.error('Missing video URLs for some segments');
-      return { started: false };
-    }
-    
-    // If only 1 segment - no merge needed
-    if (totalSegments === 1) {
-      logger.info('Only 1 segment, no merge needed');
-      return { started: false };
-    }
-
-    try {
-      // Create merge generation record
-      const { data: mergeGeneration, error: mergeError } = await (supabase
-        .from('generations') as any)
-        .insert({
-          user_id: completedGen.user_id,
-          action: 'video_edit',
-          model_id: 'video-merge',
-          model_name: 'video-merge',
-          replicate_model: 'lucataco/video-merge',
-          prompt: `Merge ${totalSegments} keyframe segments`,
-          settings: {
-            keyframe_group_id: keyframeGroupId,
-            keyframe_merge: true,
-            segment_generation_ids: completedSegments.map((s: any) => s.id),
-          },
-          status: 'processing',
-          started_at: new Date().toISOString(),
-          replicate_input: {
-            video_files: segmentVideos,
-            keep_audio: true,
-          },
-          is_keyframe_segment: false,
-        })
-        .select()
-        .single();
-
-      if (mergeError || !mergeGeneration) {
-        logger.error('Failed to create merge generation:', mergeError);
-        return { started: false };
-      }
-
-      const replicateClient = getReplicateClient();
-      
-      const webhookUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
-        : undefined;
-
-      const { prediction, tokenId } = await replicateClient.run({
-        model: 'lucataco/video-merge',
-        version: '65c81d0d0689d8608af8c2f59728135925419f4b5e62065c37fc350130fed67a',
-        input: {
-          video_files: segmentVideos,
-          keep_audio: true,
-        },
-        webhook: webhookUrl,
-        webhook_events_filter: webhookUrl ? ['completed'] : undefined,
-      });
-
-      await (supabase.from('generations') as any)
-        .update({ 
-          replicate_prediction_id: prediction.id,
-          replicate_token_index: tokenId,
-        })
-        .eq('id', mergeGeneration.id);
-
-      logger.info(`Started merge generation: ${mergeGeneration.id}`);
-      
-      return { started: true, type: 'merge', generationId: mergeGeneration.id };
-
-    } catch (error: any) {
-      logger.error('Failed to start merge:', error.message);
-      return { started: false };
-    }
+    // All segments done - no merge needed, segments are the final result
+    logger.info(`All ${totalSegments} segments completed - no merge, using segments as result`);
+    return { started: false };
   }
 
   return { started: false };
