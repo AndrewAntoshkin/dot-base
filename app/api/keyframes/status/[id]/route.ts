@@ -208,15 +208,15 @@ export async function GET(
       overallStatus = 'failed';
       currentStep = 'segment';
     } else if (mergeGeneration) {
-      // Legacy merge support
       if (mergeGeneration.status === 'completed') {
         overallStatus = 'completed';
         currentStep = 'done';
       } else if (mergeGeneration.status === 'failed') {
-        // Merge failed - but if we have all segments, treat as completed
+        // Merge failed - fallback to showing segments as completed
         if (allSegmentsCompleted && completedVideos.length > 0) {
           overallStatus = 'completed';
           currentStep = 'done';
+          logger.info('Merge failed, using segments as fallback');
         } else {
           overallStatus = 'failed';
           currentStep = 'merge';
@@ -226,9 +226,15 @@ export async function GET(
         currentStep = 'merge';
       }
     } else if (allSegmentsCompleted) {
-      // All segments done - completed! (no merge needed)
-      overallStatus = 'completed';
-      currentStep = 'done';
+      if (totalSegments === 1) {
+        // Only 1 segment - no merge needed
+        overallStatus = 'completed';
+        currentStep = 'done';
+      } else {
+        // Multiple segments done - merge should start soon
+        overallStatus = 'merging';
+        currentStep = 'merge';
+      }
     }
 
     // Calculate overall progress percentage
@@ -243,14 +249,16 @@ export async function GET(
     }
 
     // Determine final video URL
-    // Priority: merge result > first completed segment
+    // Priority: merge result > segments (for fallback or single segment)
     let finalVideoUrl = mergeGeneration?.output_urls?.[0];
-    if (!finalVideoUrl && completedVideos.length > 0) {
-      finalVideoUrl = completedVideos[0];
-    }
     
-    // All segment video URLs for multi-part playback
+    // All segment video URLs for multi-part playback (fallback if merge failed)
     const allVideoUrls = completedVideos;
+    
+    // If no merge result but we have segments, use them
+    if (!finalVideoUrl && completedVideos.length > 0) {
+      finalVideoUrl = completedVideos[0]; // First video for thumbnail/preview
+    }
     
     return NextResponse.json({
       id: keyframeGroupId,
