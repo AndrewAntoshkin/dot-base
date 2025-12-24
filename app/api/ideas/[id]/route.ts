@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/admin-client';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 // GET /api/ideas/[id] - Get a single idea
 export async function GET(
@@ -74,7 +73,7 @@ export async function DELETE(
     const isAuthor = idea.user_id === user.id;
 
     // Check if user is super_admin
-    const adminClient = createAdminClient();
+    const adminClient = createServiceRoleClient();
     const { data: userData } = await adminClient
       .from('users')
       .select('role')
