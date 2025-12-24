@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Header } from '@/components/header';
@@ -12,6 +12,35 @@ interface DocNavItem {
   title: string;
   href: string;
   children?: DocNavItem[];
+}
+
+// Функция для получения всех элементов навигации (плоский список)
+function flattenNavItems(items: DocNavItem[], parentPath: string[] = []): Array<DocNavItem & { path: string[] }> {
+  const result: Array<DocNavItem & { path: string[] }> = [];
+  
+  for (const item of items) {
+    const currentPath = [...parentPath, item.title];
+    result.push({ ...item, path: currentPath });
+    
+    if (item.children) {
+      result.push(...flattenNavItems(item.children, currentPath));
+    }
+  }
+  
+  return result;
+}
+
+// Функция поиска
+function searchNavItems(items: DocNavItem[], query: string): Array<DocNavItem & { path: string[] }> {
+  if (!query.trim()) return [];
+  
+  const flatItems = flattenNavItems(items);
+  const lowerQuery = query.toLowerCase();
+  
+  return flatItems.filter(item => 
+    item.title.toLowerCase().includes(lowerQuery) ||
+    item.href.toLowerCase().includes(lowerQuery)
+  );
 }
 
 interface DocTab {
@@ -160,6 +189,11 @@ export function DocsShell({
   const [isBannerVisible, setIsBannerVisible] = useState(showBanner);
   const [expandedItems, setExpandedItems] = useState<string[]>(['models']);
 
+  // Результаты поиска
+  const searchResults = useMemo(() => {
+    return searchNavItems(SIDEBAR_NAV, searchQuery);
+  }, [searchQuery]);
+
   const toggleExpand = (id: string) => {
     setExpandedItems(prev => 
       prev.includes(id) 
@@ -254,7 +288,7 @@ export function DocsShell({
         {/* Sidebar */}
         <div className="w-[280px] flex-shrink-0 py-6 border-r border-[#2f2f2f] pr-6">
           {/* Search */}
-          <div className="flex items-center gap-3 px-3 py-2 bg-transparent border border-[#2b2b2b] rounded-xl mb-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-transparent border border-[#2b2b2b] rounded-xl mb-3 focus-within:border-[#4a4a4a] transition-colors">
             <input
               type="text"
               placeholder="Поиск..."
@@ -262,12 +296,56 @@ export function DocsShell({
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 bg-transparent text-sm text-white placeholder:text-[#959595] outline-none font-inter"
             />
-            <Search className="w-5 h-5 text-white" />
+            {searchQuery ? (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="p-0.5 text-[#959595] hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            ) : (
+              <Search className="w-5 h-5 text-[#656565]" />
+            )}
           </div>
 
-          {/* Navigation */}
+          {/* Navigation or Search Results */}
           <nav className="flex flex-col">
-            {SIDEBAR_NAV.map((item) => renderNavItem(item))}
+            {searchQuery.trim() ? (
+              // Показываем результаты поиска
+              searchResults.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  <div className="px-3 py-2 text-xs text-[#656565] font-inter uppercase tracking-wide">
+                    Найдено: {searchResults.length}
+                  </div>
+                  {searchResults.map((item) => (
+                    <Link
+                      key={item.id + item.href}
+                      href={item.href}
+                      onClick={() => setSearchQuery('')}
+                      className={`px-3 py-2.5 rounded-xl font-inter text-sm transition-colors ${
+                        isActive(item.href)
+                          ? 'bg-[#212121] text-white font-medium'
+                          : 'text-[#959595] hover:text-white hover:bg-[#1a1a1a]'
+                      }`}
+                    >
+                      <div className="text-white">{item.title}</div>
+                      {item.path.length > 1 && (
+                        <div className="text-xs text-[#656565] mt-0.5">
+                          {item.path.slice(0, -1).join(' → ')}
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-3 py-4 text-sm text-[#656565] font-inter text-center">
+                  Ничего не найдено
+                </div>
+              )
+            ) : (
+              // Показываем обычную навигацию
+              SIDEBAR_NAV.map((item) => renderNavItem(item))
+            )}
           </nav>
         </div>
 
