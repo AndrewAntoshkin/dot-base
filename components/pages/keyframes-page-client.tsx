@@ -329,9 +329,12 @@ function PartCard({
   return (
     <div className="border border-[#2f2f2f] rounded-2xl overflow-hidden">
       {/* Header - всегда видим */}
-      <button
+      <div
         onClick={toggleCollapse}
-        className="w-full flex items-center justify-between gap-2 p-4 hover:bg-white/5 transition-colors"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleCollapse(); }}
+        className="w-full flex items-center justify-between gap-2 p-4 hover:bg-white/5 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-2">
           <Film className="w-4 h-4 text-white" />
@@ -362,7 +365,7 @@ function PartCard({
           )}
           <ChevronDown className={`w-5 h-5 text-white transition-transform ${part.isCollapsed ? '' : 'rotate-180'}`} />
         </div>
-      </button>
+      </div>
 
       {/* Content - видим только если не свёрнут */}
       {!part.isCollapsed && (

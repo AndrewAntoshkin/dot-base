@@ -68,6 +68,67 @@ function NavLinkWithTooltip({ href, label, description, isActive }: {
   );
 }
 
+// Simple tooltip wrapper for right header elements
+function HeaderTooltip({ 
+  children, 
+  label, 
+  description,
+  align = 'center',
+  disabled = false
+}: { 
+  children: React.ReactNode; 
+  label: string; 
+  description: string;
+  align?: 'left' | 'center' | 'right';
+  disabled?: boolean;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const alignmentClasses = {
+    left: 'left-0',
+    center: 'left-1/2 -translate-x-1/2',
+    right: 'right-0'
+  };
+
+  const arrowAlignmentClasses = {
+    left: 'left-4',
+    center: 'left-1/2 -translate-x-1/2',
+    right: 'right-4'
+  };
+
+  const showTooltip = isHovered && !disabled;
+
+  return (
+    <div 
+      className="relative flex items-center"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {children}
+      
+      {/* Tooltip - only visible on desktop */}
+      <div 
+        className={`hidden lg:block absolute top-full ${alignmentClasses[align]} mt-2 w-[220px] p-3 bg-[#1A1A1A] rounded-xl z-50 transition-all duration-200 ${
+          showTooltip ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+        }`}
+        style={{ boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.8)' }}
+      >
+        {/* Arrow */}
+        <div className={`absolute -top-1.5 ${arrowAlignmentClasses[align]} w-3 h-3 bg-[#1A1A1A] rotate-45`} />
+        
+        <div className="relative flex flex-col gap-1">
+          <span className="font-inter font-medium text-xs text-white">
+            {label}
+          </span>
+          <p className="font-inter font-normal text-xs leading-4 text-[#959595]">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const [isQueueOpen, setIsQueueOpen] = useState(false);
@@ -167,7 +228,7 @@ export function Header() {
               <div className="relative hidden lg:block">
                 <button
                   onClick={() => setIsWorkspaceSwitcherOpen(!isWorkspaceSwitcherOpen)}
-                  className="flex items-center gap-2 h-9 px-3 py-2 rounded-xl border border-[#4d4d4d] font-inter font-medium text-xs text-white transition-colors hover:border-white/50"
+                  className="flex items-center gap-2 h-9 px-3 py-2 rounded-xl border border-[#303030] font-inter font-medium text-xs text-white transition-colors hover:border-white/50"
                 >
                   <span className="max-w-[120px] truncate">
                     {workspaces.find(w => w.id === selectedWorkspaceId)?.name || 'Пространство'}
@@ -214,59 +275,97 @@ export function Header() {
 
             {/* Dashboard link - Desktop Only, only for admins */}
             {isAdmin && (
-              <Link
-                href="/admin"
-                className={`hidden lg:flex h-9 px-3 py-2 rounded-xl items-center font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-colors border border-[#4d4d4d] ${
-                  pathname === '/admin' || pathname.startsWith('/admin/') 
-                    ? 'bg-[#1f1f1f] text-white' 
-                    : 'text-white hover:border-white/50'
-                }`}
+              <HeaderTooltip 
+                label="Dashboard" 
+                description="Панель администратора для управления платформой и просмотра статистики"
+                align="right"
               >
-                Dashboard
-              </Link>
+                <Link
+                  href="/admin"
+                  className={`hidden lg:flex w-9 h-9 rounded-xl items-center justify-center transition-colors border border-[#303030] ${
+                    pathname === '/admin' || pathname.startsWith('/admin/') 
+                      ? 'bg-[#1f1f1f]' 
+                      : 'hover:border-white/50'
+                  }`}
+                >
+                  <Image src="/icon-dashboard.svg" alt="Dashboard" width={16} height={16} />
+                </Link>
+              </HeaderTooltip>
+            )}
+
+            {/* Docs link - Desktop Only, only for admins */}
+            {isAdmin && (
+              <HeaderTooltip 
+                label="Документация" 
+                description="Руководство по использованию платформы, описание моделей и возможностей"
+                align="right"
+              >
+                <Link
+                  href="/docs"
+                  className={`hidden lg:flex w-9 h-9 rounded-xl items-center justify-center transition-colors border border-[#303030] ${
+                    pathname === '/docs' || pathname.startsWith('/docs/') 
+                      ? 'bg-[#1f1f1f]' 
+                      : 'hover:border-white/50'
+                  }`}
+                >
+                  <Image src="/icon-docs-new.svg" alt="Docs" width={16} height={16} />
+                </Link>
+              </HeaderTooltip>
             )}
             
             {/* Generation count indicator with dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsQueueOpen(!isQueueOpen)}
-                className={`w-8 h-8 rounded-full border-2 border-[#434343] flex items-center justify-center transition-colors ${
-                  unviewedCount > 0 ? 'hover:border-white/50' : ''
-                }`}
-              >
-                {hasActiveGenerations ? (
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
-                ) : (
-                  <span className="font-inter font-medium text-base text-white tracking-[-0.32px]">
-                    {unviewedCount}
-                  </span>
-                )}
-              </button>
-              
-              {/* Generations Queue Dropdown */}
-              <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
-            </div>
+            <HeaderTooltip 
+              label="Очередь генераций" 
+              description="Нажмите, чтобы посмотреть активные и завершённые генерации"
+              align="right"
+              disabled={isQueueOpen}
+            >
+              <div className="relative">
+                <button
+                  onClick={() => setIsQueueOpen(!isQueueOpen)}
+                  className={`w-9 h-9 rounded-xl border border-[#303030] flex items-center justify-center transition-colors ${
+                    unviewedCount > 0 ? 'hover:border-white/50' : ''
+                  }`}
+                >
+                  {hasActiveGenerations ? (
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  ) : (
+                    <span className="font-inter font-medium text-base text-white tracking-[-0.32px]">
+                      {unviewedCount}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Generations Queue Dropdown */}
+                <GenerationsQueue isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+              </div>
+            </HeaderTooltip>
 
             {/* User Avatar - Click to go to profile */}
-            <Link
-              href="/profile"
-              className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
-              style={{ border: '0.67px solid rgba(255,255,255,0.3)' }}
+            <HeaderTooltip 
+              label="Профиль" 
+              description="Настройки аккаунта, история генераций и персональные данные"
+              align="right"
             >
-              {avatarUrl ? (
-                <img 
-                  src={avatarUrl} 
-                  alt="Avatar" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
-                    {userEmail ? userEmail[0].toUpperCase() : 'U'}
-                  </span>
-                </div>
-              )}
-            </Link>
+              <Link
+                href="/profile"
+                className="flex w-9 h-9 rounded-xl overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
+              >
+                {avatarUrl ? (
+                  <img 
+                    src={avatarUrl} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                    </span>
+                  </div>
+                )}
+              </Link>
+            </HeaderTooltip>
           </div>
         </div>
       </header>
@@ -387,6 +486,19 @@ export function Header() {
             </Link>
           )}
           
+          {/* Docs - only for admins */}
+          {isAdmin && (
+            <Link
+              href="/docs"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
+                pathname === '/docs' || pathname.startsWith('/docs/') ? 'bg-black' : ''
+              }`}
+            >
+              Документация
+            </Link>
+          )}
+
           {/* Dashboard - only for admins */}
           {isAdmin && (
             <Link

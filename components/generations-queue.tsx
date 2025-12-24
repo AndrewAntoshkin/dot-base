@@ -24,7 +24,7 @@ const isTextAction = (action: string): boolean => {
 
 export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
   const router = useRouter();
-  const { unviewedGenerations, markAsViewed } = useGenerations();
+  const { unviewedGenerations, markAsViewed, markAllAsViewed } = useGenerations();
 
   const handleGenerationClick = async (id: string, action: string) => {
     // Mark as viewed before navigating
@@ -82,17 +82,26 @@ export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
               </button>
             ))}
             
-            {/* View all button */}
+            {/* View all + Clear buttons */}
             <div className="h-px bg-[#2f2f2f] mx-2 my-1" />
-            <Link
-              href="/profile"
-              onClick={onClose}
-              className="w-full px-4 py-3 flex items-center justify-center hover:bg-[#2f2f2f] transition-colors"
-            >
-              <span className="font-inter text-sm text-[#959595] hover:text-white transition-colors">
+            <div className="flex items-center justify-between px-4 py-3">
+              <Link
+                href="/profile"
+                onClick={onClose}
+                className="font-inter text-sm text-[#959595] hover:text-white transition-colors"
+              >
                 Смотреть все
-              </span>
-            </Link>
+              </Link>
+              <button
+                onClick={() => {
+                  markAllAsViewed();
+                  onClose();
+                }}
+                className="font-inter text-sm text-[#959595] hover:text-white transition-colors"
+              >
+                Очистить
+              </button>
+            </div>
           </div>
         )}
       </div>

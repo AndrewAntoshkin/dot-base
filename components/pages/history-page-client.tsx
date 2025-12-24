@@ -345,10 +345,13 @@ export default function HistoryPageClient() {
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
-        setTotalPages(data.totalPages || 1);
-        // Обновляем счётчики только если они пришли (не skipCounts)
+        // Обновляем totalPages и счётчики только если они пришли (не skipCounts)
         if (data.counts && (data.counts.all > 0 || data.counts.processing > 0 || data.counts.favorites > 0 || data.counts.failed > 0)) {
+          setTotalPages(data.totalPages || 1);
           setCounts(data.counts);
+        } else if (!skipCounts) {
+          // При полной загрузке (не silent) всегда обновляем totalPages
+          setTotalPages(data.totalPages || 1);
         }
       }
     } catch (error) {

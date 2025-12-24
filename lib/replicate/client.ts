@@ -191,6 +191,24 @@ export class ReplicateClient {
     return noRetryPatterns.some(pattern => message.includes(pattern));
   }
 
+  private async getTokenWithRetry(maxAttempts: number = 3): Promise<{ id: number; token: string }> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const tokenData = await this.tokenPool.getNextToken();
+      
+      if (tokenData) {
+        return tokenData;
+      }
+      
+      if (attempt < maxAttempts) {
+        logger.warn(`No tokens available, attempt ${attempt}/${maxAttempts}. Forcing refresh...`);
+        await this.tokenPool.forceRefresh();
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+    
+    throw new Error('No available Replicate tokens after retries');
+  }
+
   async run(options: ReplicateRunOptions): Promise<{
     prediction: ReplicatePrediction;
     tokenId: number;
@@ -201,11 +219,7 @@ export class ReplicateClient {
     let lastTokenId: number | null = null;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      const tokenData = await this.tokenPool.getNextToken();
-
-      if (!tokenData) {
-        throw new Error('No available Replicate tokens');
-      }
+      const tokenData = await this.getTokenWithRetry();
 
       lastTokenId = tokenData.id;
       const replicate = new Replicate({ auth: tokenData.token });
@@ -262,10 +276,7 @@ export class ReplicateClient {
     let token = tokenOverride;
 
     if (!token) {
-      const tokenData = await this.tokenPool.getNextToken();
-      if (!tokenData) {
-        throw new Error('No available Replicate tokens');
-      }
+      const tokenData = await this.getTokenWithRetry();
       token = tokenData.token;
     }
 
@@ -277,10 +288,7 @@ export class ReplicateClient {
     let token = tokenOverride;
 
     if (!token) {
-      const tokenData = await this.tokenPool.getNextToken();
-      if (!tokenData) {
-        throw new Error('No available Replicate tokens');
-      }
+      const tokenData = await this.getTokenWithRetry();
       token = tokenData.token;
     }
 

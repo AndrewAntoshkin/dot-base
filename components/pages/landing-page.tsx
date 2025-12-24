@@ -155,6 +155,7 @@ function HowItWorksSection() {
                 src={step.image}
                 alt={step.title}
                 fill
+                sizes="(min-width: 1024px) 684px, 100vw"
                 className={`object-cover transition-opacity duration-500 ${
                   activeStep === index ? 'opacity-100' : 'opacity-0'
                 }`}
@@ -171,6 +172,7 @@ function HowItWorksSection() {
             src={HOW_IT_WORKS_STEPS[activeStep].image}
             alt={HOW_IT_WORKS_STEPS[activeStep].title}
             fill
+            sizes="(min-width: 1024px) 684px, 100vw"
             className="object-cover transition-opacity duration-500"
           />
         </div>
@@ -605,6 +607,7 @@ export function LandingPage() {
                   src={card.image} 
                   alt={card.name}
                   fill
+                  sizes="240px"
                   className="object-cover"
                 />
               </div>
@@ -760,6 +763,7 @@ export function LandingPage() {
                       src={item.image} 
                       alt={item.model}
                       fill
+                      sizes="224px"
                       className="object-cover -z-10"
                     />
                     <div className="bg-[#050505] px-2.5 py-1.5 rounded-full w-fit flex items-center justify-center">

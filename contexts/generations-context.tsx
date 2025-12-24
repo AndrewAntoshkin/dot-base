@@ -23,6 +23,7 @@ interface GenerationsContextType {
   addGeneration: (generation: Generation) => void;
   updateGeneration: (id: string, updates: Partial<Generation>) => void;
   markAsViewed: (id: string) => Promise<void>;
+  markAllAsViewed: () => Promise<void>;
   refreshGenerations: () => Promise<void>;
 }
 
@@ -242,6 +243,26 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     }
   }, []);
 
+  const markAllAsViewed = useCallback(async () => {
+    // Оптимистичное обновление UI
+    setGenerations((prev) =>
+      prev.map((g) => ({ ...g, viewed: true }))
+    );
+    try {
+      await fetchWithTimeout('/api/generations/view-all', { 
+        method: 'POST',
+        timeout: 10000,
+        retries: 1,
+        credentials: 'include',
+      });
+    } catch (error: any) {
+      // Игнорируем AbortError
+      if (!isAbortError(error)) {
+        console.error('[Generations] Mark all viewed error:', error);
+      }
+    }
+  }, []);
+
   // Derived state
   const unviewedGenerations = generations.filter((g) => !g.viewed);
   const unviewedCount = unviewedGenerations.length;
@@ -350,6 +371,7 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
         addGeneration,
         updateGeneration,
         markAsViewed,
+        markAllAsViewed,
         refreshGenerations,
       }}
     >
