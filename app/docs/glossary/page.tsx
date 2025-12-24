@@ -217,7 +217,7 @@ export default function GlossaryPage() {
   const letters = Object.keys(groupedTerms).sort();
 
   return (
-    <DocsShell activeTab="glossary">
+    <DocsShell>
       {/* Breadcrumb */}
       <DocsBreadcrumb 
         items={[
