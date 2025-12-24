@@ -54,7 +54,7 @@ export default function RecraftV3Page() {
         'Маркетинговые материалы',
         'Любой контент с текстом',
       ]}
-      tip="Для точного текста используйте формат: text \"YOUR TEXT HERE\" в промпте."
+      tip={'Для точного текста используйте формат: text "YOUR TEXT HERE" в промпте.'}
       actionHref="/"
     />
   );

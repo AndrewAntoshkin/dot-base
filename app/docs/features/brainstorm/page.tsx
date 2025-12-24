@@ -11,12 +11,12 @@ export default function BrainstormFeaturePage() {
         { label: 'Brainstorm' },
       ]} />
       
-      <DocsTitle description="Генерация идей и промптов с помощью ИИ. Преодолейте творческий блок и получите вдохновение.">
+      <DocsTitle description="Сравнивайте результаты генерации одного промпта на разных моделях. Найдите идеальную модель для вашей задачи.">
         Brainstorm
       </DocsTitle>
 
       <DocsInfoBox type="info">
-        Brainstorm — ваш творческий помощник. Опишите задачу или концепцию, и ИИ предложит варианты промптов и идеи для реализации.
+        Brainstorm — инструмент для параллельного сравнения моделей. Напишите один промпт, выберите несколько моделей и получите результаты от каждой на бесконечном холсте.
       </DocsInfoBox>
 
       {/* How it works */}
@@ -25,45 +25,49 @@ export default function BrainstormFeaturePage() {
           <ol className="space-y-3">
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
               <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">1</span>
-              Опишите вашу задачу или концепцию: "нужен логотип для кофейни" или "хочу футуристический город"
+              Напишите промпт для генерации изображения
             </li>
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
               <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">2</span>
-              ИИ сгенерирует несколько вариантов промптов с разными подходами
+              Выберите несколько моделей из списка — можно выбрать все сразу
             </li>
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
               <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">3</span>
-              Выберите понравившийся и используйте его в генераторе изображений
+              Нажмите генерировать — каждая модель создаст своё изображение по вашему промпту
+            </li>
+            <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
+              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">4</span>
+              Сравните результаты на холсте — перетаскивайте карточки, зумьте, кликайте для просмотра
             </li>
           </ol>
         </div>
       </DocsSection>
 
-      {/* What you get */}
-      <DocsSection title="Что вы получите">
+      {/* Canvas features */}
+      <DocsSection title="Возможности холста">
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
-            <h4 className="text-sm font-bold text-white font-inter mb-2">Варианты концепций</h4>
+            <h4 className="text-sm font-bold text-white font-inter mb-2">Масштабирование</h4>
             <p className="text-sm text-[#959595] font-inter">
-              Несколько разных подходов к вашей задаче. Минималистичный, детальный, абстрактный.
+              Используйте Ctrl + колесо мыши или пинч на трекпаде для приближения и отдаления холста.
             </p>
           </div>
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
-            <h4 className="text-sm font-bold text-white font-inter mb-2">Готовые промпты</h4>
+            <h4 className="text-sm font-bold text-white font-inter mb-2">Перемещение</h4>
             <p className="text-sm text-[#959595] font-inter">
-              Детальные промпты готовые к использованию. Копируйте и вставляйте в генератор.
+              Зажмите и перетащите пустое пространство холста для навигации по большой коллекции.
             </p>
           </div>
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
-            <h4 className="text-sm font-bold text-white font-inter mb-2">Рекомендации по стилю</h4>
+            <h4 className="text-sm font-bold text-white font-inter mb-2">Перетаскивание карточек</h4>
             <p className="text-sm text-[#959595] font-inter">
-              Какой стиль подойдёт для вашей задачи и какие ключевые слова использовать.
+              Перетаскивайте карточки с изображениями для организации пространства по своему усмотрению.
             </p>
           </div>
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
-            <h4 className="text-sm font-bold text-white font-inter mb-2">Выбор модели</h4>
+            <h4 className="text-sm font-bold text-white font-inter mb-2">Просмотр результата</h4>
             <p className="text-sm text-[#959595] font-inter">
-              Рекомендация какая модель лучше подойдёт для конкретной задачи.
+              Кликните на готовое изображение для просмотра в полном размере с возможностью скачать.
             </p>
           </div>
         </div>
@@ -73,13 +77,28 @@ export default function BrainstormFeaturePage() {
       <DocsSection title="Когда использовать">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
           <p className="text-sm text-[#959595] font-inter">
-            <span className="text-white font-medium">Творческий блок:</span> не знаете с чего начать? Brainstorm даст отправную точку.
+            <span className="text-white font-medium">Выбор модели:</span> не знаете какая модель лучше подойдёт для вашего стиля? Сравните все сразу.
           </p>
           <p className="text-sm text-[#959595] font-inter">
-            <span className="text-white font-medium">Исследование вариантов:</span> хотите увидеть разные подходы к одной задаче.
+            <span className="text-white font-medium">Тестирование промпта:</span> посмотрите как разные модели интерпретируют один и тот же промпт.
           </p>
           <p className="text-sm text-[#959595] font-inter">
-            <span className="text-white font-medium">Обучение промптингу:</span> изучайте как ИИ формулирует эффективные промпты.
+            <span className="text-white font-medium">Быстрое прототипирование:</span> получите много вариантов за один клик.
+          </p>
+        </div>
+      </DocsSection>
+
+      {/* Tips */}
+      <DocsSection title="Советы">
+        <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
+          <p className="text-sm text-[#959595] font-inter">
+            • Результаты сохраняются локально — вы можете закрыть вкладку и вернуться позже
+          </p>
+          <p className="text-sm text-[#959595] font-inter">
+            • Используйте кнопку очистки (иконка обновления) чтобы начать с чистого холста
+          </p>
+          <p className="text-sm text-[#959595] font-inter">
+            • Генерации идут параллельно — не нужно ждать завершения одной модели для старта другой
           </p>
         </div>
       </DocsSection>
@@ -95,4 +114,3 @@ export default function BrainstormFeaturePage() {
     </DocsShell>
   );
 }
-
