@@ -458,10 +458,11 @@ export default function RoadmapPage() {
       {/* Предложите свою идею */}
       <DocsSection title="Предложите свою идею">
         <p className="text-sm text-[#959595] font-inter leading-relaxed">
-          Постеры и афиши с заголовками<br />
-          Обложки для социальных сетей<br />
-          Мемы и карточки с надписями<br />
-          Рекламные баннеры
+          Добавить новую модель генерации<br />
+          Улучшить качество upscale<br />
+          Добавить batch-генерацию<br />
+          Интеграция с Telegram-ботом<br />
+          Расширенные настройки LoRA
         </p>
       </DocsSection>
 
