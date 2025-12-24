@@ -433,19 +433,39 @@ export default function RoadmapPage() {
         <p className="text-sm text-[#959595] font-inter leading-relaxed mb-4">
           Функции и улучшения, над которыми мы работаем:
         </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 border-b border-[#4e4e4e]">
-            <p className="text-sm text-[#959595] font-inter">Идея 1</p>
-            <p className="text-sm text-white font-medium font-inter mt-1">AI Studio</p>
+        <div className="flex gap-0">
+          {/* Column 1 */}
+          <div className="flex-1">
+            <div className="py-3 pr-4 border-b border-[#4e4e4e]">
+              <p className="text-sm text-[#959595] font-inter">Идея 1</p>
+            </div>
+            <div className="py-3 pr-4 border-b border-[#4e4e4e]">
+              <p className="text-sm text-white font-medium font-inter">AI Studio</p>
+            </div>
           </div>
-          <div className="p-4 border-b border-[#4e4e4e]">
-            <p className="text-sm text-[#959595] font-inter">Идея 2</p>
-            <p className="text-sm text-white font-medium font-inter mt-1">Работа с камерами</p>
+          {/* Column 2 */}
+          <div className="flex-1">
+            <div className="py-3 pr-4 border-b border-[#4e4e4e]">
+              <p className="text-sm text-[#959595] font-inter">Идея 2</p>
+            </div>
+            <div className="py-3 pr-4 border-b border-[#4e4e4e]">
+              <p className="text-sm text-white font-medium font-inter">Работа с камерами</p>
+            </div>
           </div>
         </div>
       </DocsSection>
 
       {/* Предложите свою идею */}
+      <DocsSection title="Предложите свою идею">
+        <p className="text-sm text-[#959595] font-inter leading-relaxed">
+          Постеры и афиши с заголовками<br />
+          Обложки для социальных сетей<br />
+          Мемы и карточки с надписями<br />
+          Рекламные баннеры
+        </p>
+      </DocsSection>
+
+      {/* Notification banner */}
       <div className="flex items-center gap-3 p-4 bg-[#212121] rounded-2xl mb-8">
         <p className="flex-1 text-sm text-white font-inter font-medium">
           Если вам чего-то не хватает или есть предложение по улучшению – пишите
