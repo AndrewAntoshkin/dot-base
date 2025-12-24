@@ -59,6 +59,7 @@ const DOC_TABS: DocTab[] = [
   { id: 'troubleshooting', title: 'Troubleshooting', href: '/docs/troubleshooting' },
   { id: 'glossary', title: 'Глоссарий', href: '/docs/glossary' },
   { id: 'changelog', title: 'Changelog', href: '/docs/changelog' },
+  { id: 'roadmap', title: 'Roadmap', href: '/docs/roadmap' },
 ];
 
 // Боковая навигация с семействами моделей
