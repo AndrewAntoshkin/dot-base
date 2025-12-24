@@ -34,7 +34,7 @@ export async function POST(
       .select('id')
       .eq('idea_id', id)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (existingVote) {
       // Remove vote (toggle)

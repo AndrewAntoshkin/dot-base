@@ -69,10 +69,10 @@ function CreateIdeaModal({
       />
       
       {/* Modal */}
-      <div className="relative flex items-center gap-2">
+      <div className="relative flex items-start gap-2">
         <div className="w-[660px] bg-[#101010] rounded-[32px] p-8 flex flex-col gap-5">
           {/* Header */}
-          <div className="text-center">
+          <div className="text-start">
             <h2 className="text-lg font-medium text-white font-inter">Новая идея</h2>
           </div>
 
@@ -133,7 +133,7 @@ function CreateIdeaModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="w-8 h-8 bg-white rounded-full flex items-center justify-center self-start"
+          className="w-8 h-8 bg-white rounded-full flex items-center justify-center"
         >
           <X className="w-4 h-4 text-black" />
         </button>
@@ -172,7 +172,7 @@ function ViewIdeaModal({
       />
       
       {/* Modal */}
-      <div className="relative flex items-center gap-2">
+      <div className="relative flex items-start gap-2">
         <div className="w-[660px] bg-[#101010] rounded-[32px] p-8 flex flex-col gap-5">
           {/* Header */}
           <div className="flex flex-col gap-1">
@@ -214,7 +214,7 @@ function ViewIdeaModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="w-8 h-8 bg-white rounded-full flex items-center justify-center self-start"
+          className="w-8 h-8 bg-white rounded-full flex items-center justify-center"
         >
           <X className="w-4 h-4 text-black" />
         </button>
@@ -327,6 +327,13 @@ export default function RoadmapPage() {
         // Update selected idea if viewing
         if (selectedIdea?.id === ideaId) {
           setSelectedIdea(prev => prev ? { ...prev, votes_count: data.votesCount } : null);
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('Vote error:', errorData);
+        // If unauthorized, maybe user is not logged in
+        if (response.status === 401) {
+          alert('Для голосования необходимо авторизоваться');
         }
       }
     } catch (error) {
