@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DocsShell, DocsBreadcrumb, DocsTitle, DocsSection, DocsFooter } from '@/components/docs/docs-shell';
-import { ArrowUp, ArrowRight, X } from 'lucide-react';
+import { ArrowUp, ArrowRight, X, Trash2 } from 'lucide-react';
+import { useUser } from '@/contexts/user-context';
 
 interface Idea {
   id: string;
@@ -10,6 +11,7 @@ interface Idea {
   description: string | null;
   votes_count: number;
   created_at: string;
+  user_id: string | null;
 }
 
 // Modal for creating a new idea
@@ -148,13 +150,19 @@ function ViewIdeaModal({
   isOpen, 
   onClose,
   hasVoted,
-  onVote
+  onVote,
+  canDelete,
+  onDelete,
+  isDeleting
 }: { 
   idea: Idea | null; 
   isOpen: boolean; 
   onClose: () => void;
   hasVoted: boolean;
   onVote: () => void;
+  canDelete: boolean;
+  onDelete: () => void;
+  isDeleting: boolean;
 }) {
   if (!isOpen || !idea) return null;
 
@@ -193,21 +201,35 @@ function ViewIdeaModal({
           </div>
 
           {/* Vote section */}
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={onVote}
-              className={`flex items-center gap-2 px-4 h-10 border rounded-xl text-sm font-medium font-inter transition-colors ${
-                hasVoted 
-                  ? 'border-white bg-white/10 text-white' 
-                  : 'border-[#2f2f2f] text-white hover:border-white/50'
-              }`}
-            >
-              <ArrowUp className="w-4 h-4" />
-              <span>{idea.votes_count}</span>
-            </button>
-            <span className="text-sm text-white font-inter">
-              Если вам понравилась идея, можете за нее проголосовать
-            </span>
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onVote}
+                className={`flex items-center gap-2 px-4 h-10 border rounded-xl text-sm font-medium font-inter transition-colors ${
+                  hasVoted 
+                    ? 'border-white bg-white/10 text-white' 
+                    : 'border-[#2f2f2f] text-white hover:border-white/50'
+                }`}
+              >
+                <ArrowUp className="w-4 h-4" />
+                <span>{idea.votes_count}</span>
+              </button>
+              <span className="text-sm text-white font-inter">
+                Если вам понравилась идея, можете за нее проголосовать
+              </span>
+            </div>
+            
+            {/* Delete button */}
+            {canDelete && (
+              <button
+                onClick={onDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-4 h-10 border border-red-500/50 rounded-xl text-sm font-medium text-red-500 font-inter hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeleting ? 'Удаление...' : 'Удалить'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -271,12 +293,15 @@ function IdeaCard({
 }
 
 export default function RoadmapPage() {
+  const { isSuperAdmin } = useUser();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [userVotes, setUserVotes] = useState<string[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchIdeas = useCallback(async () => {
     try {
@@ -285,6 +310,7 @@ export default function RoadmapPage() {
         const data = await response.json();
         setIdeas(data.ideas || []);
         setUserVotes(data.userVotes || []);
+        setCurrentUserId(data.currentUserId || null);
       }
       // If response is not OK (e.g., table doesn't exist), just show empty state
     } catch (error) {
@@ -344,6 +370,43 @@ export default function RoadmapPage() {
   const openViewModal = (idea: Idea) => {
     setSelectedIdea(idea);
     setIsViewModalOpen(true);
+  };
+
+  const handleDelete = async (ideaId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить эту идею?')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/ideas/${ideaId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setIdeas(prev => prev.filter(idea => idea.id !== ideaId));
+        setIsViewModalOpen(false);
+        setSelectedIdea(null);
+      } else {
+        const errorData = await response.json();
+        console.error('Delete error:', errorData);
+        if (response.status === 401) {
+          alert('Для удаления необходимо авторизоваться');
+        } else if (response.status === 403) {
+          alert('У вас нет прав для удаления этой идеи');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const canDeleteIdea = (idea: Idea) => {
+    if (isSuperAdmin) return true;
+    if (currentUserId && idea.user_id === currentUserId) return true;
+    return false;
   };
 
   return (
@@ -433,6 +496,9 @@ export default function RoadmapPage() {
         onClose={() => setIsViewModalOpen(false)}
         hasVoted={selectedIdea ? userVotes.includes(selectedIdea.id) : false}
         onVote={() => selectedIdea && handleVote(selectedIdea.id)}
+        canDelete={selectedIdea ? canDeleteIdea(selectedIdea) : false}
+        onDelete={() => selectedIdea && handleDelete(selectedIdea.id)}
+        isDeleting={isDeleting}
       />
     </DocsShell>
   );

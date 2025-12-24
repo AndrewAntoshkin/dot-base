@@ -32,7 +32,8 @@ export async function GET() {
 
     return NextResponse.json({ 
       ideas: ideas || [],
-      userVotes 
+      userVotes,
+      currentUserId: user?.id || null
     });
   } catch (error) {
     console.error('Error in GET /api/ideas:', error);
@@ -40,7 +41,7 @@ export async function GET() {
   }
 }
 
-// POST /api/ideas - Create a new idea (anonymous)
+// POST /api/ideas - Create a new idea
 export async function POST(request: Request) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -56,11 +57,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Title is too long' }, { status: 400 });
     }
 
+    // Get current user (optional - idea can be created anonymously)
+    const { data: { user } } = await supabase.auth.getUser();
+
     const { data: idea, error } = await supabase
       .from('ideas')
       .insert({
         title: title.trim(),
         description: description?.trim() || null,
+        user_id: user?.id || null,
       })
       .select()
       .single();

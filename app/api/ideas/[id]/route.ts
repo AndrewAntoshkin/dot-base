@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/admin-client';
 
 // GET /api/ideas/[id] - Get a single idea
 export async function GET(
@@ -30,7 +31,7 @@ export async function GET(
         .select('id')
         .eq('idea_id', id)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       hasVoted = !!vote;
     }
@@ -38,6 +39,80 @@ export async function GET(
     return NextResponse.json({ idea, hasVoted });
   } catch (error) {
     console.error('Error in GET /api/ideas/[id]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// DELETE /api/ideas/[id] - Delete an idea (author or super_admin only)
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createServerSupabaseClient();
+
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get the idea to check ownership
+    const { data: idea, error: ideaError } = await supabase
+      .from('ideas')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+
+    if (ideaError || !idea) {
+      return NextResponse.json({ error: 'Idea not found' }, { status: 404 });
+    }
+
+    // Check if user is the author
+    const isAuthor = idea.user_id === user.id;
+
+    // Check if user is super_admin
+    const adminClient = createAdminClient();
+    const { data: userData } = await adminClient
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const isSuperAdmin = userData?.role === 'super_admin';
+
+    if (!isAuthor && !isSuperAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Delete the idea (use admin client to bypass RLS for super_admin)
+    if (isSuperAdmin && !isAuthor) {
+      const { error: deleteError } = await adminClient
+        .from('ideas')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting idea:', deleteError);
+        return NextResponse.json({ error: 'Failed to delete idea' }, { status: 500 });
+      }
+    } else {
+      const { error: deleteError } = await supabase
+        .from('ideas')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting idea:', deleteError);
+        return NextResponse.json({ error: 'Failed to delete idea' }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/ideas/[id]:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
