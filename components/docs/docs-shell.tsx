@@ -263,7 +263,7 @@ export function DocsShell({
   };
 
   return (
-    <div className="min-h-screen bg-[#101010]">
+    <div className="min-h-screen bg-[#101010] flex flex-col">
       <Header />
       
       {/* Tabs Navigation */}
@@ -284,9 +284,9 @@ export function DocsShell({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex gap-8 px-20">
+      <div className="flex gap-8 px-20 flex-1">
         {/* Sidebar */}
-        <div className="w-[280px] flex-shrink-0 py-6 border-r border-[#2f2f2f] pr-6">
+        <div className="w-[280px] flex-shrink-0 py-6 border-r border-[#2f2f2f] pr-6 min-h-full">
           {/* Search */}
           <div className="flex items-center gap-2 px-3 py-2 bg-transparent border border-[#2b2b2b] rounded-xl mb-3 focus-within:border-[#4a4a4a] transition-colors">
             <input
