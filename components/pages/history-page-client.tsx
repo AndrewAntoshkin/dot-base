@@ -139,24 +139,31 @@ const BrokenLinkIcon = () => (
   </svg>
 );
 
-// Оптимизированное изображение с shimmer placeholder
+// Оптимизированное изображение с shimmer placeholder и обработкой ошибок
 function ImageWithShimmer({ src, alt }: { src: string; alt: string }) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   
   return (
     <>
-      {/* Shimmer placeholder */}
-      {!isLoaded && (
+      {/* Shimmer placeholder или ошибка */}
+      {!isLoaded && !hasError && (
         <div className="absolute inset-0 bg-[#1a1a1a] animate-pulse rounded-[12px]" />
+      )}
+      {hasError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#1a1a1a] rounded-[12px]">
+          <span className="font-inter text-[10px] lg:text-xs text-[#656565]">Не удалось загрузить</span>
+        </div>
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={alt}
-        className={`absolute inset-0 w-full h-full object-cover rounded-[12px] transition-opacity duration-200 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 w-full h-full object-cover rounded-[12px] transition-opacity duration-200 ${isLoaded && !hasError ? 'opacity-100' : 'opacity-0'}`}
         loading="lazy"
         decoding="async"
         onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
       />
     </>
   );
