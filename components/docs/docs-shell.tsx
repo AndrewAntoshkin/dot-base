@@ -273,10 +273,10 @@ export function DocsShell({
           <Link
             key={tab.id}
             href={tab.href}
-            className={`px-3 py-2 rounded-xl font-inter text-xs uppercase transition-colors ${
+            className={`px-3 py-2 rounded-xl font-inter text-xs uppercase transition-colors font-medium ${
               getActiveTab() === tab.id
-                ? 'bg-[#212121] text-white font-semibold'
-                : 'text-[#959595] hover:text-white font-normal'
+                ? 'bg-[#212121] text-white'
+                : 'text-[#959595] hover:text-white'
             }`}
           >
             {tab.title}
