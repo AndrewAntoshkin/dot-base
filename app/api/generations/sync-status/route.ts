@@ -112,16 +112,22 @@ export async function POST() {
             }
           } else {
             // Медиа вывод
+            // Проверяем что URL валидный (http/https)
+            const isValidUrl = (url: string): boolean => {
+              return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
+            };
+            
             let replicateUrls: string[] = [];
-            if (typeof output === 'string') {
+            if (typeof output === 'string' && isValidUrl(output)) {
               replicateUrls = [output];
             } else if (Array.isArray(output)) {
-              replicateUrls = output.filter(url => typeof url === 'string');
+              replicateUrls = output.filter(url => typeof url === 'string' && isValidUrl(url));
             } else if (output && typeof output === 'object') {
               const possibleUrlFields = ['url', 'video', 'output', 'result'];
               for (const field of possibleUrlFields) {
-                if ((output as any)[field] && typeof (output as any)[field] === 'string') {
-                  replicateUrls = [(output as any)[field]];
+                const fieldValue = (output as any)[field];
+                if (fieldValue && typeof fieldValue === 'string' && isValidUrl(fieldValue)) {
+                  replicateUrls = [fieldValue];
                   break;
                 }
               }

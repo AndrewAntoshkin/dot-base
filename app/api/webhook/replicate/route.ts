@@ -173,8 +173,31 @@ function isMediaUrl(value: string): boolean {
   if (!value.startsWith('http://') && !value.startsWith('https://') && !value.startsWith('data:')) {
     return false;
   }
-  const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov'];
-  return mediaExtensions.some(ext => value.toLowerCase().includes(ext));
+  
+  const lowercaseUrl = value.toLowerCase();
+  
+  // Проверяем по расширению
+  const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov', '.avi', '.mkv'];
+  if (mediaExtensions.some(ext => lowercaseUrl.includes(ext))) {
+    return true;
+  }
+  
+  // Доверяем известным CDN хостам (Replicate, Luma, Runway и др.) - они всегда возвращают медиа
+  const trustedMediaHosts = [
+    'replicate.delivery',
+    'pbxt.replicate.delivery',
+    'luma-labs',
+    'cdn.luma.ai',
+    'runway',
+    'fal.media',
+    'storage.googleapis.com',
+    'supabase.co/storage',
+  ];
+  if (trustedMediaHosts.some(host => lowercaseUrl.includes(host))) {
+    return true;
+  }
+  
+  return false;
 }
 
 function extractTextOutput(output: any): string | null {
