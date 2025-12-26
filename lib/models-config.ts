@@ -2950,15 +2950,77 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 2.5. Kling 1.0 T2V (fal.ai)
+  // 2.5. Kling 1.0 T2V Standard (fal.ai)
   {
     id: 'kling-1.0-t2v-fal',
     name: 'kling-1.0-t2v',
-    displayName: 'Kling 1.0 T2V',
+    displayName: 'Kling 1.0 Standard',
     replicateModel: 'fal-ai/kling-video/v1/standard/text-to-video',
     action: 'video_create',
     provider: 'fal',
-    description: 'Kling 1.0 — генерация видео из текста',
+    description: 'Kling 1.0 Standard — генерация видео из текста',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+        description: 'Текстовое описание видео. Опишите сцену, действия и стиль.',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: 'blur, distort, and low quality',
+        description: 'Укажите что убрать из результата.',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Формат (Aspect Ratio)',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '1:1', label: '1:1 (квадрат)' },
+        ],
+        description: 'Выберите пропорции: 16:9 для YouTube, 9:16 для TikTok/Reels.',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+        description: 'Длина видео.',
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Насколько близко следовать промпту (0 = свобода, 1 = строго).',
+      },
+    ],
+  },
+
+  // 2.6. Kling 1.0 Pro T2V (fal.ai)
+  {
+    id: 'kling-1.0-pro-t2v-fal',
+    name: 'kling-1.0-pro-t2v',
+    displayName: 'Kling 1.0 Pro',
+    replicateModel: 'fal-ai/kling-video/v1/pro/text-to-video',
+    action: 'video_create',
+    provider: 'fal',
+    description: 'Kling 1.0 Pro — премиум качество видео из текста',
     settings: [
       {
         name: 'prompt',
