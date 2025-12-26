@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ActionType, getModelsByActionLite } from '@/lib/models-lite';
 import { MobileSelect, SelectOption } from '@/components/ui/mobile-select';
 import { AlignRight } from 'lucide-react';
@@ -35,9 +35,19 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
     }));
   }, [models]);
 
+  // Track previous action to detect USER-initiated action changes
+  const prevActionRef = useRef(action);
+  
   useEffect(() => {
-    // Reset selection if current model is not in the list
-    if (value && !models.find((m) => m.id === value)) {
+    const prevAction = prevActionRef.current;
+    prevActionRef.current = action;
+    
+    // Only reset model if:
+    // 1. Action explicitly changed (user clicked different action)
+    // 2. Current value is not in the new action's models
+    // 3. Value is not empty (nothing to reset)
+    if (prevAction !== action && value && !models.find((m) => m.id === value)) {
+      console.log('[ModelSelector] Action changed from', prevAction, 'to', action, '- resetting model', value);
       onChange('');
     }
   }, [action, models, value, onChange]);
