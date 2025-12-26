@@ -98,7 +98,10 @@ export class ReplicateClient {
       } else if (modelLower.includes('seedance')) {
         cleaned.duration = Math.max(2, Math.min(12, Math.round(duration)));
       } else if (modelLower.includes('veo')) {
-        cleaned.duration = duration <= 6 ? 5 : 8;
+        // Veo 3.1 only accepts 4, 6, 8
+        if (duration <= 5) cleaned.duration = 4;
+        else if (duration <= 7) cleaned.duration = 6;
+        else cleaned.duration = 8;
       }
     }
     

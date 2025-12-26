@@ -375,6 +375,54 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Handle keyframe merge completion - update parent generation
+    if (generation.settings?.keyframe_merge && updateData.status === 'completed') {
+      const keyframeGroupId = generation.settings?.keyframe_group_id;
+      if (keyframeGroupId) {
+        logger.info('Keyframe merge completed, updating parent generation...', generation.id);
+        
+        try {
+          // Find and update parent generation
+          await (supabase.from('generations') as any)
+            .update({
+              status: 'completed',
+              output_urls: updateData.output_urls,
+              output_thumbs: updateData.output_thumbs,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('user_id', generation.user_id)
+            .contains('settings', { keyframe_group_id: keyframeGroupId, keyframe_parent: true });
+          
+          logger.info('Updated parent keyframe generation');
+        } catch (parentError: any) {
+          logger.error('Failed to update parent keyframe generation:', parentError.message);
+        }
+      }
+    }
+
+    // Handle keyframe segment/merge failure - update parent generation
+    if ((generation.is_keyframe_segment || generation.settings?.keyframe_merge) && updateData.status === 'failed') {
+      const keyframeGroupId = generation.settings?.keyframe_group_id;
+      if (keyframeGroupId) {
+        logger.info('Keyframe failed, updating parent generation...', generation.id);
+        
+        try {
+          await (supabase.from('generations') as any)
+            .update({
+              status: 'failed',
+              error_message: updateData.error_message || 'Ошибка генерации keyframes',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('user_id', generation.user_id)
+            .contains('settings', { keyframe_group_id: keyframeGroupId, keyframe_parent: true });
+          
+          logger.info('Updated parent keyframe generation as failed');
+        } catch (parentError: any) {
+          logger.error('Failed to update parent keyframe generation:', parentError.message);
+        }
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     logger.error('Webhook error:', error.message);

@@ -4,6 +4,8 @@ import { useState, useRef, Suspense, useEffect, useCallback } from 'react';
 import { Header } from '@/components/header';
 import { ImagePlus, Wand2, Plus, RefreshCw, Download, Play, Pause, Trash2, ChevronDown, Film, ArrowLeftRight } from 'lucide-react';
 import Image from 'next/image';
+import { useGenerations } from '@/contexts/generations-context';
+import { useUser } from '@/contexts/user-context';
 
 // Модели для режима "Начало – Конец" (I2V с первым и последним кадром)
 const I2V_MODELS = {
@@ -703,69 +705,86 @@ function VideoTimeline({
   );
 }
 
-// Video Player Controls
+// Video Player Controls - simplified without progress bar
 function VideoControls({
-  videoRef,
   currentTime,
   duration,
   isPlaying,
   onPlayPause,
+  onRegenerate,
+  onDownload,
+  isGenerating,
 }: {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
   currentTime: number;
   duration: number;
   isPlaying: boolean;
   onPlayPause: () => void;
+  onRegenerate?: () => void;
+  onDownload?: () => void;
+  isGenerating?: boolean;
 }) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!videoRef.current || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    videoRef.current.currentTime = percent * duration;
-  };
-
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="bg-[#191919] rounded-xl px-3 py-2 flex items-center gap-3">
-      <button
-        onClick={onPlayPause}
-        className="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full hover:bg-white/20 transition-colors"
-      >
-        {isPlaying ? (
-          <Pause className="w-4 h-4 text-white" />
-        ) : (
-          <Play className="w-4 h-4 text-white ml-0.5" />
-        )}
-      </button>
-      
-      <div className="flex items-center gap-2 text-xs text-[#959595]">
-        <span className="font-mono">{formatTime(currentTime)}</span>
-        <span>/</span>
-        <span className="font-mono">{formatTime(duration)}</span>
+    <div className="flex items-center justify-between">
+      {/* Left: Play + Duration */}
+      <div className="bg-[#191919] rounded-xl px-3 py-2 flex items-center gap-3">
+        <button
+          onClick={onPlayPause}
+          className="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+        >
+          {isPlaying ? (
+            <Pause className="w-4 h-4 text-white" />
+          ) : (
+            <Play className="w-4 h-4 text-white ml-0.5" />
+          )}
+        </button>
+        
+        <span className="font-inter font-normal text-[12px] text-white">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </span>
       </div>
 
-      <div
-        className="flex-1 h-1.5 bg-[#2f2f2f] rounded-full cursor-pointer"
-        onClick={handleSeek}
-      >
-        <div
-          className="h-full bg-white rounded-full transition-all"
-          style={{ width: `${progress}%` }}
-        />
+      {/* Right: Action buttons */}
+      <div className="flex items-center gap-2">
+        {onRegenerate && (
+          <button
+            onClick={onRegenerate}
+            disabled={isGenerating}
+            className="p-2 border border-[#2f2f2f] rounded-lg hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 text-white ${isGenerating ? 'animate-spin' : ''}`} />
+          </button>
+        )}
+        {onDownload && (
+          <button
+            onClick={onDownload}
+            className="p-2 border border-[#2f2f2f] rounded-lg hover:bg-[#1f1f1f] transition-colors"
+          >
+            <Download className="w-4 h-4 text-white" />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 // Видеоплеер
-function VideoPlayer({ videoUrls }: { videoUrls: string[] }) {
+function VideoPlayer({ 
+  videoUrls,
+  onRegenerate,
+  onDownload,
+  isGenerating,
+}: { 
+  videoUrls: string[];
+  onRegenerate?: () => void;
+  onDownload?: () => void;
+  isGenerating?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -858,11 +877,13 @@ function VideoPlayer({ videoUrls }: { videoUrls: string[] }) {
       </div>
 
       <VideoControls
-        videoRef={videoRef}
         currentTime={videoUrls.length > 1 ? getCumulativeTime() : currentTime}
         duration={videoUrls.length > 1 ? totalDuration : duration}
         isPlaying={isPlaying}
         onPlayPause={togglePlay}
+        onRegenerate={onRegenerate}
+        onDownload={onDownload}
+        isGenerating={isGenerating}
       />
     </div>
   );
@@ -981,6 +1002,11 @@ function KeyframesContent() {
   });
   
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
+  const pollStatusRef = useRef<((id: string) => void) | null>(null);
+  
+  const { refreshGenerations } = useGenerations();
+  const { selectedWorkspaceId } = useUser();
 
   const totalDuration = parts.reduce((sum, p) => sum + p.duration, 0);
 
@@ -1074,6 +1100,7 @@ function KeyframesContent() {
             duration: p.duration,
             aspectRatio: p.aspectRatio,
           })),
+          workspace_id: selectedWorkspaceId,
         }),
       });
       
@@ -1088,6 +1115,9 @@ function KeyframesContent() {
         ...prev,
         id: result.keyframeGroupId,
       }));
+      
+      // Refresh generations context so the header counter updates
+      refreshGenerations();
       
       pollStatus(result.keyframeGroupId);
       
@@ -1175,6 +1205,52 @@ function KeyframesContent() {
     poll();
   };
 
+  // Store pollStatus in ref for use in mount effect
+  pollStatusRef.current = pollStatus;
+
+  // Restore active keyframe generation on mount
+  useEffect(() => {
+    const restoreActiveGeneration = async () => {
+      try {
+        // Check for active keyframe parent generation
+        const response = await fetch('/api/generations/list?actionType=video_keyframes&status=processing&limit=1', {
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          setIsRestoring(false);
+          return;
+        }
+        
+        const data = await response.json();
+        const activeKeyframe = data.generations?.[0];
+        
+        if (activeKeyframe && activeKeyframe.settings?.keyframe_group_id) {
+          console.log('[Keyframes] Found active generation, restoring...', activeKeyframe.id);
+          
+          // Set generation state and start polling
+          setGeneration({
+            id: activeKeyframe.settings.keyframe_group_id,
+            status: 'generating',
+            segments: [],
+          });
+          setIsGenerating(true);
+          
+          // Start polling for status
+          if (pollStatusRef.current) {
+            pollStatusRef.current(activeKeyframe.settings.keyframe_group_id);
+          }
+        }
+      } catch (error) {
+        console.error('[Keyframes] Failed to restore active generation:', error);
+      } finally {
+        setIsRestoring(false);
+      }
+    };
+    
+    restoreActiveGeneration();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDownload = async () => {
     if (!generation.finalVideoUrl) return;
     
@@ -1261,34 +1337,19 @@ function KeyframesContent() {
 
         {/* RIGHT PANEL - OUTPUT */}
         <div className="flex-1 py-8 pl-0 pr-20 overflow-y-auto flex flex-col gap-6">
-          {/* Header + Actions */}
-          <div className="flex items-center justify-between">
-            <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-              OUTPUT
-            </h2>
-            
-            {generation.finalVideoUrl && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="p-2 border border-[#2f2f2f] rounded-lg hover:bg-[#1f1f1f] transition-colors"
-                >
-                  <RefreshCw className="w-4 h-4 text-white" />
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="p-2 border border-[#2f2f2f] rounded-lg hover:bg-[#1f1f1f] transition-colors"
-                >
-                  <Download className="w-4 h-4 text-white" />
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Header */}
+          <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
+            OUTPUT
+          </h2>
 
           {/* Output Content */}
-          {(generation.allVideoUrls && generation.allVideoUrls.length > 0) || generation.finalVideoUrl ? (
-            <VideoPlayer videoUrls={generation.allVideoUrls?.length ? generation.allVideoUrls : [generation.finalVideoUrl!]} />
+          {generation.finalVideoUrl ? (
+            <VideoPlayer 
+              videoUrls={[generation.finalVideoUrl]}
+              onRegenerate={handleGenerate}
+              onDownload={handleDownload}
+              isGenerating={isGenerating}
+            />
           ) : generation.status !== 'idle' ? (
             <GeneratingOutput 
               status={generation.status}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { Header } from '@/components/header';
 import { 
   ChevronUp,
@@ -16,6 +17,7 @@ import {
   Calendar,
   X,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 import { useUser } from '@/contexts/user-context';
 import { UserRole } from '@/lib/supabase/types';
@@ -1230,10 +1232,16 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center">
+              <div className="flex items-center justify-between">
                 <h3 className="font-inter font-medium text-[18px] leading-[28px] text-white truncate">
                   {sideSheetUser.email || sideSheetUser.telegram_username || 'Пользователь'}
                 </h3>
+                <Link
+                  href={`/history?creatorId=${sideSheetUser.id}&onlyMine=false`}
+                  className="px-3 py-1.5 bg-[#252525] hover:bg-[#303030] rounded-lg font-inter font-medium text-[12px] text-white transition-colors"
+                >
+                  Профиль
+                </Link>
               </div>
 
               {/* Subheader */}
@@ -1262,6 +1270,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                             Дата генерации
                           </span>
                         </th>
+                        <th className="h-11 px-3 w-[48px]"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1278,17 +1287,20 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                             <td className="h-[56px] px-6">
                               <div className="h-5 w-24 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
                             </td>
+                            <td className="h-[56px] px-3">
+                              <div className="h-5 w-5 bg-[#252525] rounded relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
+                            </td>
                           </tr>
                         ))
                       ) : paginatedGenerations.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="h-[72px] text-center text-[#a2a2a2]">
+                          <td colSpan={4} className="h-[72px] text-center text-[#a2a2a2]">
                             Генерации не найдены
                           </td>
                         </tr>
                       ) : (
                         paginatedGenerations.map((gen) => (
-                          <tr key={gen.id} className="border-b border-[#252525]">
+                          <tr key={gen.id} className="border-b border-[#252525] hover:bg-[#1a1a1a] transition-colors">
                             <td className="h-[72px] px-6">
                               <span className="font-inter font-normal text-[14px] leading-[20px] text-[#e1e1e1]">
                                 {gen.model_name || '-'}
@@ -1303,6 +1315,18 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
                               <span className="font-inter font-normal text-[14px] leading-[20px] text-[#e1e1e1]">
                                 {new Date(gen.created_at).toLocaleDateString('ru-RU')}
                               </span>
+                            </td>
+                            <td className="h-[72px] px-3">
+                              <a
+                                href={`/result/${gen.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-2 rounded-lg hover:bg-[#252525] transition-colors inline-flex items-center justify-center"
+                                title="Открыть генерацию"
+                              >
+                                <ExternalLink className="w-4 h-4 text-[#a2a2a2] hover:text-white" />
+                              </a>
                             </td>
                           </tr>
                         ))

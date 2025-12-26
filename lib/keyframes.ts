@@ -266,6 +266,7 @@ export async function startNextKeyframeSegment(
         .from('generations') as any)
         .insert({
           user_id: completedGen.user_id,
+          workspace_id: completedGen.workspace_id,
           action: 'video_edit',
           model_id: 'video-merge',
           model_name: 'video-merge',

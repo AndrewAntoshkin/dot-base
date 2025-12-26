@@ -13,9 +13,13 @@ export default function LoginPageClient() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [accessCode, setAccessCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+
+  // Secret access code for registration
+  const REGISTRATION_ACCESS_CODE = 'gfjsGst264!!hDy';
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,6 +33,13 @@ export default function LoginPageClient() {
 
     try {
       if (mode === 'register') {
+        // Check access code first
+        if (accessCode !== REGISTRATION_ACCESS_CODE) {
+          setError('Неверный код доступа');
+          setIsLoading(false);
+          return;
+        }
+
         if (password !== confirmPassword) {
           setError('Пароли не совпадают');
           setIsLoading(false);
@@ -186,15 +197,25 @@ export default function LoginPageClient() {
                 className="w-full bg-[#212121] rounded-xl px-4 py-3 font-inter font-medium text-[14px] text-white placeholder:text-[#9f9f9f] focus:outline-none focus:ring-1 focus:ring-white/20"
               />
               {mode === 'register' && (
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Подтвердите пароль"
-                  required
-                  minLength={6}
-                  className="w-full bg-[#212121] rounded-xl px-4 py-3 font-inter font-medium text-[14px] text-white placeholder:text-[#9f9f9f] focus:outline-none focus:ring-1 focus:ring-white/20"
-                />
+                <>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Подтвердите пароль"
+                    required
+                    minLength={6}
+                    className="w-full bg-[#212121] rounded-xl px-4 py-3 font-inter font-medium text-[14px] text-white placeholder:text-[#9f9f9f] focus:outline-none focus:ring-1 focus:ring-white/20"
+                  />
+                  <input
+                    type="password"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    placeholder="Код доступа"
+                    required
+                    className="w-full bg-[#212121] rounded-xl px-4 py-3 font-inter font-medium text-[14px] text-white placeholder:text-[#9f9f9f] focus:outline-none focus:ring-1 focus:ring-white/20"
+                  />
+                </>
               )}
 
               {/* Error message */}

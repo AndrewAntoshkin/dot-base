@@ -64,11 +64,16 @@ export async function GET(request: NextRequest) {
     
     // Фильтр по пространству или пользователю
     if (workspaceId) {
-      query = query.eq('workspace_id', workspaceId);
-      
-      // Если onlyMine - показываем только свои
+      // Показываем генерации ИЗ workspace ИЛИ БЕЗ workspace (для текущего пользователя)
+      // Это нужно чтобы старые генерации без workspace_id не исчезали
       if (onlyMine) {
-        query = query.eq('user_id', dbUser.id);
+        // Показываем: (мои в этом workspace) ИЛИ (мои без workspace)
+        query = query
+          .eq('user_id', dbUser.id)
+          .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
+      } else {
+        // Показываем: (все в этом workspace) ИЛИ (мои без workspace)
+        query = query.or(`workspace_id.eq.${workspaceId},and(workspace_id.is.null,user_id.eq.${dbUser.id})`);
       }
     } else {
       // Если нет workspace - показываем только свои (обратная совместимость)
@@ -214,11 +219,14 @@ export async function GET(request: NextRequest) {
           .select('id', { count: 'exact', head: true })
             .not('is_keyframe_segment', 'is', true);
           
-          // Workspace/user filter
+          // Workspace/user filter - include null workspace for current user
           if (workspaceId) {
-            q = q.eq('workspace_id', workspaceId);
             if (onlyMine) {
-              q = q.eq('user_id', dbUser.id);
+              q = q
+                .eq('user_id', dbUser.id)
+                .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
+            } else {
+              q = q.or(`workspace_id.eq.${workspaceId},and(workspace_id.is.null,user_id.eq.${dbUser.id})`);
             }
           } else {
             q = q.eq('user_id', dbUser.id);

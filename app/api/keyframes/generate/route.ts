@@ -27,6 +27,7 @@ const partSchema = z.object({
 
 const requestSchema = z.object({
   parts: z.array(partSchema).min(1).max(10),
+  workspace_id: z.string().nullish(),
 });
 
 export async function POST(request: NextRequest) {
@@ -67,12 +68,69 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request
     const body = await request.json();
-    const { parts } = requestSchema.parse(body);
+    const { parts, workspace_id: requestedWorkspaceId } = requestSchema.parse(body);
 
     logger.info(`Creating keyframe generation with ${parts.length} parts`);
 
+    // Get user's workspace
+    let workspaceId: string | null = null;
+    const { data: memberships } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', userId);
+    
+    const userWorkspaceIds = (memberships as { workspace_id: string }[] | null)?.map(m => m.workspace_id) || [];
+    
+    if (requestedWorkspaceId && userWorkspaceIds.includes(requestedWorkspaceId)) {
+      workspaceId = requestedWorkspaceId;
+    } else if (userWorkspaceIds.length > 0) {
+      workspaceId = userWorkspaceIds[0];
+    }
+
     // Create unique group ID for this keyframe session
     const keyframeGroupId = crypto.randomUUID();
+
+    // Calculate total duration for display
+    const totalDuration = parts.reduce((sum, p) => sum + (p.duration || 5), 0);
+    const firstPart = parts[0];
+    const firstModelConfig = KEYFRAME_MODELS[firstPart.model];
+
+    // Create PARENT keyframe generation (visible in queue/history)
+    const { data: parentGeneration, error: parentError } = await (supabase
+      .from('generations') as any)
+      .insert({
+        user_id: userId,
+        workspace_id: workspaceId,
+        action: 'video_keyframes',
+        model_id: firstModelConfig.modelId,
+        model_name: `Keyframes (${parts.length} ${parts.length === 1 ? 'часть' : 'частей'})`,
+        replicate_model: firstModelConfig.replicateModel,
+        prompt: parts.map((p, i) => `[Часть ${i + 1}] ${p.prompt}`).join(' | '),
+        input_image_url: firstPart.mode === 'i2v' ? firstPart.startImage : null,
+        settings: {
+          keyframe_group_id: keyframeGroupId,
+          keyframe_parent: true,
+          keyframe_total_parts: parts.length,
+          keyframe_total_duration: totalDuration,
+          keyframe_parts_config: parts.map(p => ({
+            model: p.model,
+            mode: p.mode,
+            duration: p.duration,
+            aspectRatio: p.aspectRatio,
+          })),
+        },
+        status: 'processing',
+        viewed: false,
+      })
+      .select()
+      .single();
+
+    if (parentError || !parentGeneration) {
+      logger.error('Failed to create parent keyframe generation:', parentError?.message);
+      return NextResponse.json({ error: 'Failed to create generation' }, { status: 500 });
+    }
+
+    logger.info(`Created parent keyframe generation: ${parentGeneration.id}`);
 
     // Create generation records for ALL segments (pending status)
     const segmentGenerations: string[] = [];
@@ -86,6 +144,7 @@ export async function POST(request: NextRequest) {
         .from('generations') as any)
         .insert({
           user_id: userId,
+          workspace_id: workspaceId,
           action: isI2V ? 'video_i2v' : 'video_create',
           model_id: modelConfig.modelId,
           model_name: modelConfig.modelName,
@@ -129,8 +188,7 @@ export async function POST(request: NextRequest) {
 
     // Start ONLY the first segment - subsequent segments will be started by webhook
     const firstSegmentId = segmentGenerations[0];
-    const firstPart = parts[0];
-    const firstModelConfig = KEYFRAME_MODELS[firstPart.model];
+    // firstPart and firstModelConfig already defined above
 
     try {
       const replicateClient = getReplicateClient();
@@ -184,6 +242,7 @@ export async function POST(request: NextRequest) {
     // Return immediately - webhook will handle progress
     return NextResponse.json({
       keyframeGroupId,
+      parentGenerationId: parentGeneration.id,
       segmentGenerationIds: segmentGenerations,
       status: 'processing',
       message: `Started keyframe generation with ${parts.length} parts`,
