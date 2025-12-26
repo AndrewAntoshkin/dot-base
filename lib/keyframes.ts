@@ -16,6 +16,14 @@ export interface KeyframePartInput {
   mode?: 'i2v' | 't2v';
 }
 
+// Veo 3.1 only accepts 4, 6, 8 seconds - normalize to closest valid value
+function normalizeVeoDuration(duration?: number): number {
+  if (!duration) return 8;
+  if (duration <= 5) return 4;
+  if (duration <= 7) return 6;
+  return 8;
+}
+
 // I2V Model configurations (Начало – Конец) - модели с поддержкой first+last frame
 export const I2V_KEYFRAME_MODELS = {
   'hailuo-02': {
@@ -49,7 +57,7 @@ export const I2V_KEYFRAME_MODELS = {
       image: part.startImage,
       last_frame: part.endImage, // Veo uses "last_frame" not "end_image"
       prompt: part.prompt,
-      duration: part.duration || 8,
+      duration: normalizeVeoDuration(part.duration), // Veo only accepts 4, 6, 8
       aspect_ratio: part.aspectRatio || '16:9',
     }),
   },
@@ -63,7 +71,7 @@ export const T2V_KEYFRAME_MODELS = {
     modelName: 'veo-3.1-fast',
     inputMapper: (part: KeyframePartInput) => ({
       prompt: part.prompt,
-      duration: part.duration || 8,
+      duration: normalizeVeoDuration(part.duration), // Veo only accepts 4, 6, 8
       aspect_ratio: part.aspectRatio || '16:9',
     }),
   },
