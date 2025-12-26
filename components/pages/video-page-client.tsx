@@ -81,14 +81,20 @@ function VideoContent() {
         // Mark as handled BEFORE async work to prevent race conditions
         quickActionHandledRef.current = paramsKey;
         
-        // Get first model for this action
+        // Get first model for this action from LITE list (matches ModelSelector)
+        // IMPORTANT: Use lite version to ensure model ID matches what ModelSelector expects
+        const { getModelsByActionLite } = await import('@/lib/models-lite');
         const { getModelsByAction } = await import('@/lib/models-config');
-        const models = getModelsByAction(actionParam as ActionType);
-        console.log('[VideoPage] Found models:', models.length, models[0]?.id);
+        const modelsLite = getModelsByActionLite(actionParam as ActionType);
+        const modelsFull = getModelsByAction(actionParam as ActionType);
+        console.log('[VideoPage] Found models (lite):', modelsLite.length, modelsLite[0]?.id);
         
-        if (models.length > 0) {
-          const model = models[0];
-          
+        // Use first model from lite list for ID, but full list for settings
+        const modelId = modelsLite[0]?.id;
+        const model = modelsFull.find(m => m.id === modelId);
+        console.log('[VideoPage] Using model:', modelId, 'found in full:', !!model);
+        
+        if (modelId && model) {
           // Set media URL in form data using the correct field name from model settings
           let newFormData: Record<string, any> = {};
           if (imageUrlParam) {
@@ -107,19 +113,19 @@ function VideoContent() {
             newFormData = { [fieldName]: value };
           }
           
-          console.log('[VideoPage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
+          console.log('[VideoPage] Setting state:', { action: actionParam, modelId, formData: newFormData });
           
           // Set all state at once (React will batch these)
           if (isVideoAction(actionParam)) {
             setSelectedAction(actionParam as ActionType);
           }
-          setSelectedModelId(model.id);
+          setSelectedModelId(modelId);
           setFormData(newFormData);
           setMobileShowForm(true);
           
           console.log('[VideoPage] State updated successfully');
         } else {
-          console.warn('[VideoPage] No models found for action:', actionParam);
+          console.warn('[VideoPage] No models found for action:', actionParam, 'modelId:', modelId);
         }
       } catch (error) {
         console.error('[VideoPage] Error loading quick action:', error);
