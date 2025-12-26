@@ -105,13 +105,13 @@ export function LimitToastProvider({ children }: { children: ReactNode }) {
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl animate-in slide-in-from-bottom-4 duration-300 ${
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl animate-in slide-in-from-bottom-4 duration-300 backdrop-blur-xl ${
                 toast.type === 'limit' 
-                  ? 'bg-[#2a2020] border border-red-500/30' 
-                  : 'bg-[#1a2a1a] border border-green-500/30'
+                  ? 'bg-[#1a1010]/95 border border-red-500/40' 
+                  : 'bg-[#101a10]/95 border border-green-500/40'
               }`}
               style={{ 
-                boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.6)',
+                boxShadow: '0px 4px 24px rgba(0, 0, 0, 0.8)',
                 minWidth: '280px',
                 maxWidth: '400px',
               }}
