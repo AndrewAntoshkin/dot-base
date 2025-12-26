@@ -13,9 +13,9 @@ const partSchema = z.object({
   id: z.string(),
   model: z.enum([
     // I2V модели (Начало – Конец) - поддерживают first+last frame
-    'hailuo-02', 'seedance-1-pro', 'veo-3.1-fast',
+    'hailuo-02', 'seedance-1-pro', 'seedance-1.5-pro', 'veo-3.1-fast',
     // T2V модели (Без изображений) - только промпт
-    'veo-3.1-fast-t2v', 'kling-v2.5-turbo-pro', 'hailuo-2.3', 'wan-2.5-t2v'
+    'veo-3.1-fast-t2v', 'seedance-1.5-pro-t2v', 'kling-v2.5-turbo-pro', 'hailuo-2.3', 'wan-2.5-t2v'
   ]),
   mode: z.enum(['i2v', 't2v']),
   startImage: z.string().url().nullable().optional(),

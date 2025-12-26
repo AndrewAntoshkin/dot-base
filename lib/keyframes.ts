@@ -49,6 +49,17 @@ export const I2V_KEYFRAME_MODELS = {
       duration: part.duration || 5,
     }),
   },
+  'seedance-1.5-pro': {
+    replicateModel: 'bytedance/seedance-1.5-pro',
+    modelId: 'seedance-1.5-pro-i2v',
+    modelName: 'seedance-1.5-pro',
+    inputMapper: (part: KeyframePartInput) => ({
+      image: part.startImage,
+      prompt: part.prompt,
+      duration: part.duration || 5,
+      resolution: '1080p',
+    }),
+  },
   'veo-3.1-fast': {
     replicateModel: 'google/veo-3.1-fast',
     modelId: 'veo-3.1-fast-i2v',
@@ -72,6 +83,17 @@ export const T2V_KEYFRAME_MODELS = {
     inputMapper: (part: KeyframePartInput) => ({
       prompt: part.prompt,
       duration: normalizeVeoDuration(part.duration), // Veo only accepts 4, 6, 8
+      aspect_ratio: part.aspectRatio || '16:9',
+    }),
+  },
+  'seedance-1.5-pro-t2v': {
+    replicateModel: 'bytedance/seedance-1.5-pro',
+    modelId: 'seedance-1.5-pro-t2v',
+    modelName: 'seedance-1.5-pro',
+    inputMapper: (part: KeyframePartInput) => ({
+      prompt: part.prompt,
+      duration: part.duration || 5,
+      resolution: '1080p',
       aspect_ratio: part.aspectRatio || '16:9',
     }),
   },
