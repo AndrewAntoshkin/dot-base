@@ -66,52 +66,55 @@ function VideoContent() {
     if (!actionParam) return;
     
     const loadQuickAction = async () => {
-      console.log('[VideoPage] Loading quick action for:', actionParam);
-      // Get first model for this action
-      const { getModelsByAction } = await import('@/lib/models-config');
-      const models = getModelsByAction(actionParam as ActionType);
-      console.log('[VideoPage] Found models:', models.length, models[0]?.id);
-      
-      if (models.length > 0) {
-        const model = models[0];
+      try {
+        console.log('[VideoPage] Loading quick action for:', actionParam);
+        // Get first model for this action
+        const { getModelsByAction } = await import('@/lib/models-config');
+        const models = getModelsByAction(actionParam as ActionType);
+        console.log('[VideoPage] Found models:', models.length, models[0]?.id);
         
-        // Set media URL in form data using the correct field name from model settings
-        let newFormData: Record<string, any> = {};
-        if (imageUrlParam) {
-          // Find first file or file_array field
-          const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
-          const fieldName = fileField?.name || 'image';
-          console.log('[VideoPage] Setting image field:', fieldName, 'type:', fileField?.type);
-          // For file_array, wrap in array
-          const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
-          newFormData = { [fieldName]: value };
-        } else if (videoUrlParam) {
-          // Find video field
-          const fileField = model.settings.find(s => (s.type === 'file' || s.type === 'file_array') && s.name.toLowerCase().includes('video'));
-          const fieldName = fileField?.name || 'video';
-          const value = fileField?.type === 'file_array' ? [videoUrlParam] : videoUrlParam;
-          newFormData = { [fieldName]: value };
+        if (models.length > 0) {
+          const model = models[0];
+          
+          // Set media URL in form data using the correct field name from model settings
+          let newFormData: Record<string, any> = {};
+          if (imageUrlParam) {
+            // Find first file or file_array field
+            const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
+            const fieldName = fileField?.name || 'image';
+            console.log('[VideoPage] Setting image field:', fieldName, 'type:', fileField?.type);
+            // For file_array, wrap in array
+            const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
+            newFormData = { [fieldName]: value };
+          } else if (videoUrlParam) {
+            // Find video field
+            const fileField = model.settings.find(s => (s.type === 'file' || s.type === 'file_array') && s.name.toLowerCase().includes('video'));
+            const fieldName = fileField?.name || 'video';
+            const value = fileField?.type === 'file_array' ? [videoUrlParam] : videoUrlParam;
+            newFormData = { [fieldName]: value };
+          }
+          
+          console.log('[VideoPage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
+          
+          // Set all state at once (React will batch these)
+          if (isVideoAction(actionParam)) {
+            setSelectedAction(actionParam as ActionType);
+          }
+          setSelectedModelId(model.id);
+          setFormData(newFormData);
+          setMobileShowForm(true);
+          
+          // Clear URL params after state is set
+          setTimeout(() => {
+            console.log('[VideoPage] Clearing URL params');
+            router.replace('/video', { scroll: false });
+          }, 500);
+        } else {
+          console.warn('[VideoPage] No models found for action:', actionParam);
         }
-        
-        console.log('[VideoPage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
-        
-        // Set all state at once (React will batch these)
-        if (isVideoAction(actionParam)) {
-          setSelectedAction(actionParam as ActionType);
-        }
-        setSelectedModelId(model.id);
-        setFormData(newFormData);
-        setMobileShowForm(true);
-      } else {
-        console.warn('[VideoPage] No models found for action:', actionParam);
+      } catch (error) {
+        console.error('[VideoPage] Error loading quick action:', error);
       }
-      
-      // Clear URL params after a delay to ensure state is fully applied
-      // Increased from 100ms to 500ms to give React time to batch state updates
-      setTimeout(() => {
-        console.log('[VideoPage] Clearing URL params');
-        router.replace('/video', { scroll: false });
-      }, 500);
     };
     
     loadQuickAction();

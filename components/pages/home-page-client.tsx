@@ -65,47 +65,50 @@ function HomeContent() {
     if (!actionParam) return;
     
     const loadQuickAction = async () => {
-      console.log('[HomePage] Loading quick action for:', actionParam);
-      // Get first model for this action
-      const { getModelsByAction } = await import('@/lib/models-config');
-      const models = getModelsByAction(actionParam as ActionType);
-      console.log('[HomePage] Found models:', models.length, models[0]?.id);
-      
-      if (models.length > 0) {
-        const model = models[0];
+      try {
+        console.log('[HomePage] Loading quick action for:', actionParam);
+        // Get first model for this action
+        const { getModelsByAction } = await import('@/lib/models-config');
+        const models = getModelsByAction(actionParam as ActionType);
+        console.log('[HomePage] Found models:', models.length, models[0]?.id);
         
-        // Set image URL in form data using the correct field name from model settings
-        let newFormData: Record<string, any> = {};
-        if (imageUrlParam) {
-          // Find first file or file_array field
-          const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
-          const fieldName = fileField?.name || 'image';
-          console.log('[HomePage] Setting image field:', fieldName, 'type:', fileField?.type);
-          // For file_array, wrap in array
-          const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
-          newFormData = { [fieldName]: value };
+        if (models.length > 0) {
+          const model = models[0];
+          
+          // Set image URL in form data using the correct field name from model settings
+          let newFormData: Record<string, any> = {};
+          if (imageUrlParam) {
+            // Find first file or file_array field
+            const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
+            const fieldName = fileField?.name || 'image';
+            console.log('[HomePage] Setting image field:', fieldName, 'type:', fileField?.type);
+            // For file_array, wrap in array
+            const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
+            newFormData = { [fieldName]: value };
+          }
+          
+          console.log('[HomePage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
+          
+          // Set all state at once (React will batch these)
+          // Set action (only non-video actions for home page)
+          if (!isVideoAction(actionParam)) {
+            setSelectedAction(actionParam as ActionType);
+          }
+          setSelectedModelId(model.id);
+          setFormData(newFormData);
+          setMobileShowForm(true);
+          
+          // Clear URL params after state is set
+          setTimeout(() => {
+            console.log('[HomePage] Clearing URL params');
+            router.replace('/', { scroll: false });
+          }, 500);
+        } else {
+          console.warn('[HomePage] No models found for action:', actionParam);
         }
-        
-        console.log('[HomePage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
-        
-        // Set all state at once (React will batch these)
-        // Set action (only non-video actions for home page)
-        if (!isVideoAction(actionParam)) {
-          setSelectedAction(actionParam as ActionType);
-        }
-        setSelectedModelId(model.id);
-        setFormData(newFormData);
-        setMobileShowForm(true);
-      } else {
-        console.warn('[HomePage] No models found for action:', actionParam);
+      } catch (error) {
+        console.error('[HomePage] Error loading quick action:', error);
       }
-      
-      // Clear URL params after a delay to ensure state is fully applied
-      // Increased from 100ms to 500ms to give React time to batch state updates
-      setTimeout(() => {
-        console.log('[HomePage] Clearing URL params');
-        router.replace('/', { scroll: false });
-      }, 500);
     };
     
     loadQuickAction();
