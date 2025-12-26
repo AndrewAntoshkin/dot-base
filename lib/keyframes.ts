@@ -16,13 +16,13 @@ export interface KeyframePartInput {
   mode?: 'i2v' | 't2v';
 }
 
-// Veo 3.1 only accepts '4', '6', '8' as STRING - normalize to closest valid value
-function normalizeVeoDuration(duration?: number | string): string {
+// Veo 3.1 only accepts 4, 6, 8 as NUMBER - normalize to closest valid value
+function normalizeVeoDuration(duration?: number | string): number {
   const d = typeof duration === 'string' ? parseInt(duration, 10) : duration;
-  if (!d || isNaN(d)) return '8';
-  if (d <= 5) return '4';
-  if (d <= 7) return '6';
-  return '8';
+  if (!d || isNaN(d)) return 8;
+  if (d <= 5) return 4;
+  if (d <= 7) return 6;
+  return 8;
 }
 
 // I2V Model configurations (Начало – Конец) - модели с поддержкой first+last frame

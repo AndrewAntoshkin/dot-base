@@ -178,6 +178,11 @@ export async function POST(request: NextRequest) {
         ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
         : undefined;
       
+      // Debug log for Veo duration issue
+      if (model.replicateModel.includes('veo')) {
+        logger.info('[Veo Debug] replicateInput:', JSON.stringify(replicateInput, null, 2));
+      }
+
       const { prediction, tokenId } = await replicateClient.run({
         model: model.replicateModel,
         version: model.version,
