@@ -89,6 +89,7 @@ export function QuickActions({ mediaUrl, mediaType, compact = false }: QuickActi
 
   const handleActionClick = (action: QuickAction) => {
     const path = action.getPath(mediaUrl);
+    console.log('[QuickActions] Navigating to:', path);
     router.push(path);
   };
 
