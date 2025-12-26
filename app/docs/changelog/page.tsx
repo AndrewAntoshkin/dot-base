@@ -6,13 +6,13 @@ const CHANGELOG = [
   {
     version: '0.2.2',
     date: '2025-12-26',
-    title: 'Интеграция fal.ai: Kling (T2V + I2V + V2V)',
+    title: 'Kling: Text-to-Video, Image-to-Video, Video-to-Video',
     changes: [
-      { type: 'new', text: 'Мультипровайдерная архитектура — поддержка моделей из Replicate и fal.ai' },
-      { type: 'new', text: 'Kling 1.0 T2V от fal.ai в разделе Video → Создать' },
-      { type: 'new', text: 'Kling 1.0 I2V от fal.ai с поддержкой первого и последнего кадра' },
-      { type: 'new', text: 'Kling O1 V2V от fal.ai для генерации на основе видео-референса' },
-      { type: 'improvement', text: 'Добавлен webhook и polling для fal.ai API' },
+      { type: 'new', text: 'Мультипровайдерная архитектура — расширенная поддержка моделей' },
+      { type: 'new', text: 'Kling 1.0 T2V в разделе Video → Создать' },
+      { type: 'new', text: 'Kling 1.0 I2V с поддержкой первого и последнего кадра' },
+      { type: 'new', text: 'Kling O1 V2V для генерации на основе видео-референса' },
+      { type: 'improvement', text: 'Улучшена стабильность обработки видео' },
     ],
   },
   {

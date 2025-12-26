@@ -2958,7 +2958,7 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/v1/standard/text-to-video',
     action: 'video_create',
     provider: 'fal',
-    description: 'Kling 1.0 от fal.ai - генерация видео из текста',
+    description: 'Kling 1.0 — генерация видео из текста',
     settings: [
       {
         name: 'prompt',
@@ -3532,7 +3532,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/v1/standard/image-to-video',
     action: 'video_i2v',
     provider: 'fal',
-    description: 'Kling 1.0 от fal.ai - анимация с поддержкой первого и последнего кадра',
+    description: 'Kling 1.0 — анимация с поддержкой первого и последнего кадра',
     settings: [
       {
         name: 'image',
@@ -4389,7 +4389,7 @@ export const VIDEO_EDIT_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/o1/standard/video-to-video/reference',
     action: 'video_edit',
     provider: 'fal',
-    description: 'Kling O1 от fal.ai - генерация нового кадра на основе референсного видео',
+    description: 'Kling O1 — генерация нового кадра на основе референсного видео',
     settings: [
       {
         name: 'video',
