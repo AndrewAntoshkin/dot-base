@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, skipped: true });
     }
 
-    const updateData: any = { fal_output: body };
+    const updateData: any = { replicate_output: body };  // Use same column for both providers
 
     if (status === 'COMPLETED' && payload) {
       let mediaUrls: string[] = [];

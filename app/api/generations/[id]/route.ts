@@ -199,15 +199,21 @@ export async function GET(
             if (outputUrls.length > 0) {
               const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(outputUrls, generation.id);
               
-              await (supabase.from('generations') as any)
+              const { error: updateError } = await (supabase.from('generations') as any)
                 .update({
                   status: 'completed',
                   output_urls: savedUrls.length > 0 ? savedUrls : outputUrls,
                   output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
-                  fal_output: result,
+                  replicate_output: result,  // Use same column for both providers
                   completed_at: new Date().toISOString(),
                 })
                 .eq('id', id);
+
+              if (updateError) {
+                logger.error(`[GET Generation] Failed to update Fal.ai generation ${id}:`, updateError);
+              } else {
+                logger.info(`[GET Generation] Successfully updated Fal.ai generation ${id} to completed`);
+              }
 
               generation.status = 'completed';
               generation.output_urls = savedUrls.length > 0 ? savedUrls : outputUrls;

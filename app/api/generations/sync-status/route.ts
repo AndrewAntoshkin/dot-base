@@ -110,7 +110,7 @@ export async function POST() {
                   status: 'completed',
                   output_urls: savedUrls.length > 0 ? savedUrls : outputUrls,
                   output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
-                  fal_output: result,
+                  replicate_output: result,  // Use same column for both providers
                   completed_at: new Date().toISOString(),
                 })
                 .eq('id', gen.id);
