@@ -83,6 +83,16 @@ function HeaderTooltip({
   disabled?: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const wasDisabledRef = useRef(disabled);
+
+  // При закрытии dropdown (disabled: true → false) сбрасываем hover
+  // чтобы тултип не появлялся сразу
+  useEffect(() => {
+    if (wasDisabledRef.current && !disabled) {
+      setIsHovered(false);
+    }
+    wasDisabledRef.current = disabled;
+  }, [disabled]);
 
   const alignmentClasses = {
     left: 'left-0',

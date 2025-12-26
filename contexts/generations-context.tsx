@@ -65,6 +65,7 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
   const isAuthenticatedRef = useRef(isAuthenticated);
   const isWindowVisibleRef = useRef(true);
   const hasActiveRef = useRef(false);
+  const skipNextPollRef = useRef(false); // Пропустить следующий poll после markAllAsViewed
 
   // Обновляем refs при изменении props/state
   useEffect(() => {
@@ -108,6 +109,14 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     if (!isAuthenticatedRef.current || !isWindowVisibleRef.current) {
       return;
     }
+    
+    // Пропускаем poll если недавно было markAllAsViewed (предотвращаем race condition)
+    if (skipNextPollRef.current) {
+      skipNextPollRef.current = false;
+      console.log('[Generations] Skipping refresh - cooldown after clear');
+      return;
+    }
+    
     // Пропускаем если офлайн
     if (!isOnline()) {
       setIsOffline(true);
@@ -248,6 +257,11 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     setGenerations((prev) =>
       prev.map((g) => ({ ...g, viewed: true }))
     );
+    
+    // Пропустить следующий poll чтобы не перезаписать локальное состояние
+    // до того как сервер обновится (предотвращаем race condition)
+    skipNextPollRef.current = true;
+    
     try {
       await fetchWithTimeout('/api/generations/view-all', { 
         method: 'POST',
