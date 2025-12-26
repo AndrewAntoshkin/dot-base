@@ -28,11 +28,19 @@ export interface Announcement {
  */
 export const ANNOUNCEMENTS: Announcement[] = [
   {
+    id: 'seedance-1.5-pro-release',
+    text: 'Новая модель Seedance 1.5 Pro — видео с синхронизированным аудио и lip-sync',
+    actionLabel: 'Попробовать',
+    actionUrl: '/video?model=seedance-1.5-pro-t2v',
+    active: true,
+    createdAt: '2025-12-26',
+  },
+  {
     id: 'flux-2-max-release',
     text: 'Появилась новая модель для создания изображений – FLUX 2 Max',
     actionLabel: 'Попробовать',
     actionUrl: '/?model=flux-2-max',
-    active: true,
+    active: false, // Деактивирован в пользу нового анонса
     createdAt: '2025-12-18',
   },
   // Пример для будущих анонсов:
@@ -93,6 +101,7 @@ export function getActiveAnnouncement(dismissedIds: string[]): Announcement | nu
   
   return sorted[0] || null;
 }
+
 
 
 

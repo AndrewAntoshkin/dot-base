@@ -82,6 +82,7 @@ export const INPAINT_MODELS_LITE: ModelLite[] = [
 
 export const VIDEO_CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'veo-3.1-fast', displayName: 'Veo 3.1 Fast', description: 'Google - быстрая генерация видео с аудио', action: 'video_create' },
+  { id: 'seedance-1.5-pro-t2v', displayName: 'Seedance 1.5 Pro', description: 'ByteDance - видео с аудио и lip-sync', action: 'video_create' },
   { id: 'kling-v2.5-turbo-pro-t2v', displayName: 'Kling v2.5 Turbo Pro', description: 'Kuaishou - высококачественное видео', action: 'video_create' },
   { id: 'seedance-1-pro-t2v', displayName: 'Seedance 1 Pro', description: 'ByteDance - премиум качество до 1080p с last frame', action: 'video_create' },
   { id: 'hailuo-02-t2v', displayName: 'Hailuo 02', description: 'MiniMax - отличная физика, 768p/1080p с last frame', action: 'video_create' },
@@ -92,6 +93,7 @@ export const VIDEO_CREATE_MODELS_LITE: ModelLite[] = [
 ];
 
 export const VIDEO_I2V_MODELS_LITE: ModelLite[] = [
+  { id: 'seedance-1.5-pro-i2v', displayName: 'Seedance 1.5 Pro', description: 'ByteDance - анимация с аудио и lip-sync', action: 'video_i2v' },
   { id: 'kling-v2.5-turbo-pro-i2v', displayName: 'Kling v2.5 Turbo Pro', description: 'Kuaishou - анимация изображения', action: 'video_i2v' },
   { id: 'seedance-1-pro-fast', displayName: 'Seedance 1 Pro Fast', description: 'ByteDance - быстрая анимация до 1080p', action: 'video_i2v' },
   { id: 'wan-2.5-i2v-fast', displayName: 'Wan 2.5 I2V Fast', description: 'Wan - быстрая анимация изображений', action: 'video_i2v' },

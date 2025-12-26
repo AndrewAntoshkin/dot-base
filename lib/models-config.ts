@@ -3275,6 +3275,68 @@ export const VIDEO_CREATE_MODELS: Model[] = [
       },
     ],
   },
+
+  // 10. Seedance 1.5 Pro T2V (с синхронизированным аудио и lip-sync)
+  {
+    id: 'seedance-1.5-pro-t2v',
+    name: 'seedance-1.5-pro',
+    displayName: 'Seedance 1.5 Pro',
+    replicateModel: 'bytedance/seedance-1.5-pro',
+    action: 'video_create',
+    description: 'ByteDance - видео с синхронизированным аудио и lip-sync',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео с диалогами и звуками...',
+        description: 'Опишите сцену, движения камеры и диалоги/звуки.',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '480p', label: '480p' },
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+        description: 'Разрешение выходного видео.',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: '9:16' },
+          { value: '1:1', label: '1:1' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '21:9', label: '21:9' },
+          { value: '9:21', label: '9:21' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'slider',
+        default: 5,
+        min: 2,
+        max: 12,
+        description: 'Длина видео от 2 до 12 секунд.',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Seed для воспроизводимости результата.',
+      },
+    ],
+  },
 ];
 
 /**
@@ -3959,6 +4021,58 @@ export const VIDEO_I2V_MODELS: Model[] = [
           { value: '5', label: '5 секунд' },
           { value: '10', label: '10 секунд' },
         ],
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+      },
+    ],
+  },
+
+  // 12. Seedance 1.5 Pro I2V (анимация с синхронизированным аудио и lip-sync)
+  {
+    id: 'seedance-1.5-pro-i2v',
+    name: 'seedance-1.5-pro',
+    displayName: 'Seedance 1.5 Pro',
+    replicateModel: 'bytedance/seedance-1.5-pro',
+    action: 'video_i2v',
+    description: 'ByteDance - анимация с синхронизированным аудио и lip-sync',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Фото для анимации с lip-sync.',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение и диалоги...',
+        description: 'Опишите движения, камеру и диалоги/звуки.',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '480p', label: '480p' },
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+      },
+      {
+        name: 'duration',
+        label: 'Длительность (сек)',
+        type: 'slider',
+        default: 5,
+        min: 2,
+        max: 12,
+        description: 'Длина видео от 2 до 12 секунд.',
       },
       {
         name: 'seed',
