@@ -17,10 +17,11 @@ export interface KeyframePartInput {
 }
 
 // Veo 3.1 only accepts 4, 6, 8 seconds - normalize to closest valid value
-function normalizeVeoDuration(duration?: number): number {
-  if (!duration) return 8;
-  if (duration <= 5) return 4;
-  if (duration <= 7) return 6;
+function normalizeVeoDuration(duration?: number | string): number {
+  const d = typeof duration === 'string' ? parseInt(duration, 10) : duration;
+  if (!d || isNaN(d)) return 8;
+  if (d <= 5) return 4;
+  if (d <= 7) return 6;
   return 8;
 }
 
