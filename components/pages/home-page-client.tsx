@@ -100,10 +100,12 @@ function HomeContent() {
         console.warn('[HomePage] No models found for action:', actionParam);
       }
       
-      // Clear URL params after a small delay to ensure state is applied
+      // Clear URL params after a delay to ensure state is fully applied
+      // Increased from 100ms to 500ms to give React time to batch state updates
       setTimeout(() => {
+        console.log('[HomePage] Clearing URL params');
         router.replace('/', { scroll: false });
-      }, 100);
+      }, 500);
     };
     
     loadQuickAction();
