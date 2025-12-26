@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Header } from '@/components/header';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
+import { useLimitToast } from '@/components/limit-toast';
 import { CREATE_MODELS_LITE } from '@/lib/models-lite';
 import { BrainstormImageSheet } from '@/components/brainstorm-image-sheet';
 import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
@@ -128,6 +129,7 @@ export default function BrainstormPageClient() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { addGeneration } = useGenerations();
   const { selectedWorkspaceId } = useUser();
+  const { showLimitToast } = useLimitToast();
   
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
@@ -579,11 +581,31 @@ export default function BrainstormPageClient() {
             created_at: new Date().toISOString(),
             viewed: false,
           });
-        } else if (response.status === 429 && retryCount < MAX_RETRIES) {
+        } else if (response.status === 429) {
+          const errorData = await response.json().catch(() => ({}));
+          
+          // Check if it's concurrent limit (not rate limit)
+          if (errorData.code === 'CONCURRENT_LIMIT_EXCEEDED') {
+            showLimitToast(errorData.error);
+            // Remove the pending generation from canvas
+            setGenerations(prev => prev.filter(g => g.id !== tempId));
+            return;
+          }
+          
           // Rate limit - wait and retry
-          console.log(`Rate limit hit for ${modelId}, retrying in ${RETRY_DELAY}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
-          return createGeneration(modelId, tempId, retryCount + 1);
+          if (retryCount < MAX_RETRIES) {
+            console.log(`Rate limit hit for ${modelId}, retrying in ${RETRY_DELAY}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+            return createGeneration(modelId, tempId, retryCount + 1);
+          }
+          
+          // Max retries exceeded
+          setGenerations(prev => prev.map(g => {
+            if (g.id === tempId) {
+              return { ...g, status: 'failed' as const, error: errorData.error || 'Ошибка при создании' };
+            }
+            return g;
+          }));
         } else {
           // Mark as failed
           const errorData = await response.json().catch(() => ({}));

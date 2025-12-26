@@ -19,14 +19,8 @@ const LightningIcon = () => (
 );
 
 export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
-  console.log('[ModelSelector] Render with action:', action, 'value:', value);
-  
   // Мемоизируем список моделей - пересчитывается только при смене action
-  const models = useMemo(() => {
-    const m = getModelsByActionLite(action);
-    console.log('[ModelSelector] Models for action', action, ':', m.length, 'first:', m[0]?.id);
-    return m;
-  }, [action]);
+  const models = useMemo(() => getModelsByActionLite(action), [action]);
 
   // Преобразуем модели в опции для MobileSelect
   const selectOptions: SelectOption[] = useMemo(() => {
@@ -53,7 +47,6 @@ export function ModelSelector({ action, value, onChange }: ModelSelectorProps) {
     // 2. Current value is not in the new action's models
     // 3. Value is not empty (nothing to reset)
     if (prevAction !== action && value && !models.find((m) => m.id === value)) {
-      console.log('[ModelSelector] Action changed from', prevAction, 'to', action, '- resetting model', value);
       onChange('');
     }
   }, [action, models, value, onChange]);

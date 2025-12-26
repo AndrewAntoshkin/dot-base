@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
+import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -169,6 +170,13 @@ export async function GET(
         const prediction = await replicateClient.getPrediction(
           generation.replicate_prediction_id
         );
+        
+        // Log Replicate status for debugging
+        logger.debug(`[GET Generation] ${id}: Replicate status = ${prediction.status}`, {
+          action: generation.action,
+          model: generation.model_name,
+          replicateStatus: prediction.status,
+        });
 
         // Обновить статус если изменился
         if (prediction.status === 'succeeded') {

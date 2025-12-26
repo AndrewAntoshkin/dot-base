@@ -39,6 +39,7 @@ import {
 import { AspectRatioSelector } from './aspect-ratio-selector';
 import { DirectionalExpandSelector, ExpandDirection } from './directional-expand-selector';
 import { useUser } from '@/contexts/user-context';
+import { useLimitToast } from '@/components/limit-toast';
 
 // Helper function to get image dimensions
 function getImageDimensions(imageSrc: string): Promise<{ width: number; height: number }> {
@@ -733,6 +734,7 @@ export function SettingsForm({
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showLimitToast } = useLimitToast();
   const { selectedWorkspaceId } = useUser();
   // Состояние для выбранных индексов изображений в file_array полях
   const [selectedIndices, setSelectedIndices] = useState<Record<string, number>>({});
@@ -971,6 +973,13 @@ export function SettingsForm({
 
       if (!response.ok) {
         const errorData = await response.json();
+        
+        // Handle concurrent limit error with toast
+        if (response.status === 429 && errorData.code === 'CONCURRENT_LIMIT_EXCEEDED') {
+          showLimitToast(errorData.error);
+          return; // Don't show error in form, toast is enough
+        }
+        
         throw new Error(errorData.error || 'Failed to create generation');
       }
 

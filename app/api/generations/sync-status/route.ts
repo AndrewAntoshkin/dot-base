@@ -76,6 +76,14 @@ export async function POST() {
 
       try {
         const prediction = await replicateClient.getPrediction(gen.replicate_prediction_id);
+        
+        // Log actual Replicate status for debugging
+        logger.debug(`[Sync] Generation ${gen.id}: Replicate status = ${prediction.status}`, {
+          predictionId: gen.replicate_prediction_id,
+          action: gen.action,
+          replicateStatus: prediction.status,
+          error: prediction.error || null,
+        });
 
         if (prediction.status === 'succeeded') {
           const output = prediction.output;

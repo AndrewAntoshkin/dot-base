@@ -64,66 +64,47 @@ function HomeContent() {
 
   // Handle Quick Action params (action + imageUrl)
   useEffect(() => {
-    console.log('[HomePage] Quick Action params:', { actionParam, imageUrlParam });
     if (!actionParam) return;
     
     // Create a unique key for these params to avoid re-processing
     const paramsKey = `${actionParam}-${imageUrlParam}`;
-    if (quickActionHandledRef.current === paramsKey) {
-      console.log('[HomePage] Quick action already handled, skipping');
-      return;
-    }
+    if (quickActionHandledRef.current === paramsKey) return;
     
     const loadQuickAction = async () => {
       try {
-        console.log('[HomePage] Loading quick action for:', actionParam);
         // Mark as handled BEFORE async work to prevent race conditions
         quickActionHandledRef.current = paramsKey;
         
         // Get first model for this action from LITE list (matches ModelSelector)
-        // IMPORTANT: Use lite version to ensure model ID matches what ModelSelector expects
         const { getModelsByActionLite } = await import('@/lib/models-lite');
         const { getModelsByAction } = await import('@/lib/models-config');
         const modelsLite = getModelsByActionLite(actionParam as ActionType);
         const modelsFull = getModelsByAction(actionParam as ActionType);
-        console.log('[HomePage] Found models (lite):', modelsLite.length, modelsLite[0]?.id);
         
         // Use first model from lite list for ID, but full list for settings
         const modelId = modelsLite[0]?.id;
         const model = modelsFull.find(m => m.id === modelId);
-        console.log('[HomePage] Using model:', modelId, 'found in full:', !!model);
         
         if (modelId && model) {
           // Set image URL in form data using the correct field name from model settings
           let newFormData: Record<string, any> = {};
           if (imageUrlParam) {
-            // Find first file or file_array field
             const fileField = model.settings.find(s => s.type === 'file' || s.type === 'file_array');
             const fieldName = fileField?.name || 'image';
-            console.log('[HomePage] Setting image field:', fieldName, 'type:', fileField?.type);
-            // For file_array, wrap in array
             const value = fileField?.type === 'file_array' ? [imageUrlParam] : imageUrlParam;
             newFormData = { [fieldName]: value };
           }
           
-          console.log('[HomePage] Setting state:', { action: actionParam, modelId, formData: newFormData });
-          
           // Set all state at once (React will batch these)
-          // Set action (only non-video actions for home page)
           if (!isVideoAction(actionParam)) {
             setSelectedAction(actionParam as ActionType);
           }
           setSelectedModelId(modelId);
           setFormData(newFormData);
           setMobileShowForm(true);
-          
-          console.log('[HomePage] State updated successfully');
-        } else {
-          console.warn('[HomePage] No models found for action:', actionParam, 'modelId:', modelId);
         }
       } catch (error) {
-        console.error('[HomePage] Error loading quick action:', error);
-        // Reset the handled ref on error so we can retry
+        console.error('Error loading quick action:', error);
         quickActionHandledRef.current = null;
       }
     };

@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { GenerationsProvider } from '@/contexts/generations-context';
 import { UserProvider, UserRole } from '@/contexts/user-context';
 import { GenerationToastContainer } from '@/components/generation-toast';
+import { LimitToastProvider } from '@/components/limit-toast';
 
 interface AppProvidersProps {
   initialUserEmail: string | null;
@@ -21,9 +22,11 @@ export function AppProviders({
   return (
     <UserProvider initialEmail={initialUserEmail} initialRole={initialUserRole}>
       <GenerationsProvider isAuthenticated={isAuthenticated}>
-        {children}
-        {/* Generation status notifications */}
-        <GenerationToastContainer />
+        <LimitToastProvider>
+          {children}
+          {/* Generation status notifications */}
+          <GenerationToastContainer />
+        </LimitToastProvider>
       </GenerationsProvider>
     </UserProvider>
   );
