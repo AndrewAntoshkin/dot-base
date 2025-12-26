@@ -9,6 +9,9 @@
     "app/api/webhook/replicate/route.ts": {
       "maxDuration": 60
     },
+    "app/api/webhook/fal/route.ts": {
+      "maxDuration": 60
+    },
     "app/api/generations/cleanup-stale/route.ts": {
       "maxDuration": 120
     },
