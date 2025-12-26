@@ -22,7 +22,7 @@ const TYPE_OPTIONS: FilterOption[] = [
   { value: 'remove_bg', label: 'Удаление фона' },
   { value: 'video_create', label: 'Видео T2V' },
   { value: 'video_i2v', label: 'Видео I2V' },
-  { value: 'video_keyframes', label: 'Видео Keyframes' },
+  { value: 'video_edit', label: 'Видео (Merge)' },
   { value: 'analyze_describe', label: 'Анализ' },
   { value: 'inpaint', label: 'Inpaint' },
   { value: 'outpaint', label: 'Outpaint' },

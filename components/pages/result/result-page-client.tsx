@@ -24,11 +24,8 @@ export default function ResultPageClient() {
         const generation = await response.json();
         
         // Determine redirect based on action type
-        if (generation.action === 'video_keyframes') {
-          // Keyframes generation - go to keyframes page (it will restore state)
-          router.push('/keyframes');
-        } else if (generation.action?.startsWith('video_')) {
-          // Video generation - go to video page
+        if (generation.action?.startsWith('video_')) {
+          // Video generation (including merge) - go to video page
           router.push(`/video?generationId=${id}`);
         } else if (generation.action?.startsWith('analyze_')) {
           // Analysis - go to analyze page

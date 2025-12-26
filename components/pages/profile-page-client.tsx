@@ -71,7 +71,7 @@ const TYPE_OPTIONS: FilterOption[] = [
   { value: 'remove_bg', label: 'Удаление фона' },
   { value: 'video_create', label: 'Видео' },
   { value: 'video_i2v', label: 'Image to Video' },
-  { value: 'video_keyframes', label: 'Keyframes' },
+  { value: 'video_edit', label: 'Видео (Merge)' },
   { value: 'analyze_describe', label: 'Анализ' },
   { value: 'inpaint', label: 'Inpaint' },
   { value: 'outpaint', label: 'Outpaint' },
@@ -630,12 +630,6 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
   };
 
   const handleClick = (generation: Generation) => {
-    // Keyframes redirects to keyframes page (it will restore state)
-    if (generation.action === 'video_keyframes') {
-      router.push('/keyframes');
-      return;
-    }
-    
     let basePath = '/';
     if (isVideoAction(generation.action)) basePath = '/video';
     else if (isTextAction(generation.action)) basePath = '/analyze';

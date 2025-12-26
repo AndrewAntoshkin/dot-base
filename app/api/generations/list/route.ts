@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
       .from('generations')
       .select(selectFields)
       .not('is_keyframe_segment', 'is', true)
+      .neq('action', 'video_keyframes') // Скрываем родительские keyframes, показываем только merge
       .order('created_at', { ascending: false });
     
     // Фильтр по пространству или пользователю
@@ -217,7 +218,8 @@ export async function GET(request: NextRequest) {
           let q = supabase
           .from('generations')
           .select('id', { count: 'exact', head: true })
-            .not('is_keyframe_segment', 'is', true);
+            .not('is_keyframe_segment', 'is', true)
+            .neq('action', 'video_keyframes');
           
           // Workspace/user filter - include null workspace for current user
           if (workspaceId) {
