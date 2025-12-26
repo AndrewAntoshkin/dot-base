@@ -11,6 +11,7 @@ import { ActionType } from '@/lib/models-lite';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import type { SettingsFormRef } from '@/components/settings-form';
+import type { SessionGeneration } from '@/components/recent-generations';
 
 // Ленивая загрузка тяжёлых компонентов
 const SettingsForm = lazy(() =>
@@ -41,6 +42,8 @@ function HomeContent() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
   const [mobileShowForm, setMobileShowForm] = useState(false);
+  // Сессионные генерации (только текущая сессия, не из БД)
+  const [sessionGenerations, setSessionGenerations] = useState<SessionGeneration[]>([]);
   const { addGeneration } = useGenerations();
   const { selectedWorkspaceId } = useUser();
   
@@ -214,6 +217,23 @@ function HomeContent() {
     setCurrentGenerationId(generationId);
     // Switch to output tab on mobile when generation starts
     setMobileActiveTab('output');
+    
+    // Add to session generations (for Recent Generations strip)
+    const action = generation.action || selectedAction;
+    
+    // Только image и video генерации добавляем в сессионные
+    if (!action.startsWith('analyze_')) {
+      const newSessionGen: SessionGeneration = {
+        id: generation.id,
+        status: generation.status || 'processing',
+        output_urls: generation.output_urls || null,
+        model_name: generation.model_name || 'Unknown',
+        action: action,
+        created_at: generation.created_at || new Date().toISOString(),
+      };
+      setSessionGenerations(prev => [newSessionGen, ...prev.slice(0, 15)]);
+    }
+    
     // Add to global context for header indicator
     if (generation) {
       addGeneration({
@@ -226,6 +246,63 @@ function HomeContent() {
       });
     }
   };
+
+  // Обработчик выбора генерации из Recent strip
+  const handleSelectSessionGeneration = (id: string) => {
+    setCurrentGenerationId(id);
+    setMobileActiveTab('output');
+  };
+
+  // Обновление сессионной генерации при получении результата
+  const updateSessionGeneration = (id: string, updates: Partial<SessionGeneration>) => {
+    setSessionGenerations(prev =>
+      prev.map(g => (g.id === id ? { ...g, ...updates } : g))
+    );
+  };
+
+  // Polling для обновления всех processing генераций в сессии
+  useEffect(() => {
+    const processingGens = sessionGenerations.filter(
+      g => g.status === 'pending' || g.status === 'processing'
+    );
+    
+    if (processingGens.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      for (const gen of processingGens) {
+        // Пропускаем текущую генерацию - она обновляется через OutputPanel
+        if (gen.id === currentGenerationId) continue;
+        
+        try {
+          const response = await fetch(`/api/generations/${gen.id}`, {
+            credentials: 'include',
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            // Update if status changed or output appeared
+            const statusChanged = data.status !== gen.status;
+            const outputAppeared = !gen.output_urls && data.output_urls?.length > 0;
+            
+            if (statusChanged || outputAppeared) {
+              updateSessionGeneration(gen.id, {
+                status: data.status,
+                output_urls: data.output_urls,
+                model_name: data.model_name || gen.model_name,
+              });
+            }
+          }
+        } catch (error: any) {
+          // Тихо игнорируем сетевые ошибки - они не критичны для polling
+          if (error?.name !== 'TypeError' && !error?.message?.includes('network')) {
+            console.warn('[Session] Poll error for', gen.id);
+          }
+        }
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [sessionGenerations, currentGenerationId]);
 
   const handleRegenerate = async (prompt: string, settings: Record<string, any>, modelId: string) => {
     // Set the form data from previous generation
@@ -408,6 +485,10 @@ function HomeContent() {
               <OutputPanel
                 generationId={currentGenerationId}
                 onRegenerate={handleRegenerate}
+                sessionGenerations={sessionGenerations}
+                onSelectGeneration={handleSelectSessionGeneration}
+                onGenerationUpdate={updateSessionGeneration}
+                cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
               />
             </Suspense>
           </div>
@@ -523,6 +604,10 @@ function HomeContent() {
                       generationId={currentGenerationId}
                       onRegenerate={handleRegenerate}
                       isMobile={true}
+                      sessionGenerations={sessionGenerations}
+                      onSelectGeneration={handleSelectSessionGeneration}
+                      onGenerationUpdate={updateSessionGeneration}
+                      cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
                     />
                   </Suspense>
                 </div>

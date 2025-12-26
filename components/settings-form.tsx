@@ -975,7 +975,12 @@ export function SettingsForm({
       }
 
       const result = await response.json();
-      onGenerationCreated(result.id, result);
+      // Добавляем model_name и action, т.к. API их не возвращает
+      onGenerationCreated(result.id, {
+        ...result,
+        model_name: model?.displayName || model?.name || 'Unknown',
+        action: model?.action || 'create',
+      });
       // НЕ сбрасываем форму - пользователь может хотеть переделать
     } catch (err: any) {
       const errorMsg = err.message;

@@ -8,11 +8,17 @@ import { QuickActions } from '@/components/quick-actions';
 import { formatDate } from '@/lib/utils';
 import { fetchWithTimeout, isOnline, isSlowConnection } from '@/lib/network-utils';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
+import { RecentGenerations, SessionGeneration } from '@/components/recent-generations';
 
 interface OutputPanelProps {
   generationId: string | null;
   onRegenerate?: (prompt: string, settings: Record<string, any>, modelId: string) => void;
   isMobile?: boolean;
+  sessionGenerations?: SessionGeneration[];
+  onSelectGeneration?: (id: string) => void;
+  onGenerationUpdate?: (id: string, updates: Partial<SessionGeneration>) => void;
+  /** Cached generation from session (for instant preview while loading full data) */
+  cachedGeneration?: SessionGeneration | null;
 }
 
 interface Creator {
@@ -131,7 +137,15 @@ function CopyImageButton({ onClick, copied, size = 'md' }: CopyButtonProps) {
   );
 }
 
-export function OutputPanel({ generationId, onRegenerate, isMobile = false }: OutputPanelProps) {
+export function OutputPanel({ 
+  generationId, 
+  onRegenerate, 
+  isMobile = false,
+  sessionGenerations = [],
+  onSelectGeneration,
+  onGenerationUpdate,
+  cachedGeneration,
+}: OutputPanelProps) {
   const [generation, setGeneration] = useState<Generation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [imageAspectRatio, setImageAspectRatio] = useState<'landscape' | 'portrait' | 'square'>('square');
@@ -218,6 +232,14 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
         setIsLoading(false);
         setNetworkError(null);
         consecutiveErrorsRef.current = 0;
+        
+        // Обновляем сессионную генерацию
+        if (onGenerationUpdate && generationId) {
+          onGenerationUpdate(generationId, {
+            status: data.status,
+            output_urls: data.output_urls,
+          });
+        }
 
         // Polling если обрабатывается
         if ((data.status === 'processing' || data.status === 'pending') && isCurrentEffect) {
@@ -269,17 +291,15 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     };
   }, [generationId]); // Убрали лишние зависимости
 
-  const handleDownload = async () => {
-    const url = generation?.output_urls?.[selectedImageIndex] || generation?.output_urls?.[0];
-    if (!url || !generation) return;
-
+  // Скачивание одного файла
+  const downloadSingleFile = async (url: string, index: number, total: number) => {
+    if (!generation) return;
+    
     try {
       const response = await fetch(url);
       const blob = await response.blob();
       
-      const suffix = generation.output_urls && generation.output_urls.length > 1 
-        ? `-${selectedImageIndex + 1}` 
-        : '';
+      const suffix = total > 1 ? `-${index + 1}` : '';
       
       // Для видео и SVG - скачиваем как есть
       if (isVideoUrl(url)) {
@@ -303,20 +323,14 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       }
       
       // Для изображений - конвертируем в реальный PNG через canvas
-      // Это решает проблему с WebP файлами от Replicate, которые не показывают превью на macOS/iOS
       const imageBitmap = await createImageBitmap(blob);
       const canvas = document.createElement('canvas');
       canvas.width = imageBitmap.width;
       canvas.height = imageBitmap.height;
       const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Canvas context not available');
-      }
-      
+      if (!ctx) return;
       ctx.drawImage(imageBitmap, 0, 0);
       
-      // Конвертируем в PNG blob
       const pngBlob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => {
           if (b) resolve(b);
@@ -331,7 +345,22 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
       link.click();
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Download error:', error);
+      console.error('Download error for file', index, error);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!generation?.output_urls?.length) return;
+    
+    const urls = generation.output_urls;
+    
+    // Скачиваем все файлы с небольшой задержкой между ними
+    for (let i = 0; i < urls.length; i++) {
+      await downloadSingleFile(urls[i], i, urls.length);
+      // Небольшая задержка чтобы браузер успел обработать
+      if (i < urls.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
   };
 
@@ -446,16 +475,83 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     );
   }
 
-  // Loading
+  // Loading - but show cached preview if available
   if (isLoading && !generation) {
+    // If we have a cached completed generation with output, show it immediately
+    const hasCachedPreview = cachedGeneration?.status === 'completed' && 
+                             cachedGeneration?.output_urls && 
+                             cachedGeneration.output_urls.length > 0;
+    
+    if (hasCachedPreview && cachedGeneration) {
+      const previewUrl = cachedGeneration.output_urls![0];
+      const isPreviewVideo = isVideoUrl(previewUrl);
+      
+      return (
+        <div className="flex flex-col w-full">
+          {/* Cached preview - instant display */}
+          <div className={`relative w-full ${isMobile ? '' : 'h-[660px]'} bg-[#0a0a0a] rounded-2xl overflow-hidden mb-4 flex items-center justify-center`}>
+            {isPreviewVideo ? (
+              <video 
+                src={previewUrl} 
+                controls 
+                loop 
+                muted 
+                preload="metadata"
+                className="max-w-full max-h-[660px]"
+              />
+            ) : (
+              <img
+                src={previewUrl}
+                alt="Generated"
+                className="max-w-full max-h-[660px] object-contain"
+              />
+            )}
+            {/* Loading indicator overlay */}
+            <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5">
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+              <span className="font-inter text-xs text-white">Загрузка...</span>
+            </div>
+          </div>
+
+          {/* Recent Generations */}
+          {sessionGenerations.length > 0 && onSelectGeneration && (
+            <div className="mt-4">
+              <RecentGenerations
+                generations={sessionGenerations}
+                currentGenerationId={generationId}
+                onSelect={onSelectGeneration}
+                isMobile={isMobile}
+              />
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // No cached preview - show loading spinner
     return (
-      <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
-        <div className={isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full' : ''}>
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 lg:h-12 lg:w-12 animate-spin text-white" />
-            <p className="font-inter text-sm text-[#959595]">Загрузка...</p>
+      <div className="flex flex-col w-full">
+        {/* Loading area - fixed 660px height on desktop */}
+        <div className={`flex items-center justify-center ${isMobile ? 'min-h-[400px]' : 'h-[660px]'} bg-[#0a0a0a] rounded-2xl mb-4`}>
+          <div className={isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full' : ''}>
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 lg:h-12 lg:w-12 animate-spin text-white" />
+              <p className="font-inter text-sm text-[#959595]">Загрузка...</p>
+            </div>
           </div>
         </div>
+
+        {/* Recent Generations - visible during loading */}
+        {sessionGenerations.length > 0 && onSelectGeneration && (
+          <div className="mt-4">
+            <RecentGenerations
+              generations={sessionGenerations}
+              currentGenerationId={generationId}
+              onSelect={onSelectGeneration}
+              isMobile={isMobile}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -468,28 +564,43 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     const maxRetries = 3;
     
     return (
-      <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
-        <div className={isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full' : ''}>
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 lg:h-12 lg:w-12 animate-spin text-white" />
-            <div className="text-center">
-              <p className="font-inter font-medium text-base text-white mb-1">
-                {retryCount > 0 ? `Повторная попытка ${retryCount}/${maxRetries}...` : 'Генерация...'}
-              </p>
-              <p className="font-inter text-sm text-[#959595]">{generation.model_name}</p>
-              {retryCount > 0 && (
-                <p className="font-inter text-xs text-[#6366F1] mt-1">Автоматическая повторная попытка</p>
+      <div className="flex flex-col w-full">
+        {/* Loading area - fixed 660px height on desktop */}
+        <div className={`flex items-center justify-center ${isMobile ? 'min-h-[400px]' : 'h-[660px]'} bg-[#0a0a0a] rounded-2xl mb-4`}>
+          <div className={isMobile ? 'bg-[#131313] rounded-2xl p-8 w-full' : ''}>
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 lg:h-12 lg:w-12 animate-spin text-white" />
+              <div className="text-center">
+                <p className="font-inter font-medium text-base text-white mb-1">
+                  {retryCount > 0 ? `Повторная попытка ${retryCount}/${maxRetries}...` : 'Генерация...'}
+                </p>
+                <p className="font-inter text-sm text-[#959595]">{generation.model_name}</p>
+                {retryCount > 0 && (
+                  <p className="font-inter text-xs text-[#6366F1] mt-1">Автоматическая повторная попытка</p>
+                )}
+              </div>
+              {/* Индикатор сетевых проблем */}
+              {networkError && (
+                <div className="flex items-center gap-2 text-yellow-500 text-sm">
+                  <WifiOff className="h-4 w-4" />
+                  <span>{networkError}</span>
+                </div>
               )}
             </div>
-            {/* Индикатор сетевых проблем */}
-            {networkError && (
-              <div className="flex items-center gap-2 text-yellow-500 text-sm">
-                <WifiOff className="h-4 w-4" />
-                <span>{networkError}</span>
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Recent Generations - visible during processing */}
+        {sessionGenerations.length > 0 && onSelectGeneration && (
+          <div className="mt-4">
+            <RecentGenerations
+              generations={sessionGenerations}
+              currentGenerationId={generationId}
+              onSelect={onSelectGeneration}
+              isMobile={isMobile}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -499,12 +610,26 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
     const retryCount = generation.settings?.auto_retry_count || 0;
     
     return (
-      <ErrorState
-        errorMessage={generation.error_message || 'Неизвестная ошибка'}
-        retryCount={retryCount}
-        onRetry={onRegenerate ? handleRegenerate : undefined}
-        isMobile={isMobile}
-      />
+      <div className="flex flex-col w-full">
+        <ErrorState
+          errorMessage={generation.error_message || 'Неизвестная ошибка'}
+          retryCount={retryCount}
+          onRetry={onRegenerate ? handleRegenerate : undefined}
+          isMobile={isMobile}
+        />
+
+        {/* Recent Generations - visible on error */}
+        {sessionGenerations.length > 0 && onSelectGeneration && (
+          <div className="mt-8">
+            <RecentGenerations
+              generations={sessionGenerations}
+              currentGenerationId={generationId}
+              onSelect={onSelectGeneration}
+              isMobile={isMobile}
+            />
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -626,6 +751,18 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
             </div>
           )}
         </div>
+
+        {/* Recent Generations - Mobile */}
+        {sessionGenerations.length > 0 && onSelectGeneration && (
+          <div className="mt-6">
+            <RecentGenerations
+              generations={sessionGenerations}
+              currentGenerationId={generationId}
+              onSelect={onSelectGeneration}
+              isMobile
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -758,6 +895,17 @@ export function OutputPanel({ generationId, onRegenerate, isMobile = false }: Ou
           onClose={() => setIsFullscreenViewerOpen(false)}
           alt={`Generated by ${generation.model_name}`}
         />
+      )}
+
+      {/* Recent Generations - Desktop */}
+      {sessionGenerations.length > 0 && onSelectGeneration && (
+        <div className="mt-8">
+          <RecentGenerations
+            generations={sessionGenerations}
+            currentGenerationId={generationId}
+            onSelect={onSelectGeneration}
+          />
+        </div>
       )}
     </div>
   );

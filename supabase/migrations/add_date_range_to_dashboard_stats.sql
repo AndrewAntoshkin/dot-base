@@ -127,3 +127,4 @@ GRANT EXECUTE ON FUNCTION get_workspaces_generation_counts(UUID[]) TO service_ro
 COMMENT ON FUNCTION get_workspaces_generation_counts IS 'Get generation counts for multiple workspaces in one query';
 
 
+

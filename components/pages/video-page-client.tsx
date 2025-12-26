@@ -11,6 +11,7 @@ import { ActionType } from '@/lib/models-lite';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import type { SettingsFormRef } from '@/components/settings-form';
+import type { SessionGeneration } from '@/components/recent-generations';
 
 // Ленивая загрузка тяжёлых компонентов
 const SettingsForm = lazy(() =>
@@ -42,6 +43,8 @@ function VideoContent() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [mobileActiveTab, setMobileActiveTab] = useState<'input' | 'output'>('input');
   const [mobileShowForm, setMobileShowForm] = useState(false);
+  // Сессионные генерации (только текущая сессия, не из БД)
+  const [sessionGenerations, setSessionGenerations] = useState<SessionGeneration[]>([]);
   const { addGeneration } = useGenerations();
   const { selectedWorkspaceId } = useUser();
   
@@ -214,18 +217,89 @@ function VideoContent() {
     setCurrentGenerationId(generationId);
     // Switch to output tab on mobile when generation starts
     setMobileActiveTab('output');
+    
+    // Add to session generations (for Recent Generations strip)
+    const action = generation.action || selectedAction;
+    // Только video генерации добавляем в сессионные
+    if (action.startsWith('video_')) {
+      const newSessionGen: SessionGeneration = {
+        id: generation.id,
+        status: generation.status || 'processing',
+        output_urls: generation.output_urls || null,
+        model_name: generation.model_name,
+        action: action,
+        created_at: generation.created_at || new Date().toISOString(),
+      };
+      setSessionGenerations(prev => [newSessionGen, ...prev.slice(0, 15)]); // Max 16 in session
+    }
+    
     // Add to global context for header indicator
     if (generation) {
       addGeneration({
         id: generation.id,
         model_name: generation.model_name,
-        action: generation.action || selectedAction,
+        action: action,
         status: generation.status,
         created_at: generation.created_at,
         viewed: false,
       });
     }
   };
+
+  // Обработчик выбора генерации из Recent strip
+  const handleSelectSessionGeneration = (id: string) => {
+    setCurrentGenerationId(id);
+    setMobileActiveTab('output');
+  };
+
+  // Обновление сессионной генерации при получении результата
+  const updateSessionGeneration = (id: string, updates: Partial<SessionGeneration>) => {
+    setSessionGenerations(prev =>
+      prev.map(g => (g.id === id ? { ...g, ...updates } : g))
+    );
+  };
+
+  // Polling для обновления всех processing генераций в сессии
+  useEffect(() => {
+    const processingGens = sessionGenerations.filter(
+      g => g.status === 'pending' || g.status === 'processing'
+    );
+    
+    if (processingGens.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      for (const gen of processingGens) {
+        // Пропускаем текущую генерацию - она обновляется через OutputPanel
+        if (gen.id === currentGenerationId) continue;
+        
+        try {
+          const response = await fetch(`/api/generations/${gen.id}`, {
+            credentials: 'include',
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            // Update if status changed or output appeared
+            const statusChanged = data.status !== gen.status;
+            const outputAppeared = !gen.output_urls && data.output_urls?.length > 0;
+            
+            if (statusChanged || outputAppeared) {
+              updateSessionGeneration(gen.id, {
+                status: data.status,
+                output_urls: data.output_urls,
+                // Сохраняем model_name - API может его не возвращать
+                model_name: data.model_name || gen.model_name,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[Session] Poll error for', gen.id, error);
+        }
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [sessionGenerations, currentGenerationId]);
 
   const handleRegenerate = async (prompt: string, settings: Record<string, any>, modelId: string) => {
     // Set the form data from previous generation
@@ -366,11 +440,19 @@ function VideoContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (formRef.current) {
+                    if (formRef.current && !isGenerating) {
                       setIsGenerating(true);
+                      // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                      const safetyTimeout = setTimeout(() => {
+                        console.warn('[Generate] Safety timeout triggered');
+                        setIsGenerating(false);
+                      }, 60000);
                       try {
                         await formRef.current.submit();
+                      } catch (error) {
+                        console.error('[Generate] Submit error:', error);
                       } finally {
+                        clearTimeout(safetyTimeout);
                         setIsGenerating(false);
                       }
                     }
@@ -409,6 +491,10 @@ function VideoContent() {
               <OutputPanel
                 generationId={currentGenerationId}
                 onRegenerate={handleRegenerate}
+                sessionGenerations={sessionGenerations}
+                onSelectGeneration={handleSelectSessionGeneration}
+                onGenerationUpdate={updateSessionGeneration}
+                cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
               />
             </Suspense>
           </div>
@@ -492,11 +578,19 @@ function VideoContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (formRef.current) {
+                          if (formRef.current && !isGenerating) {
                             setIsGenerating(true);
+                            // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                            const safetyTimeout = setTimeout(() => {
+                              console.warn('[Generate] Safety timeout triggered');
+                              setIsGenerating(false);
+                            }, 60000);
                             try {
                               await formRef.current.submit();
+                            } catch (error) {
+                              console.error('[Generate] Submit error:', error);
                             } finally {
+                              clearTimeout(safetyTimeout);
                               setIsGenerating(false);
                             }
                           }
@@ -525,6 +619,10 @@ function VideoContent() {
                       generationId={currentGenerationId}
                       onRegenerate={handleRegenerate}
                       isMobile={true}
+                      sessionGenerations={sessionGenerations}
+                      onSelectGeneration={handleSelectSessionGeneration}
+                      onGenerationUpdate={updateSessionGeneration}
+                      cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
                     />
                   </Suspense>
                 </div>

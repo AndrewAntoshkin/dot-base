@@ -514,3 +514,4 @@ Packer.toBuffer(doc).then((buffer) => {
   console.log('✅ Документ создан: docs/BASECRAFT_SLA.docx');
 });
 
+

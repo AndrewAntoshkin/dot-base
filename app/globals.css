@@ -378,6 +378,31 @@
   }
 }
 
+/* Skeleton pulse - smooth breathing animation with visible contrast */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    background-color: #1f1f1f;
+  }
+  50% {
+    background-color: #333333;
+  }
+}
+
+.animate-skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background-color: #1f1f1f;
+}
+
+/* Shimmer move animation for skeleton loading */
+@keyframes shimmer-move {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 /* Marquee animation for landing page */
 @keyframes marquee {
   0% {

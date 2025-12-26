@@ -395,11 +395,8 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     fetchProfile();
   }, []);
 
-  // Fetch generations - ОПТИМИЗИРОВАНО: ждём пока workspace загрузится
+  // Fetch generations - работает как с workspace, так и без него
   const fetchGenerations = useCallback(async (silent = false) => {
-    // Не загружаем пока workspace не готов (избегаем двойного запроса)
-    if (!selectedWorkspaceId) return;
-    
     if (!silent) setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -407,8 +404,12 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
         limit: '20',
         tab: activeTab,
         onlyMine: 'true',
-        workspaceId: selectedWorkspaceId,
       });
+      
+      // Добавляем workspace только если он выбран
+      if (selectedWorkspaceId) {
+        params.set('workspaceId', selectedWorkspaceId);
+      }
       
       if (filterDate) params.set('dateRange', filterDate);
       if (filterModel) params.set('modelName', filterModel);
@@ -429,11 +430,13 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     }
   }, [page, activeTab, selectedWorkspaceId, filterDate, filterModel, filterType, filterStatus]);
 
-  // Fetch filter options - ОПТИМИЗИРОВАНО: только когда есть workspace
+  // Fetch filter options - работает с workspace и без него
   const fetchFilterOptions = useCallback(async () => {
-    if (!selectedWorkspaceId) return;
     try {
-      const response = await fetch(`/api/generations/filter-options?workspaceId=${selectedWorkspaceId}`);
+      const url = selectedWorkspaceId 
+        ? `/api/generations/filter-options?workspaceId=${selectedWorkspaceId}`
+        : '/api/generations/filter-options';
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         if (data.models) {
@@ -448,17 +451,13 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     }
   }, [selectedWorkspaceId]);
 
-  // ОПТИМИЗАЦИЯ: Загружаем данные только когда workspace готов
+  // Загружаем данные сразу и перезагружаем при смене workspace
   useEffect(() => { 
-    if (selectedWorkspaceId) {
-      fetchFilterOptions(); 
-    }
+    fetchFilterOptions(); 
   }, [selectedWorkspaceId, fetchFilterOptions]);
   
   useEffect(() => { 
-    if (selectedWorkspaceId) {
-      fetchGenerations(); 
-    }
+    fetchGenerations(); 
   }, [selectedWorkspaceId, fetchGenerations]);
   
   // Сброс страницы при смене фильтров (но не при смене workspace - там новый запрос)
