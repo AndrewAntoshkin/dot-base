@@ -34,6 +34,7 @@ function VideoContent() {
   const actionParam = searchParams.get('action');
   const imageUrlParam = searchParams.get('imageUrl');
   const videoUrlParam = searchParams.get('videoUrl');
+  const modelParam = searchParams.get('model');
   
   // Видео режим - начинаем с video_create
   const [selectedAction, setSelectedAction] = useState<ActionType>('video_create');
@@ -59,6 +60,38 @@ function VideoContent() {
       router.replace('/video', { scroll: false });
     }
   }, [startParam, router]);
+
+  // Ref to track if we've already handled the model param
+  const modelParamHandledRef = useRef<string | null>(null);
+
+  // Handle model param from banner/direct link (e.g. ?model=seedance-1.5-pro-t2v)
+  useEffect(() => {
+    if (!modelParam || modelParamHandledRef.current === modelParam) return;
+    
+    const loadModelFromParam = async () => {
+      try {
+        modelParamHandledRef.current = modelParam;
+        
+        // Get the model to determine its action
+        const { getModelById } = await import('@/lib/models-config');
+        const model = getModelById(modelParam);
+        
+        if (model && isVideoAction(model.action)) {
+          setSelectedAction(model.action as ActionType);
+          setSelectedModelId(modelParam);
+          setMobileShowForm(true);
+          
+          // Clear URL param after setting
+          router.replace('/video', { scroll: false });
+        }
+      } catch (error) {
+        console.error('Error loading model from param:', error);
+        modelParamHandledRef.current = null;
+      }
+    };
+    
+    loadModelFromParam();
+  }, [modelParam, router]);
 
   // Ref to track if we've already handled the quick action params
   const quickActionHandledRef = useRef<string | null>(null);
