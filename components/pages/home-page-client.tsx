@@ -87,22 +87,23 @@ function HomeContent() {
             newFormData = { [fieldName]: value };
           }
           
-          console.log('[HomePage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
-          
-          // Set all state at once (React will batch these)
-          // Set action (only non-video actions for home page)
-          if (!isVideoAction(actionParam)) {
-            setSelectedAction(actionParam as ActionType);
-          }
-          setSelectedModelId(model.id);
-          setFormData(newFormData);
-          setMobileShowForm(true);
-          
-          // Clear URL params after state is set
-          setTimeout(() => {
-            console.log('[HomePage] Clearing URL params');
-            router.replace('/', { scroll: false });
-          }, 500);
+        console.log('[HomePage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
+        
+        // Set all state at once (React will batch these)
+        // Set action (only non-video actions for home page)
+        if (!isVideoAction(actionParam)) {
+          setSelectedAction(actionParam as ActionType);
+        }
+        setSelectedModelId(model.id);
+        setFormData(newFormData);
+        setMobileShowForm(true);
+        
+        // Clear URL params using History API to avoid component re-mount
+        // router.replace causes state reset in Next.js App Router
+        setTimeout(() => {
+          console.log('[HomePage] Clearing URL params via History API');
+          window.history.replaceState(null, '', '/');
+        }, 100);
         } else {
           console.warn('[HomePage] No models found for action:', actionParam);
         }

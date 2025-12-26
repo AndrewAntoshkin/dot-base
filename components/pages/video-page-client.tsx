@@ -94,21 +94,22 @@ function VideoContent() {
             newFormData = { [fieldName]: value };
           }
           
-          console.log('[VideoPage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
-          
-          // Set all state at once (React will batch these)
-          if (isVideoAction(actionParam)) {
-            setSelectedAction(actionParam as ActionType);
-          }
-          setSelectedModelId(model.id);
-          setFormData(newFormData);
-          setMobileShowForm(true);
-          
-          // Clear URL params after state is set
-          setTimeout(() => {
-            console.log('[VideoPage] Clearing URL params');
-            router.replace('/video', { scroll: false });
-          }, 500);
+        console.log('[VideoPage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
+        
+        // Set all state at once (React will batch these)
+        if (isVideoAction(actionParam)) {
+          setSelectedAction(actionParam as ActionType);
+        }
+        setSelectedModelId(model.id);
+        setFormData(newFormData);
+        setMobileShowForm(true);
+        
+        // Clear URL params using History API to avoid component re-mount
+        // router.replace causes state reset in Next.js App Router
+        setTimeout(() => {
+          console.log('[VideoPage] Clearing URL params via History API');
+          window.history.replaceState(null, '', '/video');
+        }, 100);
         } else {
           console.warn('[VideoPage] No models found for action:', actionParam);
         }
