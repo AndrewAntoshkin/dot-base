@@ -59,6 +59,9 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.1;
 
+// Max models limit
+const MAX_MODELS = 5;
+
 // Default card size for overlap calculations
 const DEFAULT_CARD_SIZE = { width: BASE_CARD_WIDTH + 8, height: BASE_CARD_WIDTH + 28 };
 
@@ -469,7 +472,12 @@ export default function BrainstormPageClient() {
   const handleModelToggle = useCallback((modelId: string) => {
     setSelectedModels(prev => {
       if (prev.includes(modelId)) {
+        // Always allow deselecting
         return prev.filter(id => id !== modelId);
+      }
+      // Only allow adding if under limit
+      if (prev.length >= MAX_MODELS) {
+        return prev;
       }
       return [...prev, modelId];
     });
@@ -955,14 +963,11 @@ export default function BrainstormPageClient() {
                         onClick={() => setIsModelSelectorOpen(false)}
                       />
                       <div className="absolute bottom-full left-0 mb-2 w-[313px] max-h-[480px] overflow-hidden bg-neutral-900 rounded-2xl shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] z-20 flex flex-col p-4 gap-2">
-                        {/* Header with Select all / Reset */}
-                        <div className="flex items-center gap-3 font-inter font-medium text-xs text-[#bbbbbb]">
-                          <button
-                            onClick={() => setSelectedModels(CREATE_MODELS_LITE.map(m => m.id))}
-                            className="hover:text-white transition-colors"
-                          >
-                            Выбрать все
-                          </button>
+                        {/* Header with limit info and Reset */}
+                        <div className="flex items-center justify-between font-inter font-medium text-xs text-[#bbbbbb]">
+                          <span className={selectedModels.length >= MAX_MODELS ? 'text-yellow-500' : ''}>
+                            Выбрано: {selectedModels.length}/{MAX_MODELS}
+                          </span>
                           <button
                             onClick={() => setSelectedModels([])}
                             className="hover:text-white transition-colors"
@@ -975,11 +980,17 @@ export default function BrainstormPageClient() {
                         <div className="flex flex-col gap-2 overflow-y-auto max-h-[380px]">
                           {CREATE_MODELS_LITE.map((model) => {
                             const isSelected = selectedModels.includes(model.id);
+                            const isDisabled = !isSelected && selectedModels.length >= MAX_MODELS;
                             return (
                               <button
                                 key={model.id}
                                 onClick={() => handleModelToggle(model.id)}
-                                className={`w-full h-12 rounded-xl px-4 py-2 flex items-center gap-3 transition-colors text-left bg-[#232323] hover:bg-[#2a2a2a] ${
+                                disabled={isDisabled}
+                                className={`w-full h-12 rounded-xl px-4 py-2 flex items-center gap-3 transition-colors text-left bg-[#232323] ${
+                                  isDisabled 
+                                    ? 'opacity-40 cursor-not-allowed' 
+                                    : 'hover:bg-[#2a2a2a]'
+                                } ${
                                   isSelected ? 'border border-[#d6d6d6]' : ''
                                 }`}
                               >

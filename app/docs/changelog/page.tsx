@@ -4,6 +4,17 @@ import { DocsShell, DocsBreadcrumb, DocsTitle, DocsSection, DocsFooter } from '@
 
 const CHANGELOG = [
   {
+    version: '0.2.1',
+    date: '2025-12-26',
+    title: 'Seedance 1.5 Pro и улучшения Brainstorm',
+    changes: [
+      { type: 'new', text: 'Добавлена модель Seedance 1.5 Pro с синхронизированным аудио и lip-sync' },
+      { type: 'new', text: 'Seedance 1.5 Pro доступна в разделах Video → Создать и Video → Картинка → Видео' },
+      { type: 'improvement', text: 'Добавлен лимит на 5 моделей в Brainstorm для стабильной работы' },
+      { type: 'improvement', text: 'Улучшен интерфейс выбора моделей в Brainstorm' },
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2025-12-24',
     title: 'Документация и новые модели',
