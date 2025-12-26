@@ -59,14 +59,27 @@ function HomeContent() {
     }
   }, [startParam, router]);
 
+  // Ref to track if we've already handled the quick action params
+  const quickActionHandledRef = useRef<string | null>(null);
+
   // Handle Quick Action params (action + imageUrl)
   useEffect(() => {
     console.log('[HomePage] Quick Action params:', { actionParam, imageUrlParam });
     if (!actionParam) return;
     
+    // Create a unique key for these params to avoid re-processing
+    const paramsKey = `${actionParam}-${imageUrlParam}`;
+    if (quickActionHandledRef.current === paramsKey) {
+      console.log('[HomePage] Quick action already handled, skipping');
+      return;
+    }
+    
     const loadQuickAction = async () => {
       try {
         console.log('[HomePage] Loading quick action for:', actionParam);
+        // Mark as handled BEFORE async work to prevent race conditions
+        quickActionHandledRef.current = paramsKey;
+        
         // Get first model for this action
         const { getModelsByAction } = await import('@/lib/models-config');
         const models = getModelsByAction(actionParam as ActionType);
@@ -87,33 +100,30 @@ function HomeContent() {
             newFormData = { [fieldName]: value };
           }
           
-        console.log('[HomePage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
-        
-        // Set all state at once (React will batch these)
-        // Set action (only non-video actions for home page)
-        if (!isVideoAction(actionParam)) {
-          setSelectedAction(actionParam as ActionType);
-        }
-        setSelectedModelId(model.id);
-        setFormData(newFormData);
-        setMobileShowForm(true);
-        
-        // Clear URL params using History API to avoid component re-mount
-        // router.replace causes state reset in Next.js App Router
-        setTimeout(() => {
-          console.log('[HomePage] Clearing URL params via History API');
-          window.history.replaceState(null, '', '/');
-        }, 100);
+          console.log('[HomePage] Setting state:', { action: actionParam, modelId: model.id, formData: newFormData });
+          
+          // Set all state at once (React will batch these)
+          // Set action (only non-video actions for home page)
+          if (!isVideoAction(actionParam)) {
+            setSelectedAction(actionParam as ActionType);
+          }
+          setSelectedModelId(model.id);
+          setFormData(newFormData);
+          setMobileShowForm(true);
+          
+          console.log('[HomePage] State updated successfully');
         } else {
           console.warn('[HomePage] No models found for action:', actionParam);
         }
       } catch (error) {
         console.error('[HomePage] Error loading quick action:', error);
+        // Reset the handled ref on error so we can retry
+        quickActionHandledRef.current = null;
       }
     };
     
     loadQuickAction();
-  }, [actionParam, imageUrlParam, router]);
+  }, [actionParam, imageUrlParam]);
 
   // Known image field names across different models
   const IMAGE_FIELD_NAMES = ['image', 'start_image', 'first_frame_image', 'img_cond_path', 'input_image', 'image_input'];
