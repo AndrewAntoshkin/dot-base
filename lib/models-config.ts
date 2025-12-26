@@ -35,17 +35,20 @@ export interface ModelSetting {
   maxFiles?: number;
 }
 
+export type ProviderType = 'replicate' | 'fal';
+
 export interface Model {
   id: string;
   name: string;
   displayName: string;
-  replicateModel: string;
+  replicateModel: string;  // For fal.ai models, this is the fal model path
   version?: string;
   action: ActionType;
   description?: string;
   settings: ModelSetting[];
   runs?: string;
   price?: string;
+  provider?: ProviderType;  // Default: 'replicate'
 }
 
 /**
@@ -2947,6 +2950,68 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     ],
   },
 
+  // 2.5. Kling 1.0 T2V (fal.ai)
+  {
+    id: 'kling-1.0-t2v-fal',
+    name: 'kling-1.0-t2v',
+    displayName: 'Kling 1.0 T2V',
+    replicateModel: 'fal-ai/kling-video/v1/standard/text-to-video',
+    action: 'video_create',
+    provider: 'fal',
+    description: 'Kling 1.0 от fal.ai - генерация видео из текста',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите видео...',
+        description: 'Текстовое описание видео. Опишите сцену, действия и стиль.',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: 'blur, distort, and low quality',
+        description: 'Укажите что убрать из результата.',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Формат (Aspect Ratio)',
+        type: 'select',
+        default: '16:9',
+        options: [
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '1:1', label: '1:1 (квадрат)' },
+        ],
+        description: 'Выберите пропорции: 16:9 для YouTube, 9:16 для TikTok/Reels.',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+        description: 'Длина видео.',
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Насколько близко следовать промпту (0 = свобода, 1 = строго).',
+      },
+    ],
+  },
+
   // 3. Hailuo 2.3
   {
     id: 'hailuo-2.3-t2v',
@@ -3455,6 +3520,69 @@ export const VIDEO_I2V_MODELS: Model[] = [
           { value: '10', label: '10 секунд' },
         ],
         description: 'Длина видео. 5 сек — быстрее и дешевле, 10 сек — больше действия.',
+      },
+    ],
+  },
+
+  // 1.5. Kling 1.0 I2V (fal.ai)
+  {
+    id: 'kling-1.0-i2v-fal',
+    name: 'kling-1.0-i2v',
+    displayName: 'Kling 1.0 I2V',
+    replicateModel: 'fal-ai/kling-video/v1/standard/image-to-video',
+    action: 'video_i2v',
+    provider: 'fal',
+    description: 'Kling 1.0 от fal.ai - анимация с поддержкой первого и последнего кадра',
+    settings: [
+      {
+        name: 'image',
+        label: 'Первый кадр',
+        type: 'file',
+        required: true,
+        description: 'Изображение для начала видео.',
+      },
+      {
+        name: 'tail_image',
+        label: 'Последний кадр',
+        type: 'file',
+        description: 'Опционально: изображение для конца видео. Модель создаст плавный переход между кадрами.',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите движение...',
+        description: 'Описание движения и действий в видео.',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: 'blur, distort, and low quality',
+        description: 'Укажите что убрать из результата.',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+        description: 'Длина видео.',
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Насколько близко следовать промпту (0 = свобода, 1 = строго по промпту).',
       },
     ],
   },
@@ -4249,6 +4377,63 @@ export const VIDEO_EDIT_MODELS: Model[] = [
         type: 'number',
         default: -1,
         description: '-1 = случайный',
+      },
+    ],
+  },
+
+  // 3.5. Kling O1 Reference V2V (fal.ai)
+  {
+    id: 'kling-o1-v2v-fal',
+    name: 'kling-o1-v2v',
+    displayName: 'Kling O1 V2V',
+    replicateModel: 'fal-ai/kling-video/o1/standard/video-to-video/reference',
+    action: 'video_edit',
+    provider: 'fal',
+    description: 'Kling O1 от fal.ai - генерация нового кадра на основе референсного видео',
+    settings: [
+      {
+        name: 'video',
+        label: 'Референсное видео',
+        type: 'file',
+        required: true,
+        description: 'Видео-референс. Модель сохранит стиль движения и камеры.',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Based on @Video1, generate the next shot. keep the style of the video',
+        description: 'Используйте @Video1 для ссылки на видео. Опишите желаемый следующий кадр.',
+      },
+      {
+        name: 'negative_prompt',
+        label: 'Negative Prompt',
+        type: 'textarea',
+        placeholder: 'Что исключить...',
+        default: 'blur, distort, and low quality',
+        description: 'Укажите что убрать из результата.',
+      },
+      {
+        name: 'duration',
+        label: 'Длительность',
+        type: 'select',
+        default: '5',
+        options: [
+          { value: '5', label: '5 секунд' },
+          { value: '10', label: '10 секунд' },
+        ],
+        description: 'Длина выходного видео.',
+      },
+      {
+        name: 'cfg_scale',
+        label: 'CFG Scale',
+        type: 'slider',
+        default: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Насколько близко следовать промпту.',
       },
     ],
   },

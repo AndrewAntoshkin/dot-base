@@ -496,7 +496,7 @@ export function DocsFooter() {
     <div className="flex items-center gap-2 pt-6 border-t border-[#2f2f2f] text-sm text-[#959595] font-inter mt-8">
       <span>Обновлено: {new Date().toLocaleDateString('ru-RU')}</span>
       <span className="w-1 h-1 rounded-full bg-[#959595]" />
-      <span>BASE Team</span>
+      <span>BASECRAFT! Team</span>
     </div>
   );
 }

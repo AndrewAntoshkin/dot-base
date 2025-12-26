@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { getFalClient } from '@/lib/fal/client';
+import { getModelById } from '@/lib/models-config';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
@@ -12,6 +14,8 @@ interface GenerationRecord {
   id: string;
   status: string;
   replicate_prediction_id: string | null;
+  replicate_model: string;
+  model_id: string;
   action: string;
   [key: string]: any;
 }
@@ -54,7 +58,7 @@ export async function POST() {
     // Получить все processing генерации пользователя
     const { data } = await supabase
       .from('generations')
-      .select('id, status, replicate_prediction_id, action')
+      .select('id, status, replicate_prediction_id, replicate_model, model_id, action')
       .eq('user_id', user.id)
       .in('status', ['pending', 'processing'])
       .not('replicate_prediction_id', 'is', null);
@@ -68,13 +72,65 @@ export async function POST() {
     }
 
     const replicateClient = getReplicateClient();
+    const falClient = getFalClient();
     let syncedCount = 0;
 
-    // Проверяем статус каждой генерации в Replicate
+    // Проверяем статус каждой генерации
     for (const gen of generations) {
       if (!gen.replicate_prediction_id) continue;
 
+      // Determine provider from model config
+      const modelConfig = getModelById(gen.model_id);
+      const provider = modelConfig?.provider || 'replicate';
+
       try {
+        if (provider === 'fal') {
+          // Fal.ai sync
+          const status = await falClient.getQueueStatus(gen.replicate_model, gen.replicate_prediction_id);
+          
+          logger.debug(`[Sync] Generation ${gen.id}: Fal status = ${status.status}`, {
+            requestId: gen.replicate_prediction_id,
+            action: gen.action,
+          });
+
+          if (status.status === 'COMPLETED') {
+            const result = await falClient.getResult(gen.replicate_model, gen.replicate_prediction_id);
+            const output = result.output;
+            
+            let outputUrls: string[] = [];
+            if (output?.video?.url) {
+              outputUrls = [output.video.url];
+            }
+
+            if (outputUrls.length > 0) {
+              const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(outputUrls, gen.id);
+              
+              await (supabase.from('generations') as any)
+                .update({
+                  status: 'completed',
+                  output_urls: savedUrls.length > 0 ? savedUrls : outputUrls,
+                  output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
+                  fal_output: result,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', gen.id);
+              syncedCount++;
+            }
+          } else if (status.status === 'FAILED') {
+            await (supabase.from('generations') as any)
+              .update({
+                status: 'failed',
+                error_message: 'Генерация не удалась',
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', gen.id);
+            syncedCount++;
+          }
+          // If IN_QUEUE or IN_PROGRESS - skip
+          continue;
+        }
+
+        // Replicate sync (default)
         const prediction = await replicateClient.getPrediction(gen.replicate_prediction_id);
         
         // Log actual Replicate status for debugging

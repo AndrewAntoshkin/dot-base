@@ -4,6 +4,18 @@ import { DocsShell, DocsBreadcrumb, DocsTitle, DocsSection, DocsFooter } from '@
 
 const CHANGELOG = [
   {
+    version: '0.2.2',
+    date: '2025-12-26',
+    title: 'Интеграция fal.ai: Kling (T2V + I2V + V2V)',
+    changes: [
+      { type: 'new', text: 'Мультипровайдерная архитектура — поддержка моделей из Replicate и fal.ai' },
+      { type: 'new', text: 'Kling 1.0 T2V от fal.ai в разделе Video → Создать' },
+      { type: 'new', text: 'Kling 1.0 I2V от fal.ai с поддержкой первого и последнего кадра' },
+      { type: 'new', text: 'Kling O1 V2V от fal.ai для генерации на основе видео-референса' },
+      { type: 'improvement', text: 'Добавлен webhook и polling для fal.ai API' },
+    ],
+  },
+  {
     version: '0.2.1',
     date: '2025-12-26',
     title: 'Seedance 1.5 Pro и улучшения Brainstorm',
@@ -88,7 +100,7 @@ const CHANGELOG = [
     date: '2025-10-15',
     title: 'Начальный релиз',
     changes: [
-      { type: 'new', text: 'Запуск платформы BASE' },
+      { type: 'new', text: 'Запуск платформы BASECRAFT!' },
       { type: 'new', text: 'Функция Image с моделями FLUX, SeeDream, Ideogram, Recraft' },
       { type: 'new', text: 'Функция Analyze для анализа изображений' },
       { type: 'new', text: 'Функция Brainstorm для генерации идей' },
@@ -118,7 +130,7 @@ export default function ChangelogPage() {
         { label: 'Changelog' },
       ]} />
       
-      <DocsTitle description="История изменений платформы BASE. Новые функции, улучшения и исправления.">
+      <DocsTitle description="История изменений платформы BASECRAFT! Новые функции, улучшения и исправления.">
         Changelog
       </DocsTitle>
 

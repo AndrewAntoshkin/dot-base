@@ -84,6 +84,7 @@ export const VIDEO_CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'veo-3.1-fast', displayName: 'Veo 3.1 Fast', description: 'Google - быстрая генерация видео с аудио', action: 'video_create' },
   { id: 'seedance-1.5-pro-t2v', displayName: 'Seedance 1.5 Pro', description: 'ByteDance - видео с аудио и lip-sync', action: 'video_create' },
   { id: 'kling-v2.5-turbo-pro-t2v', displayName: 'Kling v2.5 Turbo Pro', description: 'Kuaishou - высококачественное видео', action: 'video_create' },
+  { id: 'kling-1.0-t2v-fal', displayName: 'Kling 1.0 T2V', description: 'fal.ai - генерация видео из текста', action: 'video_create' },
   { id: 'seedance-1-pro-t2v', displayName: 'Seedance 1 Pro', description: 'ByteDance - премиум качество до 1080p с last frame', action: 'video_create' },
   { id: 'hailuo-02-t2v', displayName: 'Hailuo 02', description: 'MiniMax - отличная физика, 768p/1080p с last frame', action: 'video_create' },
   { id: 'hailuo-2.3-t2v', displayName: 'Hailuo 2.3', description: 'MiniMax - качественное видео с управлением камерой', action: 'video_create' },
@@ -95,6 +96,7 @@ export const VIDEO_CREATE_MODELS_LITE: ModelLite[] = [
 export const VIDEO_I2V_MODELS_LITE: ModelLite[] = [
   { id: 'seedance-1.5-pro-i2v', displayName: 'Seedance 1.5 Pro', description: 'ByteDance - анимация с аудио и lip-sync', action: 'video_i2v' },
   { id: 'kling-v2.5-turbo-pro-i2v', displayName: 'Kling v2.5 Turbo Pro', description: 'Kuaishou - анимация изображения', action: 'video_i2v' },
+  { id: 'kling-1.0-i2v-fal', displayName: 'Kling 1.0 I2V', description: 'fal.ai - анимация с первым и последним кадром', action: 'video_i2v' },
   { id: 'seedance-1-pro-fast', displayName: 'Seedance 1 Pro Fast', description: 'ByteDance - быстрая анимация до 1080p', action: 'video_i2v' },
   { id: 'wan-2.5-i2v-fast', displayName: 'Wan 2.5 I2V Fast', description: 'Wan - быстрая анимация изображений', action: 'video_i2v' },
   { id: 'hailuo-2.3-fast-i2v', displayName: 'Hailuo 2.3 Fast', description: 'MiniMax - быстрая анимация', action: 'video_i2v' },
@@ -110,6 +112,7 @@ export const VIDEO_EDIT_MODELS_LITE: ModelLite[] = [
   { id: 'luma-modify-video', displayName: 'Luma Modify Video', description: 'Luma - стиль и трансформация видео', action: 'video_edit' },
   { id: 'luma-reframe-video', displayName: 'Luma Reframe Video', description: 'Luma - изменение соотношения сторон', action: 'video_edit' },
   { id: 'mmaudio', displayName: 'MMAudio', description: 'Добавить звук к видео с помощью AI', action: 'video_edit' },
+  { id: 'kling-o1-v2v-fal', displayName: 'Kling O1 V2V', description: 'fal.ai - генерация кадра по референсу', action: 'video_edit' },
   { id: 'video-merge', displayName: 'Video Merge', description: 'Объединить несколько видео', action: 'video_edit' },
   { id: 'autocaption', displayName: 'Autocaption', description: 'AI субтитры с караоке-эффектом', action: 'video_edit' },
   { id: 'gen4-aleph', displayName: 'Runway Gen4 Aleph', description: 'Runway - редактирование, эффекты, стили', action: 'video_edit' },

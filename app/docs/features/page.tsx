@@ -79,7 +79,7 @@ export default function FeaturesPage() {
         { label: 'Функции' },
       ]} />
       
-      <DocsTitle description="Полный обзор всех функций платформы BASE: от генерации изображений и видео до редактирования и апскейла.">
+      <DocsTitle description="Полный обзор всех функций платформы BASECRAFT!: от генерации изображений и видео до редактирования и апскейла.">
         Функции
       </DocsTitle>
 

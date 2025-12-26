@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { getFalClient } from '@/lib/fal/client';
 import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
@@ -170,46 +171,83 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create generation' }, { status: 500 });
     }
 
-    // Start Replicate prediction
+    // Determine provider (default to replicate)
+    const provider = model.provider || 'replicate';
+    
+    // Start prediction based on provider
     try {
-      const replicateClient = getReplicateClient();
-      
-      const webhookUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
-        : undefined;
-      
-      // Debug log for Veo duration issue
-      if (model.replicateModel.includes('veo')) {
-        logger.info('[Veo Debug] replicateInput:', JSON.stringify(replicateInput, null, 2));
-      }
+      if (provider === 'fal') {
+        // Fal.ai provider
+        const falClient = getFalClient();
+        
+        const falWebhookUrl = process.env.NODE_ENV === 'production' 
+          ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
+          : undefined;
+        
+        logger.info('[Fal.ai] Starting generation for model:', model.replicateModel);
 
-      const { prediction, tokenId } = await replicateClient.run({
-        model: model.replicateModel,
-        version: model.version,
-        input: replicateInput,
-        webhook: webhookUrl,
-        webhook_events_filter: webhookUrl ? ['completed'] : undefined,
-      });
+        const { requestId } = await falClient.submitToQueue({
+          model: model.replicateModel,
+          input: replicateInput,
+          webhook: falWebhookUrl,
+        });
 
-      logger.debug('Generation started:', generation.id, prediction.id);
+        logger.debug('Fal.ai generation started:', generation.id, requestId);
 
-      await (supabase.from('generations') as any)
-        .update({
-          replicate_prediction_id: prediction.id,
-          replicate_token_index: tokenId,
+        await (supabase.from('generations') as any)
+          .update({
+            replicate_prediction_id: requestId,  // Store fal request_id in same field
+            status: 'processing',
+          })
+          .eq('id', generation.id);
+
+        return NextResponse.json({
+          id: generation.id,
+          prediction_id: requestId,
           status: 'processing',
-        })
-        .eq('id', generation.id);
+          provider: 'fal',
+        });
+      } else {
+        // Replicate provider (default)
+        const replicateClient = getReplicateClient();
+        
+        const webhookUrl = process.env.NODE_ENV === 'production' 
+          ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
+          : undefined;
+        
+        // Debug log for Veo duration issue
+        if (model.replicateModel.includes('veo')) {
+          logger.info('[Veo Debug] replicateInput:', JSON.stringify(replicateInput, null, 2));
+        }
 
-      return NextResponse.json({
-        id: generation.id,
-        prediction_id: prediction.id,
-        status: 'processing',
-      });
-    } catch (replicateError: any) {
-      logger.error('Replicate error:', replicateError.message);
+        const { prediction, tokenId } = await replicateClient.run({
+          model: model.replicateModel,
+          version: model.version,
+          input: replicateInput,
+          webhook: webhookUrl,
+          webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+        });
+
+        logger.debug('Generation started:', generation.id, prediction.id);
+
+        await (supabase.from('generations') as any)
+          .update({
+            replicate_prediction_id: prediction.id,
+            replicate_token_index: tokenId,
+            status: 'processing',
+          })
+          .eq('id', generation.id);
+
+        return NextResponse.json({
+          id: generation.id,
+          prediction_id: prediction.id,
+          status: 'processing',
+        });
+      }
+    } catch (providerError: any) {
+      logger.error(`${provider} error:`, providerError.message);
       
-      const userFacingError = replicateError.message || 'Ошибка при генерации';
+      const userFacingError = providerError.message || 'Ошибка при генерации';
       
       await (supabase.from('generations') as any)
         .update({ status: 'failed', error_message: userFacingError })

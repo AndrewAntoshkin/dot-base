@@ -1,0 +1,215 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
+import { saveGenerationMedia } from '@/lib/supabase/storage';
+import logger from '@/lib/logger';
+
+interface GenerationRecord {
+  id: string;
+  user_id: string;
+  status: string;
+  replicate_prediction_id?: string;
+  output_urls?: string[];
+  error_message?: string;
+  action: string;
+  model_id: string;
+  replicate_model: string;
+  settings?: Record<string, any>;
+  cost_credits?: number;
+  cost_usd?: number;
+  [key: string]: any;
+}
+
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, attempt - 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
+function getUserFriendlyErrorMessage(error: string | null | undefined): string {
+  const errorLower = (error || '').toLowerCase();
+  
+  if (errorLower.includes('nsfw') || errorLower.includes('safety')) {
+    return 'Контент заблокирован фильтром безопасности. Попробуйте изменить промпт';
+  }
+  if (errorLower.includes('timeout')) {
+    return 'Превышено время генерации. Попробуйте уменьшить разрешение';
+  }
+  if (errorLower.includes('memory') || errorLower.includes('oom')) {
+    return 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
+  }
+  if (errorLower.includes('overload') || errorLower.includes('rate limit')) {
+    return 'Сервер перегружен. Попробуйте через несколько минут';
+  }
+  if (errorLower.includes('invalid') || errorLower.includes('validation')) {
+    return 'Некорректные параметры. Проверьте настройки';
+  }
+  if (!error || error === '' || error === 'null') {
+    return 'Генерация не удалась. Попробуйте другую модель';
+  }
+  if (error.length > 150 || error.includes('stack') || error.includes('Error:')) {
+    return 'Произошла ошибка. Попробуйте снова';
+  }
+  return error;
+}
+
+function isMediaUrl(value: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+  if (!value.startsWith('http://') && !value.startsWith('https://')) {
+    return false;
+  }
+  
+  const lowercaseUrl = value.toLowerCase();
+  
+  const mediaExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov', '.avi', '.mkv'];
+  if (mediaExtensions.some(ext => lowercaseUrl.includes(ext))) {
+    return true;
+  }
+  
+  const trustedMediaHosts = [
+    'fal.media',
+    'fal.run',
+    'fal-cdn',
+    'storage.googleapis.com',
+    'supabase.co/storage',
+  ];
+  if (trustedMediaHosts.some(host => lowercaseUrl.includes(host))) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Fal.ai Webhook Handler
+ * Handles completion callbacks from fal.ai
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    // Fal.ai webhook payload structure
+    const { request_id: requestId, status, payload, error } = body;
+
+    logger.info('[Fal Webhook] Received:', JSON.stringify({ requestId, status, hasPayload: !!payload, error }));
+
+    if (!requestId) {
+      return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
+    }
+
+    const supabase = createServiceRoleClient();
+
+    // Find generation by fal request_id (stored in replicate_prediction_id field)
+    let generation: GenerationRecord | null = null;
+    try {
+      generation = await withRetry(async () => {
+        const { data, error } = await supabase
+          .from('generations')
+          .select('*')
+          .eq('replicate_prediction_id', requestId)
+          .single();
+        if (error) throw error;
+        return data;
+      }) as GenerationRecord;
+    } catch {
+      logger.warn('[Fal Webhook] Generation not found:', requestId);
+      return NextResponse.json({ error: 'Generation not found' }, { status: 404 });
+    }
+
+    if (!generation) {
+      return NextResponse.json({ error: 'Generation not found' }, { status: 404 });
+    }
+
+    // Idempotency check
+    if (generation.status === 'completed' || generation.status === 'failed') {
+      logger.info('[Fal Webhook] Already processed, skipping:', generation.id);
+      return NextResponse.json({ success: true, skipped: true });
+    }
+
+    const updateData: any = { fal_output: body };
+
+    if (status === 'COMPLETED' && payload) {
+      let mediaUrls: string[] = [];
+      
+      // Extract video URL from fal.ai response
+      // Kling returns: { video: { url: "..." } }
+      if (payload.video?.url && isMediaUrl(payload.video.url)) {
+        mediaUrls = [payload.video.url];
+      }
+      // Some models return direct URL
+      else if (typeof payload === 'string' && isMediaUrl(payload)) {
+        mediaUrls = [payload];
+      }
+      // Array of outputs
+      else if (Array.isArray(payload)) {
+        mediaUrls = payload
+          .filter((item: any) => {
+            if (typeof item === 'string') return isMediaUrl(item);
+            if (item?.url) return isMediaUrl(item.url);
+            return false;
+          })
+          .map((item: any) => typeof item === 'string' ? item : item.url);
+      }
+      
+      if (mediaUrls.length === 0) {
+        logger.error('[Fal Webhook] No media URLs found in payload:', JSON.stringify(payload));
+        updateData.status = 'failed';
+        updateData.error_message = 'Не удалось получить результат генерации';
+      } else {
+        // Save media to storage
+        const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(mediaUrls, generation.id);
+        
+        updateData.status = 'completed';
+        updateData.output_urls = savedUrls.length > 0 ? savedUrls : mediaUrls;
+        updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+        
+        logger.info('[Fal Webhook] Generation completed:', generation.id, 'URLs:', updateData.output_urls);
+        
+        // Deduct credits
+        try {
+          await (supabase.rpc as any)('decrement_credits', {
+            user_id_param: generation.user_id,
+            credits_param: generation.cost_credits || 1,
+          });
+        } catch {}
+      }
+    } else if (status === 'FAILED' || error) {
+      updateData.status = 'failed';
+      updateData.error_message = getUserFriendlyErrorMessage(error || 'Генерация не удалась');
+      
+      logger.error('[Fal Webhook] Generation failed:', generation.id, error);
+    }
+
+    // Update DB
+    try {
+      await withRetry(async () => {
+        const { error: updateError } = await (supabase.from('generations') as any)
+          .update(updateData)
+          .eq('id', generation.id);
+        if (updateError) throw updateError;
+      });
+    } catch (updateError: any) {
+      logger.error('[Fal Webhook] Failed to update generation:', updateError.message);
+      return NextResponse.json({ error: 'Failed to save result' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    logger.error('[Fal Webhook] Error:', error.message);
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+  }
+}
+
