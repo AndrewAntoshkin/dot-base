@@ -139,9 +139,17 @@ export async function POST(request: NextRequest) {
         ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
         : undefined;
 
+      const mappedInput = firstModelConfig.inputMapper(firstPart);
+      logger.info(`[Keyframes] First part input:`, { 
+        model: firstPart.model,
+        duration: firstPart.duration,
+        mode: firstPart.mode,
+      });
+      logger.info(`[Keyframes] Mapped input for Replicate:`, mappedInput);
+
       const { prediction, tokenId } = await replicateClient.run({
         model: firstModelConfig.replicateModel,
-        input: firstModelConfig.inputMapper(firstPart),
+        input: mappedInput,
         webhook: webhookUrl,
         webhook_events_filter: webhookUrl ? ['completed'] : undefined,
       });
