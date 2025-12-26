@@ -959,6 +959,44 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                             </div>
                           )}
                           
+                          {/* Multi-image stack indicator */}
+                          {!isFailed && generation.output_urls && generation.output_urls.length > 1 && (
+                            <div className="absolute bottom-2 right-2 z-10">
+                              <div
+                                className="flex items-center p-[2px] rounded-[10px] backdrop-blur-[4px]"
+                                style={{ background: '#101010' }}
+                              >
+                                {/* Show up to 4 thumbnails from remaining images */}
+                                {(generation.output_thumbs || generation.output_urls).slice(1, 5).map((url, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="w-8 h-8 rounded-[8px] overflow-hidden border-2 border-[#101010] shrink-0"
+                                    style={{ marginLeft: idx > 0 ? '-16px' : 0 }}
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={url}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  </div>
+                                ))}
+                                {/* "+N" badge if more than 5 images total */}
+                                {generation.output_urls.length > 5 && (
+                                  <div
+                                    className="w-8 h-8 rounded-[8px] flex items-center justify-center bg-[#212121] border-2 border-[#101010] shrink-0"
+                                    style={{ marginLeft: '-16px' }}
+                                  >
+                                    <span className="font-inter font-medium text-[10px] leading-[16px] tracking-[-0.02em] uppercase text-white">
+                                      +{generation.output_urls.length - 5}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
                           <div className="absolute bottom-2 sm:bottom-auto sm:top-2 left-2 bg-[#181818] px-1.5 py-1 rounded-[8px]">
                             <span className="font-inter font-medium text-[10px] text-[#bbbbbb] uppercase tracking-[-0.2px] leading-4">{generation.model_name}</span>
                           </div>
