@@ -845,8 +845,9 @@ export function SettingsForm({
         return setting?.label || name;
       });
       
-      setError(`Заполните обязательные поля: ${fieldLabels.join(', ')}`);
-      if (onError) onError(new Error('Validation failed'));
+      const errorMessage = `Заполните обязательные поля: ${fieldLabels.join(', ')}`;
+      setError(errorMessage);
+      if (onError) onError(errorMessage);
       return;
     }
     
