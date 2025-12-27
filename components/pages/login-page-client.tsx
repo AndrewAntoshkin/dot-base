@@ -63,8 +63,8 @@ export default function LoginPageClient() {
         });
 
         if (error) throw error;
-        router.push('/');
-        router.refresh();
+        // Hard redirect для полной перезагрузки с новыми данными пользователя
+        window.location.href = '/';
       }
     } catch (err: any) {
       setError(err.message || 'Произошла ошибка');

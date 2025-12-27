@@ -479,8 +479,8 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
       console.error('Logout error:', error);
     } finally {
       setEmail(null);
-      router.push('/login');
-      router.refresh();
+      // Hard redirect для полной перезагрузки с новыми данными
+      window.location.href = '/login';
     }
   };
 
