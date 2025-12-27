@@ -706,6 +706,23 @@ export function ExpandPageClient() {
             <div className="animate-fade-in-up animate-delay-200 flex-1">
               <OutputPanel generationId={currentGenerationId} />
             </div>
+          ) : isCreating ? (
+            /* Loading state while waiting for API response */
+            <div className="animate-fade-in-up animate-delay-200 flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-6">
+                <div className="relative w-20 h-20">
+                  <div className="absolute inset-0 rounded-full border-4 border-[#2f2f2f]" />
+                  <div 
+                    className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"
+                    style={{ animationDuration: '1.5s' }}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 text-center">
+                  <p className="text-lg font-medium text-white">Создание генерации...</p>
+                  <p className="text-sm text-[#959595]">Подготавливаем запрос</p>
+                </div>
+              </div>
+            </div>
           ) : (
           /* Canvas Container - fills remaining space with 32px bottom padding */
           <div className="animate-fade-in-up animate-delay-200 flex-1 pb-8 flex items-start justify-start">
