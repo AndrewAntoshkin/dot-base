@@ -160,14 +160,15 @@ function AnalyzeContent() {
   const showStartScreen = false;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#101010]">
+    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
       <Header />
 
-      {/* Desktop Layout */}
-      <main className="hidden lg:flex flex-1 gap-6">
+      {/* Desktop Layout - Independent scroll for each column */}
+      <main className="hidden lg:flex flex-1 min-h-0 gap-6">
         {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0 relative">
-          <div className="flex-1 flex flex-col py-8">
+        <div className="w-[480px] flex flex-col pl-20 pr-0">
+          {/* Scrollable content area */}
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
             {/* Header */}
             <div className="mb-6 shrink-0 animate-fade-in-up">
               <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
@@ -176,7 +177,7 @@ function AnalyzeContent() {
             </div>
 
             {/* Form fields */}
-            <div className="flex-1 flex flex-col gap-6">
+            <div className="flex flex-col gap-6">
               {/* Action Selector */}
               <div className="animate-fade-in-up animate-delay-100">
                 <ActionSelector
@@ -200,7 +201,7 @@ function AnalyzeContent() {
 
               {/* Settings Form */}
               {selectedModelId && (
-                <div className="animate-fade-in-up animate-delay-300">
+                <div className="animate-fade-in-up animate-delay-300 pb-4">
                   <Suspense fallback={<div className="p-4 text-center text-[#959595]">Загрузка настроек...</div>}>
                     <SettingsForm
                       modelId={selectedModelId}
@@ -218,9 +219,9 @@ function AnalyzeContent() {
             </div>
           </div>
 
-          {/* Sticky buttons */}
+          {/* Fixed buttons at bottom (outside scroll area) */}
           {selectedModelId && (
-            <div className="sticky bottom-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] z-10">
+            <div className="shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -257,8 +258,8 @@ function AnalyzeContent() {
           <div className="w-px h-full bg-[#2f2f2f]" />
         </div>
 
-        {/* RIGHT PANEL - OUTPUT */}
-        <div className="flex-1 py-8 pl-0 pr-20 overflow-y-auto">
+        {/* RIGHT PANEL - OUTPUT (independent scroll) */}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pl-0 pr-20">
           <div className="mb-6 animate-fade-in-up">
             <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
               OUTPUT

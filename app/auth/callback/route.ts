@@ -35,7 +35,11 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      // Очищаем кэши от предыдущего пользователя
+      const response = NextResponse.redirect(`${origin}${next}`);
+      response.cookies.delete('user_role');
+      response.cookies.delete('session_checked');
+      return response;
     }
   }
 

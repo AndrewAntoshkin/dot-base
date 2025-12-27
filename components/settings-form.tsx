@@ -810,6 +810,46 @@ export function SettingsForm({
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
+    // Проверяем required поля перед отправкой
+    const missingFields: string[] = [];
+    for (const setting of model.settings) {
+      if (setting.required) {
+        const value = formData[setting.name];
+        const isEmpty = value === undefined || 
+                       value === null || 
+                       value === '' || 
+                       (Array.isArray(value) && value.length === 0);
+        
+        if (isEmpty) {
+          missingFields.push(setting.name);
+        }
+      }
+    }
+    
+    // Если есть незаполненные поля - прокручиваем к первому и показываем ошибку
+    if (missingFields.length > 0) {
+      const firstMissingField = missingFields[0];
+      const fieldElement = document.querySelector(`[data-field-name="${firstMissingField}"]`);
+      
+      if (fieldElement) {
+        fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Добавляем визуальную подсветку
+        fieldElement.classList.add('ring-2', 'ring-red-500', 'ring-opacity-50');
+        setTimeout(() => {
+          fieldElement.classList.remove('ring-2', 'ring-red-500', 'ring-opacity-50');
+        }, 2000);
+      }
+      
+      const fieldLabels = missingFields.map(name => {
+        const setting = model.settings.find(s => s.name === name);
+        return setting?.label || name;
+      });
+      
+      setError(`Заполните обязательные поля: ${fieldLabels.join(', ')}`);
+      if (onError) onError(new Error('Validation failed'));
+      return;
+    }
+    
     if (onSubmitStart) onSubmitStart();
     setIsLoading(true);
     setError(null);
@@ -1214,7 +1254,7 @@ export function SettingsForm({
         if (setting.type === 'checkbox') {
           const Icon = getFieldIcon(setting.name, setting.type);
           return (
-            <div key={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+            <div key={setting.name} data-field-name={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2 transition-all duration-300">
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -1237,7 +1277,7 @@ export function SettingsForm({
         if (isAspectRatio) {
           const Icon = getFieldIcon(setting.name, setting.type);
           return (
-            <div key={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+            <div key={setting.name} data-field-name={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2 transition-all duration-300">
               <TooltipLabel
                 label={setting.label}
                 description={meta.description}
@@ -1252,7 +1292,7 @@ export function SettingsForm({
         
         const Icon = getFieldIcon(setting.name, setting.type);
         return (
-          <div key={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+          <div key={setting.name} data-field-name={setting.name} className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2 transition-all duration-300">
             {/* Label with tooltip on hover */}
             <TooltipLabel
               label={setting.label}

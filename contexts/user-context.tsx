@@ -52,6 +52,7 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
   // Предотвращаем повторную загрузку
   const hasLoadedWorkspaces = useRef(false);
   const hasLoadedProfile = useRef(false);
+  const previousEmail = useRef<string | null>(null);
 
   // Load workspaces - оптимизировано для отложенной загрузки
   const loadWorkspaces = useCallback(async () => {
@@ -122,6 +123,21 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
   // ОПТИМИЗАЦИЯ: Отложенная загрузка workspaces и профиля
   // Загружаем через 100ms после монтирования, чтобы не блокировать начальный рендер
   useEffect(() => {
+    // Проверяем, изменился ли пользователь
+    const emailChanged = previousEmail.current !== null && previousEmail.current !== email;
+    
+    // Если пользователь изменился — сбрасываем всё
+    if (emailChanged) {
+      setWorkspaces([]);
+      setSelectedWorkspaceIdState(null);
+      setAvatarUrl(null);
+      setDisplayName(null);
+      hasLoadedWorkspaces.current = false;
+      hasLoadedProfile.current = false;
+    }
+    
+    previousEmail.current = email;
+    
     if (email && !hasLoadedWorkspaces.current) {
       const timer = setTimeout(() => {
         loadWorkspaces();

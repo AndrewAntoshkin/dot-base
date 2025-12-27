@@ -5,7 +5,15 @@ export async function POST() {
   try {
     const supabase = await createServerSupabaseClient();
     await supabase.auth.signOut();
-    return NextResponse.json({ status: 'success' });
+    
+    // Создаём ответ и очищаем кэш-cookies
+    const response = NextResponse.json({ status: 'success' });
+    
+    // Очищаем кэши сессии и роли
+    response.cookies.delete('user_role');
+    response.cookies.delete('session_checked');
+    
+    return response;
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json(
