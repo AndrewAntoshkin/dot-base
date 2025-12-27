@@ -4,6 +4,16 @@ import { DocsShell, DocsBreadcrumb, DocsTitle, DocsSection, DocsFooter } from '@
 
 const CHANGELOG = [
   {
+    version: '0.2.3',
+    date: '2025-12-27',
+    title: 'Kling: Motion Control + Edit Video',
+    changes: [
+      { type: 'new', text: 'Kling 2.6 Motion Control Pro — перенос движений на изображение персонажа' },
+      { type: 'new', text: 'Kling O1 Edit Pro — редактирование видео текстовыми инструкциями' },
+      { type: 'improvement', text: 'Поддержка @Element и @Image синтаксиса для замены персонажей' },
+    ],
+  },
+  {
     version: '0.2.2',
     date: '2025-12-26',
     title: 'Kling: Text-to-Video, Image-to-Video, Video-to-Video',

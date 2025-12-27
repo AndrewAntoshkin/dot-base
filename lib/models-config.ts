@@ -3405,7 +3405,7 @@ export const VIDEO_CREATE_MODELS: Model[] = [
 ];
 
 /**
- * КАРТИНКА → ВИДЕО (Image-to-Video) - 8 моделей
+ * КАРТИНКА → ВИДЕО (Image-to-Video) - 9 моделей
  */
 export const VIDEO_I2V_MODELS: Model[] = [
   // 0. Google Veo 3.1 Fast I2V
@@ -4209,10 +4209,62 @@ export const VIDEO_I2V_MODELS: Model[] = [
       },
     ],
   },
+
+  // 9. Kling V2.6 Motion Control Pro (fal.ai)
+  {
+    id: 'kling-2.6-motion-control-fal',
+    name: 'kling-2.6-motion-control',
+    displayName: 'Kling 2.6 Motion Control',
+    replicateModel: 'fal-ai/kling-video/v2.6/pro/motion-control',
+    action: 'video_i2v',
+    provider: 'fal',
+    description: 'Kling 2.6 Pro — перенос движений с референсного видео на изображение персонажа',
+    settings: [
+      {
+        name: 'image',
+        label: 'Изображение персонажа',
+        type: 'file',
+        required: true,
+        description: 'Референсное изображение. Персонаж должен быть чётко виден, без перекрытий, занимать более 5% площади.',
+      },
+      {
+        name: 'video',
+        label: 'Референсное видео',
+        type: 'file',
+        required: true,
+        description: 'Видео с движениями для переноса. Персонаж должен быть реалистичным, видно всё тело или верхнюю часть.',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        placeholder: 'Опишите персонажа и действия...',
+        description: 'Опционально: дополнительное описание для генерации.',
+      },
+      {
+        name: 'character_orientation',
+        label: 'Ориентация персонажа',
+        type: 'select',
+        default: 'video',
+        options: [
+          { value: 'video', label: 'Как в референсном видео (до 30 сек)' },
+          { value: 'image', label: 'Как на изображении (до 10 сек)' },
+        ],
+        description: '"video" — лучше для сложных движений и танцев. "image" — лучше для следования за камерой.',
+      },
+      {
+        name: 'keep_original_sound',
+        label: 'Сохранить звук',
+        type: 'checkbox',
+        default: true,
+        description: 'Сохранить оригинальный звук из референсного видео.',
+      },
+    ],
+  },
 ];
 
 /**
- * РЕДАКТИРОВАТЬ ВИДЕО - 6 моделей
+ * РЕДАКТИРОВАТЬ ВИДЕО - 8 моделей
  */
 export const VIDEO_EDIT_MODELS: Model[] = [
   // 1. Luma Modify Video
@@ -4434,6 +4486,54 @@ export const VIDEO_EDIT_MODELS: Model[] = [
         max: 1,
         step: 0.1,
         description: 'Насколько близко следовать промпту.',
+      },
+    ],
+  },
+
+  // 3.6. Kling O1 Edit Video Pro (fal.ai)
+  {
+    id: 'kling-o1-edit-fal',
+    name: 'kling-o1-edit',
+    displayName: 'Kling O1 Edit',
+    replicateModel: 'fal-ai/kling-video/o1/video-to-video/edit',
+    action: 'video_edit',
+    provider: 'fal',
+    description: 'Kling O1 Pro — редактирование видео с помощью текстовых инструкций. Замена персонажей, трансформация сцен.',
+    settings: [
+      {
+        name: 'video',
+        label: 'Видео для редактирования',
+        type: 'file',
+        required: true,
+        description: 'Видео .mp4/.mov, 3-10 сек, 720-2160px, макс 200MB.',
+      },
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Replace the character with @Element1, transform the landscape into @Image1...',
+        description: 'Используйте @Element1, @Element2 для элементов и @Image1, @Image2 для изображений.',
+      },
+      {
+        name: 'reference_images',
+        label: 'Референсные изображения',
+        type: 'file_array',
+        maxFiles: 4,
+        description: 'Изображения для стилизации/внешности. Ссылайтесь как @Image1, @Image2 и т.д. Макс 4 в сумме с элементами.',
+      },
+      {
+        name: 'element_image',
+        label: 'Изображение элемента',
+        type: 'file',
+        description: 'Изображение персонажа/объекта для замены. Ссылайтесь как @Element1 в промпте.',
+      },
+      {
+        name: 'keep_audio',
+        label: 'Сохранить аудио',
+        type: 'checkbox',
+        default: true,
+        description: 'Сохранить оригинальное аудио из видео.',
       },
     ],
   },

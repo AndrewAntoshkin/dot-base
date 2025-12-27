@@ -19,11 +19,27 @@ export function ImageFullscreenViewer({ imageUrl, isOpen, onClose, alt = 'Image'
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  // Reset zoom and pan when image changes
+  // Reset zoom and pan when image changes, and auto-enter fullscreen
   useEffect(() => {
     if (isOpen) {
       setZoom(1);
       setPan({ x: 0, y: 0 });
+      
+      // Автоматически входим в fullscreen при открытии
+      // Небольшая задержка чтобы DOM успел отрендериться
+      const timer = setTimeout(() => {
+        if (containerRef.current && !document.fullscreenElement) {
+          if (containerRef.current.requestFullscreen) {
+            containerRef.current.requestFullscreen().catch(() => {
+              // Игнорируем ошибку если fullscreen заблокирован
+            });
+          } else if ((containerRef.current as any).webkitRequestFullscreen) {
+            (containerRef.current as any).webkitRequestFullscreen();
+          }
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [imageUrl, isOpen]);
 
@@ -233,7 +249,13 @@ export function ImageFullscreenViewer({ imageUrl, isOpen, onClose, alt = 'Image'
     >
       {/* Close button */}
       <button
-        onClick={onClose}
+        onClick={() => {
+          // Выходим из fullscreen и закрываем
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+          onClose();
+        }}
         className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-lg transition-colors"
         aria-label="Close"
       >
