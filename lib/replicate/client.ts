@@ -187,6 +187,17 @@ export class ReplicateClient {
 
   private isNonRetryableError(error: any): boolean {
     const message = error.message?.toLowerCase() || '';
+    
+    // These errors ARE retryable (network/connection issues)
+    const retryablePatterns = [
+      'socket', 'fetch failed', 'timeout', 'econnreset', 'econnrefused',
+      'network', 'connection', 'aborted', 'other side closed',
+    ];
+    if (retryablePatterns.some(pattern => message.includes(pattern))) {
+      return false; // IS retryable
+    }
+    
+    // These errors are NOT retryable (auth/validation issues)
     const noRetryPatterns = [
       'invalid token', 'authentication', '401', '403', 'permission denied',
       'not found', '404', 'does not exist', 'is required', 'invalid type',

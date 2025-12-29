@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseUrl } from '@/lib/supabase/proxy';
 
 type AuthMode = 'login' | 'register';
 
@@ -21,10 +22,22 @@ export default function LoginPageClient() {
   // Secret access code for registration
   const REGISTRATION_ACCESS_CODE = 'gfjsGst264!!hDy';
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  // Создаём клиент один раз с useMemo
+  const supabase = useMemo(() => {
+    const url = getSupabaseUrl();
+    console.log('[Login] Using Supabase URL:', url);
+    return createBrowserClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  }, []);
+
+  // Helper function to add timeout to promises
+  const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => 
+        setTimeout(() => reject(new Error(errorMessage)), ms)
+      )
+    ]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,28 +59,51 @@ export default function LoginPageClient() {
           return;
         }
 
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
-        });
+        const { error } = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          }),
+          15000, // 15 sec timeout
+          'Сервер недоступен. Проверьте подключение или попробуйте VPN.'
+        );
 
         if (error) throw error;
         setEmailSent(true);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          15000, // 15 sec timeout
+          'Сервер недоступен. Проверьте подключение или попробуйте VPN.'
+        );
 
         if (error) throw error;
         // Hard redirect для полной перезагрузки с новыми данными пользователя
         window.location.href = '/';
       }
     } catch (err: any) {
-      setError(err.message || 'Произошла ошибка');
+      console.error('[Login] Error:', err);
+      console.error('[Login] Error message:', err.message);
+      console.error('[Login] Error status:', err.status);
+      
+      // Улучшенные сообщения об ошибках
+      let errorMessage = err.message || 'Произошла ошибка';
+      
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+        errorMessage = 'Ошибка сети. Попробуйте использовать VPN.';
+      } else if (errorMessage.includes('Invalid login credentials')) {
+        errorMessage = 'Неверный email или пароль';
+      } else if (errorMessage.includes('недоступен') || errorMessage.includes('timeout')) {
+        errorMessage = 'Сервер недоступен. Попробуйте позже.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -208,8 +208,8 @@ export function OutputPanel({
       
       try {
         const response = await fetchWithTimeout(`/api/generations/${generationId}`, {
-          timeout: isSlowConnection() ? 20000 : 10000,
-          retries: 1,
+          timeout: isSlowConnection() ? 45000 : 30000, // Увеличили: Replicate API может долго отвечать
+          retries: 2,
           credentials: 'include',
           signal: abortController.signal,
         });

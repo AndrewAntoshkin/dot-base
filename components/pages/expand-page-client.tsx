@@ -284,11 +284,20 @@ export function ExpandPageClient() {
       return;
     }
     
+    // Используем expand state напрямую (то что видит пользователь)
+    const currentExpand = expand;
+    
+    // Проверка что хотя бы одно направление расширения > 0
+    const hasAnyExpand = currentExpand.top > 0 || currentExpand.right > 0 || currentExpand.bottom > 0 || currentExpand.left > 0;
+    if (!hasAnyExpand) {
+      console.log('[Expand] No expansion set, aborting');
+      alert('Растяните области расширения на canvas справа');
+      return;
+    }
+    
     setIsCreating(true);
     
     try {
-      // Используем expand state напрямую (то что видит пользователь)
-      const currentExpand = expand;
       
       console.log('[Expand] ============ GENERATION START ============');
       console.log('[Expand] Using expand:', currentExpand);
@@ -706,23 +715,6 @@ export function ExpandPageClient() {
             <div className="animate-fade-in-up animate-delay-200 flex-1">
               <OutputPanel generationId={currentGenerationId} />
             </div>
-          ) : isCreating ? (
-            /* Loading state while waiting for API response */
-            <div className="animate-fade-in-up animate-delay-200 flex-1 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-6">
-                <div className="relative w-20 h-20">
-                  <div className="absolute inset-0 rounded-full border-4 border-[#2f2f2f]" />
-                  <div 
-                    className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"
-                    style={{ animationDuration: '1.5s' }}
-                  />
-                </div>
-                <div className="flex flex-col gap-2 text-center">
-                  <p className="text-lg font-medium text-white">Создание генерации...</p>
-                  <p className="text-sm text-[#959595]">Подготавливаем запрос</p>
-                </div>
-              </div>
-            </div>
           ) : (
           /* Canvas Container - fills remaining space with 32px bottom padding */
           <div className="animate-fade-in-up animate-delay-200 flex-1 pb-8 flex items-start justify-start">
@@ -781,14 +773,28 @@ export function ExpandPageClient() {
                 {/* Expanded area background - single dark rectangle that shows the total generation zone */}
                 {hasExpand && (
                   <div 
-                    className="absolute bg-[#212121] pointer-events-none z-0"
+                    className={`absolute pointer-events-none z-0 overflow-hidden ${
+                      isCreating ? 'bg-[#1a1a1a]' : 'bg-[#212121]'
+                    }`}
                     style={{
                       top: `${handleTop}%`,
                       left: `${handleLeft}%`,
                       right: `${100 - handleRight}%`,
                       bottom: `${100 - handleBottom}%`,
                     }}
-                  />
+                  >
+                    {/* Shimmer effect during generation */}
+                    {isCreating && (
+                      <div 
+                        className="absolute inset-0"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)',
+                          backgroundSize: '200% 100%',
+                          animation: 'shimmer-move 2s ease-in-out infinite',
+                        }}
+                      />
+                    )}
+                  </div>
                 )}
                 
                 {/* Original image - в центре, z-10 чтобы быть ниже handles (z-30) */}

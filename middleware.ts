@@ -9,6 +9,14 @@ const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 const SESSION_CHECK_TTL = 60 * 1000; // 1 минута - для быстрой проверки сессии
 
 /**
+ * Получить URL для Supabase (с учётом прокси)
+ * В middleware используем прокси если он настроен
+ */
+function getSupabaseUrlForMiddleware(): string {
+  return process.env.NEXT_PUBLIC_SUPABASE_PROXY_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+}
+
+/**
  * Быстрая проверка наличия сессии по cookie
  * Избегаем полного getUser() если сессия недавно проверялась
  */
@@ -47,7 +55,7 @@ async function getUserRole(
   // Запрашиваем из БД
   try {
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      getSupabaseUrlForMiddleware(),
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         auth: {
@@ -133,9 +141,17 @@ export async function middleware(request: NextRequest) {
   }
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getSupabaseUrlForMiddleware(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      auth: {
+        // ВАЖНО: Отключаем автоматический refresh токена в middleware
+        // чтобы избежать запросов к заблокированному Supabase
+        // Refresh будет происходить на клиенте через прокси
+        autoRefreshToken: false,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -158,9 +174,11 @@ export async function middleware(request: NextRequest) {
   // Refresh session if expired - only when needed
   // Add timeout to prevent 504 errors when Supabase is slow
   let user = null;
+  let authFailed = false;
+  
   try {
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Auth timeout')), 3000) // Уменьшили с 5 до 3 сек
+      setTimeout(() => reject(new Error('Auth timeout')), 2000) // 2 sec timeout
     );
     const authPromise = supabase.auth.getUser();
     const result = await Promise.race([authPromise, timeoutPromise]) as { data: { user: any } };
@@ -178,8 +196,16 @@ export async function middleware(request: NextRequest) {
     }
   } catch (error) {
     console.error('[Middleware] Auth check failed or timed out:', error);
-    // On timeout/error, allow request to proceed (API routes handle their own auth)
-    // For protected routes, we'll redirect to login as a fallback
+    authFailed = true;
+    
+    // FALLBACK: If we have auth cookies, assume user is logged in
+    // API routes will do proper auth check
+    if (hasAuthCookie) {
+      // Allow request to proceed - API routes handle their own auth
+      return NextResponse.next({ request });
+    }
+    
+    // No cookies and auth failed - redirect to login for protected routes
     if (needsAuthCheck(pathname) || isAdminPath) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';

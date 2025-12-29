@@ -146,25 +146,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create DB record
-    const { data: generation, error: insertError } = await (supabase
-      .from('generations') as any)
-      .insert({
-        user_id: userId,
-        workspace_id: workspaceId,
-        action: validatedData.action,
-        model_id: validatedData.model_id,
-        model_name: model.name,
-        replicate_model: model.replicateModel,
-        prompt: validatedData.prompt,
-        input_image_url: validatedData.input_image_url,
-        input_video_url: validatedData.input_video_url,
-        settings: validatedData.settings || {},
-        status: 'pending',
-        replicate_input: replicateInput,
-      })
-      .select()
-      .single();
+    // Create DB record with retry logic for connection issues
+    let generation: any = null;
+    let insertError: any = null;
+    const MAX_INSERT_RETRIES = 3;
+    
+    for (let attempt = 1; attempt <= MAX_INSERT_RETRIES; attempt++) {
+      const result = await (supabase
+        .from('generations') as any)
+        .insert({
+          user_id: userId,
+          workspace_id: workspaceId,
+          action: validatedData.action,
+          model_id: validatedData.model_id,
+          model_name: model.name,
+          replicate_model: model.replicateModel,
+          prompt: validatedData.prompt,
+          input_image_url: validatedData.input_image_url,
+          input_video_url: validatedData.input_video_url,
+          settings: validatedData.settings || {},
+          status: 'pending',
+          replicate_input: replicateInput,
+        })
+        .select()
+        .single();
+      
+      generation = result.data;
+      insertError = result.error;
+      
+      if (!insertError && generation) {
+        break; // Success
+      }
+      
+      // Check if error is retryable (connection/socket issues)
+      const errorMsg = insertError?.message?.toLowerCase() || '';
+      const isRetryable = errorMsg.includes('socket') || 
+                          errorMsg.includes('fetch failed') || 
+                          errorMsg.includes('timeout') ||
+                          errorMsg.includes('connection');
+      
+      if (!isRetryable || attempt === MAX_INSERT_RETRIES) {
+        break; // Non-retryable or max attempts reached
+      }
+      
+      logger.warn(`DB insert attempt ${attempt} failed, retrying...`, insertError?.message);
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
 
     if (insertError || !generation) {
       logger.error('Failed to create generation:', insertError);

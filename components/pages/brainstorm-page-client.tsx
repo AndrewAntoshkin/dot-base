@@ -62,65 +62,27 @@ const ZOOM_STEP = 0.1;
 // Max models limit
 const MAX_MODELS = 5;
 
+// Grid layout settings
+const GRID_COLS = 5;
+
 // Default card size for overlap calculations
 const DEFAULT_CARD_SIZE = { width: BASE_CARD_WIDTH + 8, height: BASE_CARD_WIDTH + 28 };
 
-// Check if two rectangles overlap
-function rectanglesOverlap(
-  r1: { x: number; y: number; width: number; height: number },
-  r2: { x: number; y: number; width: number; height: number }
-): boolean {
-  return !(
-    r1.x + r1.width + CARD_MARGIN < r2.x ||
-    r2.x + r2.width + CARD_MARGIN < r1.x ||
-    r1.y + r1.height + CARD_MARGIN < r2.y ||
-    r2.y + r2.height + CARD_MARGIN < r1.y
-  );
-}
-
-// Generate position that doesn't overlap with existing cards
-function generateNonOverlappingPosition(
-  existingPositions: { x: number; y: number }[]
-): { x: number; y: number } {
-  const maxAttempts = 100;
-  const padding = 100;
+// Generate grid position for new cards (5 per row, centered on canvas)
+function generateGridPosition(index: number): { x: number; y: number } {
+  const row = Math.floor(index / GRID_COLS);
+  const col = index % GRID_COLS;
   
-  // Center area of canvas
-  const centerX = CANVAS_WIDTH / 2;
-  const centerY = CANVAS_HEIGHT / 2;
-  const spreadRadius = 800;
+  // Calculate grid dimensions
+  const gridWidth = GRID_COLS * DEFAULT_CARD_SIZE.width + (GRID_COLS - 1) * CARD_MARGIN;
   
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * spreadRadius;
-    const x = centerX + Math.cos(angle) * distance - DEFAULT_CARD_SIZE.width / 2;
-    const y = centerY + Math.sin(angle) * distance - DEFAULT_CARD_SIZE.height / 2;
-    
-    const newRect = { x, y, ...DEFAULT_CARD_SIZE };
-    
-    let hasOverlap = false;
-    for (const pos of existingPositions) {
-      const existingRect = { x: pos.x, y: pos.y, ...DEFAULT_CARD_SIZE };
-      if (rectanglesOverlap(newRect, existingRect)) {
-        hasOverlap = true;
-        break;
-      }
-    }
-    
-    if (!hasOverlap) {
-      return { x, y };
-    }
-  }
-  
-  // Fallback: grid layout
-  const index = existingPositions.length;
-  const cols = Math.floor((CANVAS_WIDTH - padding * 2) / (DEFAULT_CARD_SIZE.width + CARD_MARGIN));
-  const row = Math.floor(index / Math.max(1, cols));
-  const col = index % Math.max(1, cols);
+  // Center grid on canvas
+  const startX = (CANVAS_WIDTH - gridWidth) / 2;
+  const startY = CANVAS_HEIGHT / 2 - 200; // Start slightly above center
   
   return {
-    x: padding + col * (DEFAULT_CARD_SIZE.width + CARD_MARGIN),
-    y: padding + row * (DEFAULT_CARD_SIZE.height + CARD_MARGIN),
+    x: startX + col * (DEFAULT_CARD_SIZE.width + CARD_MARGIN),
+    y: startY + row * (DEFAULT_CARD_SIZE.height + CARD_MARGIN),
   };
 }
 
@@ -143,7 +105,7 @@ export default function BrainstormPageClient() {
   const [modalGeneration, setModalGeneration] = useState<BrainstormGeneration | null>(null);
   
   // Zoom and pan state
-  const [zoom, setZoom] = useState(0.6);
+  const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -488,18 +450,16 @@ export default function BrainstormPageClient() {
     
     setIsGenerating(true);
     
-    // Collect existing positions
-    const existingPositions = generations.map(g => g.position);
-    
-    // Create generation entries for each selected model with non-overlapping positions
+    // Create generation entries for each selected model with grid positions
     const newGenerations: BrainstormGeneration[] = [];
+    const existingCount = generations.length;
+    
     for (let i = 0; i < selectedModels.length; i++) {
       const modelId = selectedModels[i];
       const model = CREATE_MODELS_LITE.find(m => m.id === modelId);
       
-      // Calculate position without overlapping existing + new cards
-      const allPositions = [...existingPositions, ...newGenerations.map(g => g.position)];
-      const position = generateNonOverlappingPosition(allPositions);
+      // Calculate grid position based on total index (existing + new)
+      const position = generateGridPosition(existingCount + i);
       
       newGenerations.push({
         id: `temp-${Date.now()}-${i}`,
@@ -816,77 +776,22 @@ export default function BrainstormPageClient() {
           {/* Empty state - centered on canvas */}
           {generations.length === 0 && (
             <div 
-              className="absolute flex flex-col items-center justify-center gap-6"
+              className="absolute flex flex-col items-center justify-center gap-4"
               style={{
                 left: CANVAS_WIDTH / 2,
                 top: CANVAS_HEIGHT / 2,
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              {/* Image icon */}
-              <div className="relative w-24 h-24">
-                {/* First image frame (behind) */}
-                <svg
-                  width="96"
-                  height="96"
-                  viewBox="0 0 96 96"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute"
-                  style={{ transform: 'rotate(-8deg) translate(8px, 8px)' }}
-                >
-                  <rect
-                    x="8"
-                    y="8"
-                    width="64"
-                    height="64"
-                    rx="4"
-                    stroke="#656565"
-                    strokeWidth="1.5"
-                    fill="none"
-                  />
-                  {/* Landscape inside first frame */}
-                  <path
-                    d="M16 48 L28 36 L40 40 L52 32 L64 44 L64 56 L16 56 Z"
-                    fill="#656565"
-                    fillOpacity="0.3"
-                  />
-                  {/* Sun */}
-                  <circle cx="56" cy="24" r="6" fill="#656565" fillOpacity="0.4" />
-                </svg>
-                
-                {/* Second image frame (front) */}
-                <svg
-                  width="96"
-                  height="96"
-                  viewBox="0 0 96 96"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="absolute"
-                  style={{ transform: 'rotate(8deg) translate(-8px, -8px)' }}
-                >
-                  <rect
-                    x="8"
-                    y="8"
-                    width="64"
-                    height="64"
-                    rx="4"
-                    stroke="#656565"
-                    strokeWidth="1.5"
-                    fill="none"
-                  />
-                  {/* Landscape inside second frame */}
-                  <path
-                    d="M16 48 L28 36 L40 40 L52 32 L64 44 L64 56 L16 56 Z"
-                    fill="#656565"
-                    fillOpacity="0.3"
-                  />
-                  {/* Sun */}
-                  <circle cx="56" cy="24" r="6" fill="#656565" fillOpacity="0.4" />
-                </svg>
-              </div>
+              {/* Image from Figma */}
+              <img 
+                src="/images/brainstorm-empty.png" 
+                alt=""
+                className="w-[255px] h-auto"
+                draggable={false}
+              />
               
-              <p className="font-inter text-[#656565] text-lg whitespace-nowrap">
+              <p className="font-inter text-[#6D6D6D] text-sm whitespace-nowrap">
                 Напишите промпт и выберите модели для генерации
               </p>
             </div>
