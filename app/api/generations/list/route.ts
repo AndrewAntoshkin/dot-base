@@ -69,20 +69,18 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
     
     // Фильтр по пространству или пользователю
+    // ОПТИМИЗИРОВАНО: После миграции migrate_orphan_generations.sql
+    // все генерации имеют workspace_id, поэтому OR не нужен
     if (workspaceId) {
-      // Показываем генерации ИЗ workspace ИЛИ БЕЗ workspace (для текущего пользователя)
-      // Это нужно чтобы старые генерации без workspace_id не исчезали
+      // Фильтр по workspace
+      query = query.eq('workspace_id', workspaceId);
+      
+      // Если onlyMine - дополнительно фильтруем по user_id
       if (onlyMine) {
-        // Показываем: (мои в этом workspace) ИЛИ (мои без workspace)
-        query = query
-          .eq('user_id', dbUser.id)
-          .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
-      } else {
-        // Показываем: (все в этом workspace) ИЛИ (мои без workspace)
-        query = query.or(`workspace_id.eq.${workspaceId},and(workspace_id.is.null,user_id.eq.${dbUser.id})`);
+        query = query.eq('user_id', dbUser.id);
       }
     } else {
-      // Если нет workspace - показываем только свои (обратная совместимость)
+      // Если нет workspace - показываем только свои
       query = query.eq('user_id', dbUser.id);
     }
     
@@ -229,14 +227,12 @@ export async function GET(request: NextRequest) {
             .not('is_keyframe_segment', 'is', true)
             .neq('action', 'video_keyframes');
           
-          // Workspace/user filter - include null workspace for current user
+          // Workspace/user filter
+          // ОПТИМИЗИРОВАНО: После миграции migrate_orphan_generations.sql
           if (workspaceId) {
+            q = q.eq('workspace_id', workspaceId);
             if (onlyMine) {
-              q = q
-                .eq('user_id', dbUser.id)
-                .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
-            } else {
-              q = q.or(`workspace_id.eq.${workspaceId},and(workspace_id.is.null,user_id.eq.${dbUser.id})`);
+              q = q.eq('user_id', dbUser.id);
             }
           } else {
             q = q.eq('user_id', dbUser.id);
