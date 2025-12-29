@@ -8,9 +8,14 @@ export const dynamic = 'force-dynamic';
 type TabFilter = 'all' | 'processing' | 'favorites' | 'failed';
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  const timings: Record<string, number> = {};
+  
   try {
     // Используем кэшированный auth - один вызов вместо двух
+    const authStart = Date.now();
     const auth = await getFullAuth();
+    timings.auth = Date.now() - authStart;
     
     if (!auth.isAuthenticated || !auth.dbUser) {
       return NextResponse.json(
@@ -159,7 +164,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get paginated data
+    const queryStart = Date.now();
     const { data, error } = await query.range(from, to);
+    timings.query = Date.now() - queryStart;
 
     if (error) {
       console.error('Supabase error:', error);
@@ -168,6 +175,7 @@ export async function GET(request: NextRequest) {
 
     // Get counts - skip if not needed (для silent polling можно пропустить)
     const skipCounts = searchParams.get('skipCounts') === 'true';
+    const countsStart = Date.now();
     
     let counts = { all: 0, processing: 0, favorites: 0, failed: 0 };
     
@@ -304,6 +312,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate total pages for current tab
+    timings.counts = Date.now() - countsStart;
+    
     let totalForTab = counts.all;
     if (tab === 'processing') totalForTab = counts.processing;
     else if (tab === 'favorites') totalForTab = counts.favorites;
@@ -324,6 +334,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    timings.total = Date.now() - startTime;
+    
+    // Логируем если запрос медленный (> 1 сек)
+    if (timings.total > 1000) {
+      console.warn('[Generations] Slow request:', timings);
+    }
+
     return NextResponse.json({
       generations,
       total: totalForTab,
@@ -338,6 +355,8 @@ export async function GET(request: NextRequest) {
         creatorId,
         modelId,
       },
+      // Профилирование (можно убрать в production)
+      _timings: process.env.NODE_ENV === 'development' ? timings : undefined,
     });
   } catch (error: any) {
     console.error('List generations error:', error);

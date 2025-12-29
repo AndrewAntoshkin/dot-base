@@ -407,6 +407,11 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
         onlyMine: 'true',
       });
       
+      // Для silent refresh пропускаем counts - они не изменились
+      if (silent) {
+        params.set('skipCounts', 'true');
+      }
+      
       // Добавляем workspace только если он выбран
       if (selectedWorkspaceId) {
         params.set('workspaceId', selectedWorkspaceId);
@@ -421,8 +426,11 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
       if (response.ok) {
         const data = await response.json();
         setGenerations(data.generations || []);
-        setTotalPages(data.totalPages || 1);
-        if (data.counts) setCounts(data.counts);
+        // Обновляем counts только при полной загрузке (не silent)
+        if (!silent) {
+          setTotalPages(data.totalPages || 1);
+          if (data.counts) setCounts(data.counts);
+        }
       }
     } catch (error) {
       console.error('Fetch error:', error);

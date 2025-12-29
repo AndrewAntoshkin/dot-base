@@ -434,7 +434,7 @@ export default function HistoryPageClient() {
         console.log('📊 Sync result:', data);
         if (data.synced > 0) {
           // Перезагрузить данные после синхронизации
-          fetchGenerations(true);
+          fetchGenerations(true, true);
         }
       }
     } catch (error) {
@@ -586,7 +586,7 @@ export default function HistoryPageClient() {
       if (response.ok) {
         setGenerations(prev => prev.filter(g => g.id !== id));
         // Refresh counts
-        fetchGenerations(true);
+        fetchGenerations(true, true);
       }
     } catch (error) {
       console.error('Delete error:', error);
@@ -607,7 +607,7 @@ export default function HistoryPageClient() {
           )
         );
         // Refresh counts
-        fetchGenerations(true);
+        fetchGenerations(true, true);
       }
     } catch (error) {
       console.error('Toggle favorite error:', error);
@@ -632,7 +632,7 @@ export default function HistoryPageClient() {
           )
         );
         // Refresh data
-        fetchGenerations(true);
+        fetchGenerations(true, true);
       }
     } catch (error) {
       console.error('Retry error:', error);
