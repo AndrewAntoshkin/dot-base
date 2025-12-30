@@ -396,7 +396,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     fetchProfile();
   }, []);
 
-  // Fetch generations - работает как с workspace, так и без него
+  // Fetch generations - в профиле показываем только МОИ генерации (без workspace фильтра)
   const fetchGenerations = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
@@ -404,17 +404,13 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
         page: page.toString(),
         limit: '20',
         tab: activeTab,
-        onlyMine: 'true',
+        // В профиле НЕ передаём workspaceId - показываем все мои генерации
+        // onlyMine не нужен т.к. без workspaceId API автоматически фильтрует по user_id
       });
       
       // Для silent refresh пропускаем counts - они не изменились
       if (silent) {
         params.set('skipCounts', 'true');
-      }
-      
-      // Добавляем workspace только если он выбран
-      if (selectedWorkspaceId) {
-        params.set('workspaceId', selectedWorkspaceId);
       }
       
       if (filterDate) params.set('dateRange', filterDate);
@@ -437,15 +433,12 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [page, activeTab, selectedWorkspaceId, filterDate, filterModel, filterType, filterStatus]);
+  }, [page, activeTab, filterDate, filterModel, filterType, filterStatus]);
 
-  // Fetch filter options - работает с workspace и без него
+  // Fetch filter options - в профиле без workspace
   const fetchFilterOptions = useCallback(async () => {
     try {
-      const url = selectedWorkspaceId 
-        ? `/api/generations/filter-options?workspaceId=${selectedWorkspaceId}`
-        : '/api/generations/filter-options';
-      const response = await fetch(url);
+      const response = await fetch('/api/generations/filter-options');
       if (response.ok) {
         const data = await response.json();
         if (data.models) {
@@ -458,16 +451,16 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
     } catch (error) {
       console.error('Filter options error:', error);
     }
-  }, [selectedWorkspaceId]);
+  }, []);
 
-  // Загружаем данные сразу и перезагружаем при смене workspace
+  // Загружаем данные один раз при монтировании
   useEffect(() => { 
     fetchFilterOptions(); 
-  }, [selectedWorkspaceId, fetchFilterOptions]);
+  }, [fetchFilterOptions]);
   
   useEffect(() => { 
     fetchGenerations(); 
-  }, [selectedWorkspaceId, fetchGenerations]);
+  }, [fetchGenerations]);
   
   // Сброс страницы при смене фильтров (но не при смене workspace - там новый запрос)
   useEffect(() => { setPage(1); }, [activeTab, filterDate, filterModel, filterType, filterStatus]);
@@ -839,15 +832,6 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Workspace Selector */}
-              <WorkspaceDropdown
-                workspaces={workspaces}
-                selectedId={selectedWorkspaceId}
-                onSelect={setSelectedWorkspaceId}
-                isOpen={openDropdown === 'workspace'}
-                onToggle={() => setOpenDropdown(openDropdown === 'workspace' ? null : 'workspace')}
-              />
-              
               <FilterDropdown
                 label="Дата создания"
                 value={filterDate}

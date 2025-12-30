@@ -16,7 +16,6 @@ SET workspace_id = (
   SELECT wm.workspace_id 
   FROM workspace_members wm 
   WHERE wm.user_id = g.user_id 
-  ORDER BY wm.created_at ASC 
   LIMIT 1
 )
 WHERE g.workspace_id IS NULL

@@ -9,14 +9,6 @@ const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 const SESSION_CHECK_TTL = 60 * 1000; // 1 минута - для быстрой проверки сессии
 
 /**
- * Получить URL для Supabase (с учётом прокси)
- * В middleware используем прокси если он настроен
- */
-function getSupabaseUrlForMiddleware(): string {
-  return process.env.NEXT_PUBLIC_SUPABASE_PROXY_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-}
-
-/**
  * Быстрая проверка наличия сессии по cookie
  * Избегаем полного getUser() если сессия недавно проверялась
  */
@@ -55,7 +47,7 @@ async function getUserRole(
   // Запрашиваем из БД
   try {
     const supabase = createClient(
-      getSupabaseUrlForMiddleware(),
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         auth: {
@@ -141,7 +133,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const supabase = createServerClient(
-    getSupabaseUrlForMiddleware(),
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {

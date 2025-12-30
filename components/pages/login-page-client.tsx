@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createBrowserClient } from '@supabase/ssr';
-import { getSupabaseUrl } from '@/lib/supabase/proxy';
 
 type AuthMode = 'login' | 'register';
 
@@ -24,9 +23,10 @@ export default function LoginPageClient() {
 
   // Создаём клиент один раз с useMemo
   const supabase = useMemo(() => {
-    const url = getSupabaseUrl();
-    console.log('[Login] Using Supabase URL:', url);
-    return createBrowserClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
   }, []);
 
   // Helper function to add timeout to promises

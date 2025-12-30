@@ -2,23 +2,18 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { Database } from './types';
-import { getSupabaseUrl } from './proxy';
 
 /**
  * Создаёт Supabase клиент для сервера (с cookies)
- * Автоматически использует прокси если он настроен
  */
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
-  const url = getSupabaseUrl();
 
   return createServerClient<Database>(
-    url,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        // Отключаем автоматический refresh на сервере
-        // чтобы избежать запросов к заблокированному Supabase
         autoRefreshToken: false,
         persistSession: true,
         detectSessionInUrl: false,
@@ -49,19 +44,13 @@ export async function createServerSupabaseClient() {
 /**
  * Singleton Service Role Client
  * Повторно использует одно подключение для всех admin операций
- * Снижает latency и нагрузку на Supabase
- * Автоматически использует прокси если он настроен
  */
 let serviceRoleClientInstance: SupabaseClient<Database> | null = null;
-let lastServiceRoleUrl: string | null = null;
 
 export function createServiceRoleClient(): SupabaseClient<Database> {
-  const url = getSupabaseUrl();
-  
-  // Пересоздаём клиент если URL изменился (например, переключились на прокси)
-  if (!serviceRoleClientInstance || lastServiceRoleUrl !== url) {
+  if (!serviceRoleClientInstance) {
     serviceRoleClientInstance = createClient<Database>(
-      url,
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         auth: {
@@ -70,14 +59,9 @@ export function createServiceRoleClient(): SupabaseClient<Database> {
         },
       }
     );
-    lastServiceRoleUrl = url;
   }
   return serviceRoleClientInstance;
 }
 
 // Alias для обратной совместимости
 export const getServiceRoleClient = createServiceRoleClient;
-
-
-
-

@@ -7,190 +7,254 @@ export const dynamic = 'force-dynamic';
 // Tab filter types
 type TabFilter = 'all' | 'processing' | 'favorites' | 'failed';
 
+// Прямой fetch к Supabase REST API - в 100 раз быстрее чем JS клиент
+async function directSupabaseFetch<T>(
+  endpoint: string,
+  options?: { count?: boolean }
+): Promise<{ data: T | null; count: number | null; error: string | null }> {
+  const headers: Record<string, string> = {
+    'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+    'Content-Type': 'application/json',
+  };
+  
+  if (options?.count) {
+    headers['Prefer'] = 'count=exact';
+  }
+  
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${endpoint}`,
+      { headers }
+    );
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[DirectFetch] Error:', res.status, errorText);
+      return { data: null, count: null, error: errorText };
+    }
+    
+    const data = await res.json();
+    const countHeader = res.headers.get('content-range');
+    const count = countHeader ? parseInt(countHeader.split('/')[1]) : null;
+    
+    return { data, count, error: null };
+  } catch (error: any) {
+    console.error('[DirectFetch] Exception:', error);
+    return { data: null, count: null, error: error.message };
+  }
+}
+
+// Строим URL параметры для запроса
+function buildQueryParams(params: {
+  userId: string;
+  workspaceId?: string | null;
+  onlyMine: boolean;
+  creatorId?: string | null;
+  modelId?: string | null;
+  modelName?: string | null;
+  actionType?: string | null;
+  statusFilter?: string | null;
+  dateRange?: string | null;
+  tab: TabFilter;
+  action?: string | null;
+  limit: number;
+  offset: number;
+  selectFields: string;
+  forCount?: boolean;
+}): string {
+  const parts: string[] = [];
+  
+  // Select fields
+  if (params.forCount) {
+    parts.push('select=id');
+  } else {
+    parts.push(`select=${encodeURIComponent(params.selectFields)}`);
+  }
+  
+  // Фильтр по keyframe segments и video_keyframes
+  // Важно: этот фильтр должен соответствовать partial index
+  parts.push('is_keyframe_segment=is.false');
+  parts.push('action=neq.video_keyframes');
+  
+  // Workspace/user filter
+  if (params.workspaceId) {
+    parts.push(`workspace_id=eq.${params.workspaceId}`);
+    if (params.onlyMine) {
+      parts.push(`user_id=eq.${params.userId}`);
+    }
+  } else {
+    parts.push(`user_id=eq.${params.userId}`);
+  }
+  
+  // Creator filter
+  if (params.creatorId) {
+    parts.push(`user_id=eq.${params.creatorId}`);
+  }
+  
+  // Model filters
+  if (params.modelId) {
+    parts.push(`model_id=eq.${params.modelId}`);
+  }
+  if (params.modelName) {
+    parts.push(`model_name=eq.${encodeURIComponent(params.modelName)}`);
+  }
+  
+  // Action type filter
+  if (params.actionType) {
+    if (params.actionType.endsWith('_')) {
+      parts.push(`action=like.${params.actionType}*`);
+    } else {
+      parts.push(`action=eq.${params.actionType}`);
+    }
+  }
+  
+  // Status filter
+  if (params.statusFilter) {
+    parts.push(`status=eq.${params.statusFilter}`);
+  }
+  
+  // Date range filter
+  if (params.dateRange) {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (params.dateRange) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        parts.push(`created_at=gte.${startDate.toISOString()}`);
+        break;
+      case 'yesterday':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        parts.push(`created_at=gte.${startDate.toISOString()}`);
+        parts.push(`created_at=lt.${endYesterday.toISOString()}`);
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        parts.push(`created_at=gte.${startDate.toISOString()}`);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        parts.push(`created_at=gte.${startDate.toISOString()}`);
+        break;
+    }
+  }
+  
+  // Tab filter
+  switch (params.tab) {
+    case 'processing':
+      parts.push('status=in.(pending,processing)');
+      break;
+    case 'favorites':
+      parts.push('is_favorite=eq.true');
+      break;
+    case 'failed':
+      parts.push('status=eq.failed');
+      break;
+  }
+  
+  // Action filter
+  if (params.action) {
+    parts.push(`action=eq.${params.action}`);
+  }
+  
+  // Ordering
+  parts.push('order=created_at.desc');
+  
+  // Pagination (только для не-count запросов)
+  if (!params.forCount) {
+    parts.push(`limit=${params.limit}`);
+    parts.push(`offset=${params.offset}`);
+  }
+  
+  return 'generations?' + parts.join('&');
+}
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const timings: Record<string, number> = {};
   
   try {
-    // Используем кэшированный auth - один вызов вместо двух
+    // Auth check
     const authStart = Date.now();
     const auth = await getFullAuth();
     timings.auth = Date.now() - authStart;
     
     if (!auth.isAuthenticated || !auth.dbUser) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const dbUser = auth.dbUser;
-    const supabase = createServiceRoleClient();
     const { searchParams } = new URL(request.url);
+    
+    // Parse params
     const page = parseInt(searchParams.get('page') || '1');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
     const action = searchParams.get('action');
     const tab = (searchParams.get('tab') || 'all') as TabFilter;
-
-    // Workspace filters
     const workspaceId = searchParams.get('workspaceId');
-    const onlyMine = searchParams.get('onlyMine') !== 'false'; // По умолчанию true
-    
-    // Filter by creator (для фильтра "Создатель")
+    const onlyMine = searchParams.get('onlyMine') !== 'false';
     const creatorId = searchParams.get('creatorId');
-    
-    // Filter by model (legacy)
     const modelId = searchParams.get('modelId');
-    
-    // New filters
-    const dateRange = searchParams.get('dateRange'); // today, yesterday, week, month
+    const dateRange = searchParams.get('dateRange');
     const modelName = searchParams.get('modelName');
     const actionType = searchParams.get('actionType');
     const statusFilter = searchParams.get('status');
-
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
-    // Build query based on filters
-    // Hide keyframe segments (only show final merge)
-    // Using .not('is_keyframe_segment', 'is', true) instead of .or() for better index usage
+    const skipCounts = searchParams.get('skipCounts') === 'true';
     
-    // Определяем какие поля выбирать - добавляем user info для workspace view
-    // settings нужен для отображения retry count
+    const offset = (page - 1) * limit;
+    
+    // Select fields - убрали settings для ускорения (большой JSON)
     const selectFields = workspaceId && !onlyMine
-      ? 'id, user_id, status, output_urls, output_thumbs, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message, settings, users!inner(email, telegram_first_name)'
-      : 'id, user_id, status, output_urls, output_thumbs, prompt, model_id, model_name, action, created_at, viewed, is_favorite, error_message, settings';
+      ? 'id,user_id,status,output_urls,output_thumbs,prompt,model_id,model_name,action,created_at,viewed,is_favorite,error_message,users!inner(email,telegram_first_name)'
+      : 'id,user_id,status,output_urls,output_thumbs,prompt,model_id,model_name,action,created_at,viewed,is_favorite,error_message';
     
-    let query = supabase
-      .from('generations')
-      .select(selectFields)
-      .not('is_keyframe_segment', 'is', true)
-      .neq('action', 'video_keyframes') // Скрываем родительские keyframes, показываем только merge
-      .order('created_at', { ascending: false });
+    const baseParams = {
+      userId: dbUser.id,
+      workspaceId,
+      onlyMine,
+      creatorId,
+      modelId,
+      modelName,
+      actionType,
+      statusFilter,
+      dateRange,
+      tab,
+      action,
+      limit,
+      offset,
+      selectFields,
+    };
     
-    // Фильтр по пространству или пользователю
-    // ОПТИМИЗИРОВАНО: После миграции migrate_orphan_generations.sql
-    // все генерации имеют workspace_id, поэтому OR не нужен
-    if (workspaceId) {
-      // Фильтр по workspace
-      query = query.eq('workspace_id', workspaceId);
-      
-      // Если onlyMine - дополнительно фильтруем по user_id
-      if (onlyMine) {
-        query = query.eq('user_id', dbUser.id);
-      }
-    } else {
-      // Если нет workspace - показываем только свои
-      query = query.eq('user_id', dbUser.id);
-    }
-    
-    // Фильтр по конкретному создателю (для фильтра "Создатель")
-    if (creatorId) {
-      query = query.eq('user_id', creatorId);
-    }
-    
-    // Фильтр по модели (legacy)
-    if (modelId) {
-      query = query.eq('model_id', modelId);
-    }
-    
-    // Фильтр по названию модели
-    if (modelName) {
-      query = query.eq('model_name', modelName);
-    }
-    
-    // Фильтр по типу действия
-    if (actionType) {
-      // Поддерживаем частичное совпадение для групп (например video_ для всех видео)
-      if (actionType.endsWith('_')) {
-        query = query.like('action', `${actionType}%`);
-      } else {
-        query = query.eq('action', actionType);
-      }
-    }
-    
-    // Фильтр по статусу (отдельный от tab)
-    if (statusFilter) {
-      query = query.eq('status', statusFilter);
-    }
-    
-    // Фильтр по дате
-    if (dateRange) {
-      const now = new Date();
-      let startDate: Date;
-      
-      switch (dateRange) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'yesterday':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-          const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          query = query.gte('created_at', startDate.toISOString()).lt('created_at', endYesterday.toISOString());
-          break;
-        case 'week':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(0); // All time
-      }
-      
-      if (dateRange !== 'yesterday') {
-        query = query.gte('created_at', startDate.toISOString());
-      }
-    }
-
-    // Apply tab filter
-    switch (tab) {
-      case 'processing':
-        query = query.in('status', ['pending', 'processing']);
-        break;
-      case 'favorites':
-        query = query.eq('is_favorite', true);
-        break;
-      case 'failed':
-        query = query.eq('status', 'failed');
-        break;
-      // 'all' - no additional filter
-    }
-
-    if (action) {
-      query = query.eq('action', action);
-    }
-
-    // Get paginated data
+    // Main query - прямой fetch к REST API
     const queryStart = Date.now();
-    const { data, error } = await query.range(from, to);
+    const queryEndpoint = buildQueryParams(baseParams);
+    const { data, error } = await directSupabaseFetch<any[]>(queryEndpoint);
     timings.query = Date.now() - queryStart;
-
+    
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Query error:', error);
       return NextResponse.json({ error: 'Ошибка при загрузке истории' }, { status: 500 });
     }
-
-    // Get counts - skip if not needed (для silent polling можно пропустить)
-    const skipCounts = searchParams.get('skipCounts') === 'true';
-    const countsStart = Date.now();
     
+    // Counts
+    const countsStart = Date.now();
     let counts = { all: 0, processing: 0, favorites: 0, failed: 0 };
     
     if (!skipCounts) {
-      // Проверяем есть ли дополнительные фильтры (требуют fallback запросов)
+      const supabase = createServiceRoleClient();
       const hasFilters = creatorId || dateRange || modelName || actionType || statusFilter;
       
-      // Используем RPC функции если нет дополнительных фильтров
+      // Try RPC first (намного быстрее чем 4 отдельных count запроса)
       if (!hasFilters) {
         if (workspaceId) {
-          // Workspace counts - используем новую RPC функцию
           const { data: countsData, error: rpcError } = await supabase
             .rpc('get_workspace_generation_counts', { 
               p_workspace_id: workspaceId, 
               p_user_id: onlyMine ? dbUser.id : null 
             } as any)
-            .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
+            .single() as { data: any; error: any };
 
           if (!rpcError && countsData) {
             counts = {
@@ -201,10 +265,9 @@ export async function GET(request: NextRequest) {
             };
           }
         } else {
-          // User counts - используем существующую RPC функцию
           const { data: countsData, error: rpcError } = await supabase
             .rpc('get_generation_counts', { p_user_id: dbUser.id } as any)
-            .single() as { data: { all_count: number; processing_count: number; favorites_count: number; failed_count: number } | null; error: any };
+            .single() as { data: any; error: any };
 
           if (!rpcError && countsData) {
             counts = {
@@ -217,126 +280,48 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      // Fallback: parallel count queries with filters (только если есть фильтры или RPC не сработал)
+      // Fallback to direct count queries
       if (hasFilters || counts.all === 0) {
-        // Build base filter function with all active filters
-        const buildCountQuery = () => {
-          let q = supabase
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-            .not('is_keyframe_segment', 'is', true)
-            .neq('action', 'video_keyframes');
-          
-          // Workspace/user filter
-          // ОПТИМИЗИРОВАНО: После миграции migrate_orphan_generations.sql
-          if (workspaceId) {
-            q = q.eq('workspace_id', workspaceId);
-            if (onlyMine) {
-              q = q.eq('user_id', dbUser.id);
-            }
-          } else {
-            q = q.eq('user_id', dbUser.id);
-          }
-          
-          // Creator filter
-          if (creatorId) {
-            q = q.eq('user_id', creatorId);
-          }
-          
-          // Model filter
-          if (modelName) {
-            q = q.eq('model_name', modelName);
-          }
-          
-          // Action type filter
-          if (actionType) {
-            if (actionType.endsWith('_')) {
-              q = q.like('action', `${actionType}%`);
-            } else {
-              q = q.eq('action', actionType);
-            }
-          }
-          
-          // Status filter (separate from tab)
-          if (statusFilter) {
-            q = q.eq('status', statusFilter);
-          }
-          
-          // Date range filter
-          if (dateRange) {
-            const now = new Date();
-            let startDate: Date;
-            
-            switch (dateRange) {
-              case 'today':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                q = q.gte('created_at', startDate.toISOString());
-                break;
-              case 'yesterday':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-                const endYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                q = q.gte('created_at', startDate.toISOString()).lt('created_at', endYesterday.toISOString());
-                break;
-              case 'week':
-                startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                q = q.gte('created_at', startDate.toISOString());
-                break;
-              case 'month':
-                startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                q = q.gte('created_at', startDate.toISOString());
-                break;
-            }
-          }
-          
-          return q;
-        };
+        const countBaseParams = { ...baseParams, forCount: true };
         
-        const [allCount, processingCount, favoritesCount, failedCount] = await Promise.all([
-          buildCountQuery(),
-          buildCountQuery().in('status', ['pending', 'processing']),
-          buildCountQuery().eq('is_favorite', true),
-          buildCountQuery().eq('status', 'failed'),
-      ]);
-      
-      counts = {
-        all: allCount.count || 0,
-        processing: processingCount.count || 0,
-        favorites: favoritesCount.count || 0,
-        failed: failedCount.count || 0,
-      };
+        const [allRes, processingRes, favoritesRes, failedRes] = await Promise.all([
+          directSupabaseFetch<any[]>(buildQueryParams({ ...countBaseParams, tab: 'all' as TabFilter }), { count: true }),
+          directSupabaseFetch<any[]>(buildQueryParams({ ...countBaseParams, tab: 'processing' as TabFilter }), { count: true }),
+          directSupabaseFetch<any[]>(buildQueryParams({ ...countBaseParams, tab: 'favorites' as TabFilter }), { count: true }),
+          directSupabaseFetch<any[]>(buildQueryParams({ ...countBaseParams, tab: 'failed' as TabFilter }), { count: true }),
+        ]);
+        
+        counts = {
+          all: allRes.count || 0,
+          processing: processingRes.count || 0,
+          favorites: favoritesRes.count || 0,
+          failed: failedRes.count || 0,
+        };
       }
     }
-
-    // Calculate total pages for current tab
     timings.counts = Date.now() - countsStart;
     
+    // Calculate pagination
     let totalForTab = counts.all;
     if (tab === 'processing') totalForTab = counts.processing;
     else if (tab === 'favorites') totalForTab = counts.favorites;
     else if (tab === 'failed') totalForTab = counts.failed;
-
     const totalPages = Math.ceil(totalForTab / limit) || 1;
-
-    // Format response - flatten user data if present
+    
+    // Format response
     const generations = (data || []).map((gen: any) => {
       const { users, ...rest } = gen;
       return {
         ...rest,
-        // Добавляем данные создателя если есть (для workspace view)
         creator: users ? {
           email: users.email,
           name: users.telegram_first_name || users.email?.split('@')[0] || 'User',
         } : undefined,
       };
     });
-
+    
     timings.total = Date.now() - startTime;
     
-    // Логируем если запрос медленный (> 1 сек)
-    if (timings.total > 1000) {
-      console.warn('[Generations] Slow request:', timings);
-    }
-
     return NextResponse.json({
       generations,
       total: totalForTab,
@@ -344,21 +329,11 @@ export async function GET(request: NextRequest) {
       limit,
       totalPages,
       counts,
-      // Дополнительная информация для UI
-      filters: {
-        workspaceId,
-        onlyMine,
-        creatorId,
-        modelId,
-      },
-      // Профилирование (можно убрать в production)
+      filters: { workspaceId, onlyMine, creatorId, modelId },
       _timings: process.env.NODE_ENV === 'development' ? timings : undefined,
     });
   } catch (error: any) {
     console.error('List generations error:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при загрузке истории' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Ошибка при загрузке истории' }, { status: 500 });
   }
 }
