@@ -274,7 +274,8 @@ export function ExpandPageClient() {
   }, [handleRemoveImage]);
 
   // Compress image to fit within size limit (4MB to be safe for Vercel's 4.5MB limit)
-  const compressImage = async (dataUrl: string, maxSizeBytes: number = 4 * 1024 * 1024): Promise<Blob> => {
+  // Returns blob and final dimensions
+  const compressImage = async (dataUrl: string, maxSizeBytes: number = 4 * 1024 * 1024): Promise<{ blob: Blob; width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -287,8 +288,10 @@ export function ExpandPageClient() {
         let scale = 1;
         
         const tryCompress = () => {
-          canvas.width = Math.round(width * scale);
-          canvas.height = Math.round(height * scale);
+          const finalWidth = Math.round(width * scale);
+          const finalHeight = Math.round(height * scale);
+          canvas.width = finalWidth;
+          canvas.height = finalHeight;
           
           const ctx = canvas.getContext('2d');
           if (!ctx) {
@@ -305,10 +308,10 @@ export function ExpandPageClient() {
                 return;
               }
               
-              console.log(`[Expand] Compressed: ${canvas.width}x${canvas.height}, quality=${quality.toFixed(2)}, size=${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+              console.log(`[Expand] Compressed: ${finalWidth}x${finalHeight}, quality=${quality.toFixed(2)}, size=${(blob.size / 1024 / 1024).toFixed(2)}MB`);
               
               if (blob.size <= maxSizeBytes) {
-                resolve(blob);
+                resolve({ blob, width: finalWidth, height: finalHeight });
               } else if (quality > 0.5) {
                 // Try lower quality first
                 quality -= 0.1;
@@ -321,7 +324,7 @@ export function ExpandPageClient() {
               } else {
                 // Give up and use what we have
                 console.warn('[Expand] Could not compress below target size, using best effort');
-                resolve(blob);
+                resolve({ blob, width: finalWidth, height: finalHeight });
               }
             },
             'image/jpeg',
@@ -337,16 +340,17 @@ export function ExpandPageClient() {
   };
 
   // Upload data URL to server (or return HTTP URL as-is)
-  const uploadDataUrl = async (dataUrl: string): Promise<string> => {
-    // If it's already an HTTP URL, return it directly
+  // Returns URL and actual dimensions of uploaded image
+  const uploadDataUrl = async (dataUrl: string, originalDimensions: { width: number; height: number }): Promise<{ url: string; dimensions: { width: number; height: number } }> => {
+    // If it's already an HTTP URL, return it directly with original dimensions
     if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
-      return dataUrl;
+      return { url: dataUrl, dimensions: originalDimensions };
     }
     
     // Compress image to fit Vercel's 4.5MB body limit
     console.log('[Expand] Compressing image before upload...');
-    const blob = await compressImage(dataUrl);
-    console.log(`[Expand] Final compressed size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+    const { blob, width, height } = await compressImage(dataUrl);
+    console.log(`[Expand] Final compressed size: ${(blob.size / 1024 / 1024).toFixed(2)}MB, dimensions: ${width}x${height}`);
 
     const formData = new FormData();
     formData.append('files', blob, 'image.jpg');
@@ -362,7 +366,7 @@ export function ExpandPageClient() {
     }
 
     const data = await response.json();
-    return data.urls[0];
+    return { url: data.urls[0], dimensions: { width, height } };
   };
 
   // Генерация
@@ -396,11 +400,16 @@ export function ExpandPageClient() {
       console.log('[Expand] imageDimensions:', imageDimensions);
       
       // Загружаем изображение в Storage если это base64 (избегаем 413 Payload Too Large)
+      // Получаем реальные размеры загруженного изображения (может быть сжато)
       let imageUrl = image;
+      let actualDimensions = imageDimensions;
+      
       if (image.startsWith('data:')) {
         console.log('[Expand] Uploading image to storage...');
-        imageUrl = await uploadDataUrl(image);
-        console.log('[Expand] Image uploaded:', imageUrl);
+        const uploadResult = await uploadDataUrl(image, imageDimensions);
+        imageUrl = uploadResult.url;
+        actualDimensions = uploadResult.dimensions;
+        console.log('[Expand] Image uploaded:', imageUrl, 'dimensions:', actualDimensions);
       }
       
       let requestBody: Record<string, any>;
@@ -411,11 +420,11 @@ export function ExpandPageClient() {
       
       if (selectedModel === 'outpainter') {
         // Outpainter использует пиксели напрямую
-        // Параметры называются left, right, top, bottom (не extend_*)
-        const extendLeft = Math.round(imageDimensions.width * (currentExpand.left / 100));
-        const extendRight = Math.round(imageDimensions.width * (currentExpand.right / 100));
-        const extendTop = Math.round(imageDimensions.height * (currentExpand.top / 100));
-        const extendBottom = Math.round(imageDimensions.height * (currentExpand.bottom / 100));
+        // Используем actualDimensions (реальные размеры загруженного изображения)
+        const extendLeft = Math.round(actualDimensions.width * (currentExpand.left / 100));
+        const extendRight = Math.round(actualDimensions.width * (currentExpand.right / 100));
+        const extendTop = Math.round(actualDimensions.height * (currentExpand.top / 100));
+        const extendBottom = Math.round(actualDimensions.height * (currentExpand.bottom / 100));
         
         // Ограничение до 2000 пикселей на сторону
         const clamp = (v: number) => Math.min(v, 2000);
@@ -449,21 +458,22 @@ export function ExpandPageClient() {
         };
       } else {
         // Bria Expand использует canvas_size
+        // Используем actualDimensions (реальные размеры загруженного изображения)
         const expandRatioX = (currentExpand.left + currentExpand.right) / 100;
         const expandRatioY = (currentExpand.top + currentExpand.bottom) / 100;
         
-        let canvasWidth = Math.round(imageDimensions.width * (1 + expandRatioX));
-        let canvasHeight = Math.round(imageDimensions.height * (1 + expandRatioY));
+        let canvasWidth = Math.round(actualDimensions.width * (1 + expandRatioX));
+        let canvasHeight = Math.round(actualDimensions.height * (1 + expandRatioY));
         
-        let offsetX = Math.round(imageDimensions.width * (currentExpand.left / 100));
-        let offsetY = Math.round(imageDimensions.height * (currentExpand.top / 100));
+        let offsetX = Math.round(actualDimensions.width * (currentExpand.left / 100));
+        let offsetY = Math.round(actualDimensions.height * (currentExpand.top / 100));
         
-        let originalWidth = imageDimensions.width;
-        let originalHeight = imageDimensions.height;
+        let originalWidth = actualDimensions.width;
+        let originalHeight = actualDimensions.height;
         
         console.log('[Expand] Bria params BEFORE scaling:', {
           expand: currentExpand,
-          imageDimensions,
+          actualDimensions,
           expandRatioX,
           expandRatioY,
           canvasWidth,
@@ -516,31 +526,43 @@ export function ExpandPageClient() {
         
         console.log('[Expand] Bria aspect_ratio:', closestPreset.name, 'for canvas ratio:', canvasRatio.toFixed(3));
         
-        // Bria API требует:
+        // Bria API параметры:
+        // - aspect_ratio: целевое соотношение сторон (fallback если нет точных размеров)
         // - canvas_size: [width, height] - общий размер результата
         // - original_image_size: [width, height] - размер исходного изображения на холсте  
         // - original_image_location: [x, y] - позиция исходного изображения (offset)
+        
+        // Используем canvas_size ТОЛЬКО если есть реальное расширение
+        const hasManualExpand = currentExpand.top > 0 || currentExpand.right > 0 || 
+                                currentExpand.bottom > 0 || currentExpand.left > 0;
+        
+        const briaSettings: Record<string, any> = {
+          image: imageUrl,
+          prompt: finalPrompt,
+          negative_prompt: negativePrompt || undefined,
+          aspect_ratio: closestPreset.name,
+        };
+        
+        // Добавляем точные размеры только при ручном расширении
+        if (hasManualExpand) {
+          briaSettings.canvas_size = [canvasWidth, canvasHeight];
+          briaSettings.original_image_size = [originalWidth, originalHeight];
+          briaSettings.original_image_location = [offsetX, offsetY];
+        }
         
         requestBody = {
           action: 'expand',
           model_id: 'bria-expand',
           prompt: finalPrompt,
           input_image_url: imageUrl,
-          settings: {
-            image: imageUrl,
-            prompt: finalPrompt,
-            negative_prompt: negativePrompt || undefined,
-            // Передаём точные параметры для ручного расширения
-            canvas_size: [canvasWidth, canvasHeight],
-            original_image_size: [originalWidth, originalHeight],
-            original_image_location: [offsetX, offsetY],
-          },
+          settings: briaSettings,
         };
         
         console.log('[Expand] Bria FINAL params:', {
-          canvas_size: [canvasWidth, canvasHeight],
-          original_image_size: [originalWidth, originalHeight],
-          original_image_location: [offsetX, offsetY],
+          aspect_ratio: closestPreset.name,
+          canvas_size: hasManualExpand ? [canvasWidth, canvasHeight] : 'not set',
+          original_image_size: hasManualExpand ? [originalWidth, originalHeight] : 'not set',
+          original_image_location: hasManualExpand ? [offsetX, offsetY] : 'not set',
           expand: currentExpand,
         });
       }
