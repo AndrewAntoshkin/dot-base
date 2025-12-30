@@ -542,18 +542,49 @@ export function ExpandPageClient() {
           negative_prompt: negativePrompt || undefined,
         };
         
-        // При ручном расширении используем canvas_size
-        // При пресетах используем aspect_ratio
-        // ВАЖНО: Когда передаём canvas_size, Bria должен его использовать вместо aspect_ratio
-        // НЕ передаём aspect_ratio вообще при ручном расширении!
+        // Bria API ВСЕГДА требует aspect_ratio (default "1:1" игнорирует canvas_size!)
+        // Поэтому ВСЕГДА передаём aspect_ratio, и при ручном расширении корректируем canvas_size
+        // чтобы он соответствовал выбранному aspect_ratio
+        
+        // Всегда устанавливаем aspect_ratio
+        briaSettings.aspect_ratio = closestPreset.name;
+        
         if (hasManualExpand) {
-          // Точные размеры - НЕ передаём aspect_ratio (Bria использует canvas_size если он указан)
-          briaSettings.canvas_size = [canvasWidth, canvasHeight];
+          // Корректируем canvas_size чтобы соответствовал aspect_ratio
+          // Bria масштабирует результат под aspect_ratio, поэтому нужно согласовать размеры
+          const targetRatio = closestPreset.ratio;
+          
+          // Корректируем canvas под aspect_ratio (сохраняем большую сторону)
+          let adjustedCanvasWidth = canvasWidth;
+          let adjustedCanvasHeight = canvasHeight;
+          
+          if (canvasWidth / canvasHeight > targetRatio) {
+            // Слишком широкий - уменьшаем ширину
+            adjustedCanvasWidth = Math.round(canvasHeight * targetRatio);
+          } else {
+            // Слишком высокий - уменьшаем высоту
+            adjustedCanvasHeight = Math.round(canvasWidth / targetRatio);
+          }
+          
+          // Пересчитываем offset чтобы изображение было примерно по центру
+          const adjustedOffsetX = Math.round((adjustedCanvasWidth - originalWidth) / 2);
+          const adjustedOffsetY = Math.round((adjustedCanvasHeight - originalHeight) / 2);
+          
+          briaSettings.canvas_size = [adjustedCanvasWidth, adjustedCanvasHeight];
           briaSettings.original_image_size = [originalWidth, originalHeight];
-          briaSettings.original_image_location = [offsetX, offsetY];
-        } else {
-          // Нет ручного расширения - используем aspect_ratio
-          briaSettings.aspect_ratio = closestPreset.name;
+          briaSettings.original_image_location = [Math.max(0, adjustedOffsetX), Math.max(0, adjustedOffsetY)];
+          
+          console.log('[Expand] Bria adjusted canvas:', {
+            original: { canvasWidth, canvasHeight, offsetX, offsetY },
+            adjusted: { 
+              canvasWidth: adjustedCanvasWidth, 
+              canvasHeight: adjustedCanvasHeight,
+              offsetX: adjustedOffsetX,
+              offsetY: adjustedOffsetY
+            },
+            aspect_ratio: closestPreset.name,
+            targetRatio
+          });
         }
         
         requestBody = {
@@ -565,11 +596,11 @@ export function ExpandPageClient() {
         };
         
         console.log('[Expand] Bria FINAL params:', {
-          mode: hasManualExpand ? 'canvas_size (manual)' : 'aspect_ratio (preset)',
-          aspect_ratio: hasManualExpand ? 'NOT SET' : closestPreset.name,
-          canvas_size: hasManualExpand ? [canvasWidth, canvasHeight] : 'NOT SET',
-          original_image_size: hasManualExpand ? [originalWidth, originalHeight] : 'NOT SET',
-          original_image_location: hasManualExpand ? [offsetX, offsetY] : 'NOT SET',
+          mode: hasManualExpand ? 'manual (adjusted to aspect_ratio)' : 'preset only',
+          aspect_ratio: closestPreset.name,
+          canvas_size: briaSettings.canvas_size || 'NOT SET',
+          original_image_size: briaSettings.original_image_size || 'NOT SET',
+          original_image_location: briaSettings.original_image_location || 'NOT SET',
           expand: currentExpand,
         });
       }
