@@ -515,6 +515,11 @@ export function ExpandPageClient() {
         
         console.log('[Expand] Bria aspect_ratio:', closestPreset.name, 'for canvas ratio:', canvasRatio.toFixed(3));
         
+        // Bria API требует:
+        // - canvas_size: [width, height] - общий размер результата
+        // - original_image_size: [width, height] - размер исходного изображения на холсте  
+        // - original_image_location: [x, y] - позиция исходного изображения (offset)
+        
         requestBody = {
           action: 'expand',
           model_id: 'bria-expand',
@@ -524,13 +529,17 @@ export function ExpandPageClient() {
             image: imageUrl,
             prompt: finalPrompt,
             negative_prompt: negativePrompt || undefined,
-            // Bria ТРЕБУЕТ aspect_ratio
-            aspect_ratio: closestPreset.name,
+            // Передаём точные параметры для ручного расширения
+            canvas_size: [canvasWidth, canvasHeight],
+            original_image_size: [originalWidth, originalHeight],
+            original_image_location: [offsetX, offsetY],
           },
         };
         
         console.log('[Expand] Bria FINAL params:', {
-          aspect_ratio: closestPreset.name,
+          canvas_size: [canvasWidth, canvasHeight],
+          original_image_size: [originalWidth, originalHeight],
+          original_image_location: [offsetX, offsetY],
           expand: currentExpand,
         });
       }

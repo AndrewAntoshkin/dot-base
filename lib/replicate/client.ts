@@ -105,15 +105,23 @@ export class ReplicateClient {
       }
     }
     
-    // canvas_size conversion
-    if (cleaned.canvas_size !== undefined && typeof cleaned.canvas_size === 'string') {
-      try {
-        const parsed = JSON.parse(cleaned.canvas_size);
-        if (Array.isArray(parsed) && parsed.length === 2) {
-          cleaned.canvas_size = parsed.map(Number);
+    // Array fields conversion (for Bria Expand)
+    const arrayFields = ['canvas_size', 'original_image_size', 'original_image_location'];
+    for (const field of arrayFields) {
+      if (cleaned[field] !== undefined) {
+        if (typeof cleaned[field] === 'string') {
+          try {
+            const parsed = JSON.parse(cleaned[field]);
+            if (Array.isArray(parsed) && parsed.length === 2) {
+              cleaned[field] = parsed.map(Number);
+            }
+          } catch {
+            delete cleaned[field];
+          }
+        } else if (Array.isArray(cleaned[field])) {
+          // Already an array - ensure numbers
+          cleaned[field] = cleaned[field].map(Number);
         }
-      } catch {
-        delete cleaned.canvas_size;
       }
     }
     

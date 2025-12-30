@@ -1931,7 +1931,7 @@ export const EDIT_MODELS: Model[] = [
     action: 'expand',
     runs: '103.4K runs',
     price: '$0.04 per image',
-    description: 'Расширение границ изображения с AI генерацией',
+    description: 'Высокое качество, фиксированные соотношения',
     settings: [
       {
         name: 'image',
@@ -1950,6 +1950,24 @@ export const EDIT_MODELS: Model[] = [
         label: 'Negative Prompt',
         type: 'textarea',
         placeholder: 'Что исключить...',
+      },
+      {
+        name: 'canvas_size',
+        label: 'Canvas Size',
+        type: 'array',
+        hidden: true,
+      },
+      {
+        name: 'original_image_size',
+        label: 'Original Image Size',
+        type: 'array',
+        hidden: true,
+      },
+      {
+        name: 'original_image_location',
+        label: 'Original Image Location',
+        type: 'array',
+        hidden: true,
       },
       {
         name: 'seed',
