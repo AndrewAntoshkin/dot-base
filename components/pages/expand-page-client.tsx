@@ -544,14 +544,13 @@ export function ExpandPageClient() {
         
         // При ручном расширении используем canvas_size
         // При пресетах используем aspect_ratio
-        // ВАЖНО: API имеет default aspect_ratio="1:1", нужно явно передать null чтобы отключить!
+        // ВАЖНО: Когда передаём canvas_size, Bria должен его использовать вместо aspect_ratio
+        // НЕ передаём aspect_ratio вообще при ручном расширении!
         if (hasManualExpand) {
-          // Точные размеры
+          // Точные размеры - НЕ передаём aspect_ratio (Bria использует canvas_size если он указан)
           briaSettings.canvas_size = [canvasWidth, canvasHeight];
           briaSettings.original_image_size = [originalWidth, originalHeight];
           briaSettings.original_image_location = [offsetX, offsetY];
-          // Явно отключаем aspect_ratio чтобы API не использовал default "1:1"
-          briaSettings.aspect_ratio = null;
         } else {
           // Нет ручного расширения - используем aspect_ratio
           briaSettings.aspect_ratio = closestPreset.name;

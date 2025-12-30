@@ -140,13 +140,8 @@ export class ReplicateClient {
     }
     
     // Remove empty values
-    // ВАЖНО: сохраняем aspect_ratio: null для Bria Expand (чтобы отключить default "1:1")
     Object.keys(cleaned).forEach(key => {
-      if (cleaned[key] === undefined || cleaned[key] === '') {
-        delete cleaned[key];
-      }
-      // Удаляем null только если это НЕ aspect_ratio (для Bria нужен null чтобы отключить дефолт)
-      if (cleaned[key] === null && key !== 'aspect_ratio') {
+      if (cleaned[key] === undefined || cleaned[key] === null || cleaned[key] === '') {
         delete cleaned[key];
       }
     });
