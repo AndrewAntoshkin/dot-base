@@ -273,6 +273,69 @@ export function ExpandPageClient() {
     setNegativePrompt('');
   }, [handleRemoveImage]);
 
+  // Compress image to fit within size limit (4MB to be safe for Vercel's 4.5MB limit)
+  const compressImage = async (dataUrl: string, maxSizeBytes: number = 4 * 1024 * 1024): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.naturalWidth;
+        let height = img.naturalHeight;
+        
+        // Start with original size, reduce if needed
+        let quality = 0.9;
+        let scale = 1;
+        
+        const tryCompress = () => {
+          canvas.width = Math.round(width * scale);
+          canvas.height = Math.round(height * scale);
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Failed to compress image'));
+                return;
+              }
+              
+              console.log(`[Expand] Compressed: ${canvas.width}x${canvas.height}, quality=${quality.toFixed(2)}, size=${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+              
+              if (blob.size <= maxSizeBytes) {
+                resolve(blob);
+              } else if (quality > 0.5) {
+                // Try lower quality first
+                quality -= 0.1;
+                tryCompress();
+              } else if (scale > 0.5) {
+                // Then try smaller size
+                quality = 0.85;
+                scale -= 0.1;
+                tryCompress();
+              } else {
+                // Give up and use what we have
+                console.warn('[Expand] Could not compress below target size, using best effort');
+                resolve(blob);
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        
+        tryCompress();
+      };
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      img.src = dataUrl;
+    });
+  };
+
   // Upload data URL to server (or return HTTP URL as-is)
   const uploadDataUrl = async (dataUrl: string): Promise<string> => {
     // If it's already an HTTP URL, return it directly
@@ -280,22 +343,13 @@ export function ExpandPageClient() {
       return dataUrl;
     }
     
-    const match = dataUrl.match(/^data:(.*?);base64,(.+)$/);
-    if (!match) throw new Error('Invalid data URL');
-    
-    const mimeType = match[1];
-    const base64 = match[2];
-    const binary = atob(base64);
-    const len = binary.length;
-    const buffer = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      buffer[i] = binary.charCodeAt(i);
-    }
-    const extension = mimeType.split('/')[1] || 'png';
-    const blob = new Blob([buffer], { type: mimeType });
+    // Compress image to fit Vercel's 4.5MB body limit
+    console.log('[Expand] Compressing image before upload...');
+    const blob = await compressImage(dataUrl);
+    console.log(`[Expand] Final compressed size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
 
     const formData = new FormData();
-    formData.append('files', blob, `file.${extension}`);
+    formData.append('files', blob, 'image.jpg');
 
     const response = await fetch('/api/upload', {
       method: 'POST',
