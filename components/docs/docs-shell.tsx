@@ -107,8 +107,8 @@ const SIDEBAR_SECTIONS: DocNavSection[] = [
         href: '/docs/models/flux',
         icon: <Sparkles className="w-4 h-4" />,
         children: [
-          { id: 'flux-2-max', title: 'FLUX 2 Max', href: '/docs/models/flux/flux-2-max', badge: 'NEW' },
-          { id: 'flux-2-pro', title: 'FLUX 2 Pro', href: '/docs/models/flux/flux-2-pro', badge: 'NEW' },
+          { id: 'flux-2-max', title: 'FLUX 2 Max', href: '/docs/models/flux/flux-2-max' },
+          { id: 'flux-2-pro', title: 'FLUX 2 Pro', href: '/docs/models/flux/flux-2-pro' },
           { id: 'flux-1-1-pro', title: 'FLUX 1.1 Pro', href: '/docs/models/flux/flux-1-1-pro' },
           { id: 'flux-kontext-max', title: 'FLUX Kontext Max', href: '/docs/models/flux/flux-kontext-max' },
           { id: 'flux-kontext-fast', title: 'FLUX Kontext Fast', href: '/docs/models/flux/flux-kontext-fast' },
@@ -121,7 +121,7 @@ const SIDEBAR_SECTIONS: DocNavSection[] = [
         href: '/docs/models/kling',
         icon: <Video className="w-4 h-4" />,
         children: [
-          { id: 'kling-2-5-pro', title: 'Kling 2.5 PRO', href: '/docs/models/kling/kling-2-5-pro', badge: 'NEW' },
+          { id: 'kling-2-5-pro', title: 'Kling 2.5 PRO', href: '/docs/models/kling/kling-2-5-pro' },
           { id: 'kling-2-1-master', title: 'Kling 2.1 Master', href: '/docs/models/kling/kling-2-1-master' },
           { id: 'kling-2-0', title: 'Kling 2.0', href: '/docs/models/kling/kling-2-0' },
         ]
@@ -132,7 +132,7 @@ const SIDEBAR_SECTIONS: DocNavSection[] = [
         href: '/docs/models/hailuo',
         icon: <Video className="w-4 h-4" />,
         children: [
-          { id: 'hailuo-2-3', title: 'Hailuo 2.3', href: '/docs/models/hailuo/hailuo-2-3', badge: 'NEW' },
+          { id: 'hailuo-2-3', title: 'Hailuo 2.3', href: '/docs/models/hailuo/hailuo-2-3' },
           { id: 'hailuo-02', title: 'Hailuo 02', href: '/docs/models/hailuo/hailuo-02' },
         ]
       },
@@ -142,7 +142,7 @@ const SIDEBAR_SECTIONS: DocNavSection[] = [
         href: '/docs/models/seedream',
         icon: <Image className="w-4 h-4" />,
         children: [
-          { id: 'seedream-4-5', title: 'SeeDream 4.5', href: '/docs/models/seedream/seedream-4-5', badge: 'NEW' },
+          { id: 'seedream-4-5', title: 'SeeDream 4.5', href: '/docs/models/seedream/seedream-4-5' },
           { id: 'seedream-4', title: 'SeeDream 4', href: '/docs/models/seedream/seedream-4' },
         ]
       },
@@ -163,8 +163,8 @@ const SIDEBAR_SECTIONS: DocNavSection[] = [
         href: '/docs/models/google',
         icon: <Sparkles className="w-4 h-4" />,
         children: [
-          { id: 'veo-3-1', title: 'Veo 3.1 Fast', href: '/docs/models/google/veo-3-1', badge: 'NEW' },
-          { id: 'imagen-4', title: 'Imagen 4 Ultra', href: '/docs/models/google/imagen-4', badge: 'NEW' },
+          { id: 'veo-3-1', title: 'Veo 3.1 Fast', href: '/docs/models/google/veo-3-1' },
+          { id: 'imagen-4', title: 'Imagen 4 Ultra', href: '/docs/models/google/imagen-4' },
         ]
       },
       { 
