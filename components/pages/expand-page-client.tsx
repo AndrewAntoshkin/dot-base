@@ -542,13 +542,16 @@ export function ExpandPageClient() {
           negative_prompt: negativePrompt || undefined,
         };
         
-        // При ручном расширении используем canvas_size (БЕЗ aspect_ratio!)
+        // При ручном расширении используем canvas_size
         // При пресетах используем aspect_ratio
+        // ВАЖНО: API имеет default aspect_ratio="1:1", нужно явно передать null чтобы отключить!
         if (hasManualExpand) {
-          // Точные размеры - НЕ передаём aspect_ratio чтобы не было конфликта
+          // Точные размеры
           briaSettings.canvas_size = [canvasWidth, canvasHeight];
           briaSettings.original_image_size = [originalWidth, originalHeight];
           briaSettings.original_image_location = [offsetX, offsetY];
+          // Явно отключаем aspect_ratio чтобы API не использовал default "1:1"
+          briaSettings.aspect_ratio = null;
         } else {
           // Нет ручного расширения - используем aspect_ratio
           briaSettings.aspect_ratio = closestPreset.name;
