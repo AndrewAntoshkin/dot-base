@@ -581,7 +581,7 @@ export function DocsInfoBox({
   const styles = {
     info: 'border-[#2a2a2a] bg-[#1a1a1a]',
     warning: 'border-[#854d0e] bg-[#422006]',
-    tip: 'border-[#166534] bg-[#14532d]',
+    tip: 'border-[#2a2a2a] bg-[#1a1a1a]',
   };
   
   const iconColors = {

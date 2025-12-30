@@ -154,7 +154,7 @@ export default function TroubleshootingPage() {
               <ul className="space-y-2 pl-7">
                 {item.solutions.map((solution, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-[#959595] font-inter">
-                    <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
                     {solution}
                   </li>
                 ))}

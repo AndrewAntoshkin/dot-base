@@ -154,7 +154,7 @@ export default function QuickStartPage() {
                   </code>
                 </div>
                 <div>
-                  <span className="text-xs text-green-400 font-inter uppercase mb-1 block">Хорошо</span>
+                  <span className="text-xs text-white font-inter uppercase mb-1 block">Хорошо</span>
                   <code className="block p-2 bg-[#1a1a1a] rounded text-sm text-[#b0b0b0] font-inter">
                     {mistake.right}
                   </code>
