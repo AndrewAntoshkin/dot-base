@@ -273,6 +273,44 @@ export function ExpandPageClient() {
     setNegativePrompt('');
   }, [handleRemoveImage]);
 
+  // Upload data URL to server (or return HTTP URL as-is)
+  const uploadDataUrl = async (dataUrl: string): Promise<string> => {
+    // If it's already an HTTP URL, return it directly
+    if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
+      return dataUrl;
+    }
+    
+    const match = dataUrl.match(/^data:(.*?);base64,(.+)$/);
+    if (!match) throw new Error('Invalid data URL');
+    
+    const mimeType = match[1];
+    const base64 = match[2];
+    const binary = atob(base64);
+    const len = binary.length;
+    const buffer = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      buffer[i] = binary.charCodeAt(i);
+    }
+    const extension = mimeType.split('/')[1] || 'png';
+    const blob = new Blob([buffer], { type: mimeType });
+
+    const formData = new FormData();
+    formData.append('files', blob, `file.${extension}`);
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Ошибка загрузки изображения');
+    }
+
+    const data = await response.json();
+    return data.urls[0];
+  };
+
   // Генерация
   const handleGenerate = async () => {
     console.log('[Expand] handleGenerate called');
@@ -302,6 +340,14 @@ export function ExpandPageClient() {
       console.log('[Expand] ============ GENERATION START ============');
       console.log('[Expand] Using expand:', currentExpand);
       console.log('[Expand] imageDimensions:', imageDimensions);
+      
+      // Загружаем изображение в Storage если это base64 (избегаем 413 Payload Too Large)
+      let imageUrl = image;
+      if (image.startsWith('data:')) {
+        console.log('[Expand] Uploading image to storage...');
+        imageUrl = await uploadDataUrl(image);
+        console.log('[Expand] Image uploaded:', imageUrl);
+      }
       
       let requestBody: Record<string, any>;
       
@@ -334,9 +380,9 @@ export function ExpandPageClient() {
           action: 'expand',
           model_id: 'outpainter',
           prompt: finalPrompt,
-          input_image_url: image,
+          input_image_url: imageUrl,
           settings: {
-            image: image,
+            image: imageUrl,
             prompt: finalPrompt,
             left: clamp(extendLeft),
             right: clamp(extendRight),
@@ -419,9 +465,9 @@ export function ExpandPageClient() {
           action: 'expand',
           model_id: 'bria-expand',
           prompt: finalPrompt,
-          input_image_url: image,
+          input_image_url: imageUrl,
           settings: {
-            image: image,
+            image: imageUrl,
             prompt: finalPrompt,
             negative_prompt: negativePrompt || undefined,
             // Bria ТРЕБУЕТ aspect_ratio
