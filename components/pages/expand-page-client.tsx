@@ -527,12 +527,12 @@ export function ExpandPageClient() {
         console.log('[Expand] Bria aspect_ratio:', closestPreset.name, 'for canvas ratio:', canvasRatio.toFixed(3));
         
         // Bria API параметры:
-        // - aspect_ratio: целевое соотношение сторон (fallback если нет точных размеров)
+        // - aspect_ratio: целевое соотношение сторон (используется ТОЛЬКО если нет canvas_size)
         // - canvas_size: [width, height] - общий размер результата
         // - original_image_size: [width, height] - размер исходного изображения на холсте  
         // - original_image_location: [x, y] - позиция исходного изображения (offset)
+        // ВАЖНО: aspect_ratio и canvas_size конфликтуют - используем ЛИБО одно, ЛИБО другое!
         
-        // Используем canvas_size ТОЛЬКО если есть реальное расширение
         const hasManualExpand = currentExpand.top > 0 || currentExpand.right > 0 || 
                                 currentExpand.bottom > 0 || currentExpand.left > 0;
         
@@ -540,14 +540,18 @@ export function ExpandPageClient() {
           image: imageUrl,
           prompt: finalPrompt,
           negative_prompt: negativePrompt || undefined,
-          aspect_ratio: closestPreset.name,
         };
         
-        // Добавляем точные размеры только при ручном расширении
+        // При ручном расширении используем canvas_size (БЕЗ aspect_ratio!)
+        // При пресетах используем aspect_ratio
         if (hasManualExpand) {
+          // Точные размеры - НЕ передаём aspect_ratio чтобы не было конфликта
           briaSettings.canvas_size = [canvasWidth, canvasHeight];
           briaSettings.original_image_size = [originalWidth, originalHeight];
           briaSettings.original_image_location = [offsetX, offsetY];
+        } else {
+          // Нет ручного расширения - используем aspect_ratio
+          briaSettings.aspect_ratio = closestPreset.name;
         }
         
         requestBody = {
@@ -559,10 +563,11 @@ export function ExpandPageClient() {
         };
         
         console.log('[Expand] Bria FINAL params:', {
-          aspect_ratio: closestPreset.name,
-          canvas_size: hasManualExpand ? [canvasWidth, canvasHeight] : 'not set',
-          original_image_size: hasManualExpand ? [originalWidth, originalHeight] : 'not set',
-          original_image_location: hasManualExpand ? [offsetX, offsetY] : 'not set',
+          mode: hasManualExpand ? 'canvas_size (manual)' : 'aspect_ratio (preset)',
+          aspect_ratio: hasManualExpand ? 'NOT SET' : closestPreset.name,
+          canvas_size: hasManualExpand ? [canvasWidth, canvasHeight] : 'NOT SET',
+          original_image_size: hasManualExpand ? [originalWidth, originalHeight] : 'NOT SET',
+          original_image_location: hasManualExpand ? [offsetX, offsetY] : 'NOT SET',
           expand: currentExpand,
         });
       }
