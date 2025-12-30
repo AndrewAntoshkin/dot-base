@@ -438,10 +438,11 @@ export function ExpandPageClient() {
           settings: {
             image: imageUrl,
             prompt: finalPrompt,
-            left: clamp(extendLeft),
-            right: clamp(extendRight),
-            top: clamp(extendTop),
-            bottom: clamp(extendBottom),
+            // Outpainter API uses extend_* naming convention
+            extend_left: clamp(extendLeft),
+            extend_right: clamp(extendRight),
+            extend_top: clamp(extendTop),
+            extend_bottom: clamp(extendBottom),
             steps,
             guidance,
           },
