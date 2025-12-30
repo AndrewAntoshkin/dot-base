@@ -42,7 +42,7 @@ export function ExpandPageClient() {
   const router = useRouter();
   const imageUrlParam = searchParams.get('imageUrl');
   
-  const { addGeneration } = useGenerations();
+  const { addGeneration, generations } = useGenerations();
   const { selectedWorkspaceId } = useUser();
   
   // Состояние
@@ -590,6 +590,14 @@ export function ExpandPageClient() {
   const handleNewGeneration = useCallback(() => {
     setCurrentGenerationId(null);
   }, []);
+  
+  // Получаем статус текущей генерации из контекста
+  const currentGeneration = currentGenerationId 
+    ? generations.find(g => g.id === currentGenerationId) 
+    : null;
+  const isGenerating = currentGeneration?.status === 'pending' || currentGeneration?.status === 'processing';
+  const isCompleted = currentGeneration?.status === 'completed' || currentGeneration?.status === 'failed';
+
   // Вычисляем визуальные позиции для канваса
   const hasExpand = expand.top > 0 || expand.right > 0 || expand.bottom > 0 || expand.left > 0;
   
@@ -766,13 +774,22 @@ export function ExpandPageClient() {
           {/* Fixed buttons at bottom (outside scroll area) */}
           <div className="animate-fade-in-up animate-delay-500 shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
             <div className="flex gap-3">
-              {currentGenerationId ? (
+              {isCompleted ? (
                 <button
                   type="button"
                   onClick={handleNewGeneration}
                   className="flex-1 h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors"
                 >
                   Новая генерация
+                </button>
+              ) : isGenerating ? (
+                <button
+                  type="button"
+                  disabled
+                  className="flex-1 h-10 px-4 rounded-xl bg-white/50 font-inter font-medium text-sm text-black tracking-[-0.084px] disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  Генерация...
                 </button>
               ) : (
                 <>
@@ -810,8 +827,8 @@ export function ExpandPageClient() {
             </h2>
           </div>
 
-          {/* Show OutputPanel when generation is in progress, otherwise show canvas editor */}
-          {currentGenerationId ? (
+          {/* Show OutputPanel only when generation is completed, show canvas with shimmer during generation */}
+          {isCompleted && currentGenerationId ? (
             <div className="animate-fade-in-up animate-delay-200 flex-1">
               <OutputPanel generationId={currentGenerationId} />
             </div>
@@ -874,7 +891,7 @@ export function ExpandPageClient() {
                 {hasExpand && (
                   <div 
                     className={`absolute pointer-events-none z-0 overflow-hidden ${
-                      isCreating ? 'bg-[#1a1a1a]' : 'bg-[#212121]'
+                      (isCreating || isGenerating) ? 'bg-[#1a1a1a]' : 'bg-[#212121]'
                     }`}
                     style={{
                       top: `${handleTop}%`,
@@ -884,7 +901,7 @@ export function ExpandPageClient() {
                     }}
                   >
                     {/* Shimmer effect during generation */}
-                    {isCreating && (
+                    {(isCreating || isGenerating) && (
                       <div 
                         className="absolute inset-0"
                         style={{
