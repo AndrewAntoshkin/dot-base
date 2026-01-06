@@ -1289,7 +1289,6 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                       }}>
                         {/* Markdown rendered content */}
                         <div 
-                          className={isLoading && messages[messages.length - 1]?.id === message.id && message.content ? 'streaming-text' : ''}
                           style={{
                             fontFamily: 'Google Sans, sans-serif',
                             fontWeight: 400,
@@ -1304,23 +1303,21 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                         >
                           {message.content ? (
                             <>
-                              {renderMarkdown(message.content)}
+                              <div style={{ 
+                                transition: 'opacity 0.2s ease-out',
+                                opacity: 1
+                              }}>
+                                {renderMarkdown(message.content)}
+                              </div>
                               {/* Streaming cursor */}
                               {isLoading && messages[messages.length - 1]?.id === message.id && (
                                 <span className="streaming-cursor" />
                               )}
                             </>
                           ) : isLoading && messages[messages.length - 1]?.id === message.id ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div className="animate-pulse" style={{
-                                width: '100%',
-                                height: '16px',
-                                background: 'linear-gradient(90deg, #2a2a2a 0%, #3a3a3a 50%, #2a2a2a 100%)',
-                                backgroundSize: '200% 100%',
-                                animation: 'shimmer 1.5s infinite',
-                                borderRadius: '4px'
-                              }} />
-                            </div>
+                            <span className="thinking-shimmer">
+                              Думаю...
+                            </span>
                           ) : null}
                         </div>
                       </div>
