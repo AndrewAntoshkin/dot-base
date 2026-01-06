@@ -99,7 +99,15 @@ export default function BrainstormPageClient() {
   const [prompt, setPrompt] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
+  const [isAspectRatioSelectorOpen, setIsAspectRatioSelectorOpen] = useState(false);
   const [generations, setGenerations] = useState<BrainstormGeneration[]>([]);
+  
+  const ASPECT_RATIOS = [
+    { value: '1:1', label: '1:1' },
+    { value: '16:9', label: '16:9' },
+    { value: '9:16', label: '9:16' },
+  ];
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
   const [modalGeneration, setModalGeneration] = useState<BrainstormGeneration | null>(null);
@@ -492,7 +500,7 @@ export default function BrainstormPageClient() {
         
         // Default settings - aspect_ratio for all models as base
         const defaultSettings: Record<string, any> = {
-          aspect_ratio: '1:1',
+          aspect_ratio: selectedAspectRatio,
         };
         
         // Add model-specific settings ON TOP of defaults
@@ -846,7 +854,7 @@ export default function BrainstormPageClient() {
             
             {/* Actions row */}
             <div className="flex items-center justify-between">
-              {/* Left side - Model selector */}
+              {/* Left side - Model selector and Aspect Ratio */}
               <div className="flex items-center gap-2">
                 {/* Models selector */}
                 <div className="relative">
@@ -911,6 +919,49 @@ export default function BrainstormPageClient() {
                             );
                           })}
                         </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                {/* Aspect Ratio selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsAspectRatioSelectorOpen(!isAspectRatioSelectorOpen)}
+                    className="h-9 px-2 bg-[#212121] rounded-lg flex items-center gap-1 hover:bg-[#2a2a2a] transition-colors"
+                  >
+                    <span className="font-inter font-medium text-xs text-[#bbbbbb]">
+                      {selectedAspectRatio}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-[#bbbbbb]" />
+                  </button>
+                  
+                  {/* Aspect Ratio dropdown */}
+                  {isAspectRatioSelectorOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10"
+                        onClick={() => setIsAspectRatioSelectorOpen(false)}
+                      />
+                      <div className="absolute bottom-full left-0 mb-2 w-[100px] bg-neutral-900 rounded-xl shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] z-20 flex flex-col p-2 gap-1">
+                        {ASPECT_RATIOS.map((ratio) => (
+                          <button
+                            key={ratio.value}
+                            onClick={() => {
+                              setSelectedAspectRatio(ratio.value);
+                              setIsAspectRatioSelectorOpen(false);
+                            }}
+                            className={`w-full h-8 rounded-lg px-3 py-1 flex items-center justify-center transition-colors text-center ${
+                              selectedAspectRatio === ratio.value 
+                                ? 'bg-[#333] text-white' 
+                                : 'bg-[#232323] hover:bg-[#2a2a2a] text-[#bbbbbb]'
+                            }`}
+                          >
+                            <span className="font-inter font-medium text-xs">
+                              {ratio.label}
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     </>
                   )}
