@@ -18,6 +18,7 @@ export type SettingType =
   | 'checkbox' 
   | 'file'
   | 'file_array'
+  | 'array'
   | 'directional_expand';
 
 export interface ModelSetting {
