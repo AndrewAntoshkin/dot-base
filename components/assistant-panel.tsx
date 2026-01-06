@@ -756,9 +756,13 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
         const decoder = new TextDecoder();
         let accumulatedText = '';
 
+        let streamComplete = false;
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            streamComplete = true;
+            break;
+          }
 
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split('\n');
@@ -766,7 +770,10 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6);
-              if (data === '[DONE]') continue;
+              if (data === '[DONE]') {
+                streamComplete = true;
+                continue;
+              }
 
               try {
                 const parsed = JSON.parse(data);
@@ -789,6 +796,9 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
           }
         }
 
+        // Stream finished - ensure loading is reset
+        console.log('[Assistant Client] Stream complete, accumulated:', accumulatedText.length, 'chars');
+        
         // Ensure final content is set
         if (accumulatedText) {
           setMessages(prev => prev.map(m => 
@@ -804,6 +814,9 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
               : m
           ));
         }
+        
+        // Force reset loading state
+        setIsLoading(false);
       } else {
         // Non-streaming fallback
         const data = await response.json();
@@ -925,6 +938,9 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
               : m
           ));
         }
+        
+        // Force reset loading state
+        setIsLoading(false);
       } else {
         const data = await response.json();
         setMessages(prev => prev.map(m => 
