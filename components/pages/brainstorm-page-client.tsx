@@ -635,7 +635,7 @@ export default function BrainstormPageClient() {
       // Don't await - start in background so UI updates faster
       createGeneration(modelId, tempId);
     }
-  }, [prompt, selectedModels, generations, addGeneration, selectedWorkspaceId]);
+  }, [prompt, selectedModels, generations, addGeneration, selectedWorkspaceId, selectedAspectRatio]);
   
   const handleClear = useCallback(() => {
     setGenerations([]);
