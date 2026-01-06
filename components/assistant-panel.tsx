@@ -342,9 +342,14 @@ function renderMarkdown(text: string): React.ReactNode {
       .replace(/^Ссылка\s*/gi, '')
       .replace(/\s*Ссылка:\s*$/gi, '')
       .replace(/\s*Ссылка\s*$/gi, '')
+      // Remove orphan punctuation left between removed links
+      .replace(/^\s*[,;.]\s*$/g, '')
+      .replace(/^\s*[,;.]\s+/g, '')
+      .replace(/\s+[,;.]\s*$/g, '')
+      .replace(/\s+[,;.]\s+/g, ' ')
       .trim();
-    // If only "Ссылка" remains, return empty
-    if (/^Ссылка:?\s*$/i.test(result)) return '';
+    // If only "Ссылка" or punctuation remains, return empty
+    if (/^Ссылка:?\s*$/i.test(result) || /^[,;.\s]*$/.test(result)) return '';
     return result;
   };
 
