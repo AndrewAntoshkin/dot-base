@@ -722,6 +722,16 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
     setMessages(newMessages);
     setIsLoading(true);
 
+    // Create placeholder for streaming response
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, assistantMessage]);
+
     try {
       const response = await fetch('/api/assistant/chat', {
         method: 'POST',
@@ -729,7 +739,8 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           images: images || userMessage.images,
-          context: context,  // Передаём контекст пользователя
+          context: context,
+          stream: true,  // Request streaming
         }),
       });
 
@@ -737,24 +748,79 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
         throw new Error('Failed to get response');
       }
 
-      const data = await response.json();
-      
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.content || 'Не удалось получить ответ',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, assistantMessage]);
+      // Check if streaming response
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('text/event-stream') && response.body) {
+        // Handle streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.text) {
+                  accumulatedText += parsed.text;
+                  // Update the assistant message with accumulated text
+                  setMessages(prev => prev.map(m => 
+                    m.id === assistantMessageId 
+                      ? { ...m, content: accumulatedText }
+                      : m
+                  ));
+                }
+                if (parsed.error) {
+                  console.error('Stream error:', parsed.error);
+                }
+              } catch {
+                // Ignore parse errors for incomplete chunks
+              }
+            }
+          }
+        }
+
+        // Ensure final content is set
+        if (accumulatedText) {
+          setMessages(prev => prev.map(m => 
+            m.id === assistantMessageId 
+              ? { ...m, content: accumulatedText }
+              : m
+          ));
+        } else {
+          // Remove empty message if no content received
+          setMessages(prev => prev.map(m => 
+            m.id === assistantMessageId 
+              ? { ...m, content: 'Не удалось получить ответ' }
+              : m
+          ));
+        }
+      } else {
+        // Non-streaming fallback
+        const data = await response.json();
+        setMessages(prev => prev.map(m => 
+          m.id === assistantMessageId 
+            ? { ...m, content: data.content || 'Не удалось получить ответ' }
+            : m
+        ));
+      }
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Произошла ошибка. Попробуйте ещё раз.',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      // Update placeholder message with error
+      setMessages(prev => prev.map(m => 
+        m.id === assistantMessageId 
+          ? { ...m, content: 'Произошла ошибка. Попробуйте ещё раз.' }
+          : m
+      ));
     } finally {
       setIsLoading(false);
     }
@@ -794,6 +860,15 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
     setMessages(messagesWithoutCurrent);
     setIsLoading(true);
 
+    // Create placeholder for streaming response
+    const newAssistantId = Date.now().toString();
+    setMessages(prev => [...prev, {
+      id: newAssistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    }]);
+
     try {
       const response = await fetch('/api/assistant/chat', {
         method: 'POST',
@@ -802,27 +877,69 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
           messages: messagesWithoutCurrent.map(m => ({ role: m.role, content: m.content })),
           images: userMessage.images,
           context: context,
+          stream: true,
         }),
       });
 
       if (!response.ok) throw new Error('Failed');
 
-      const data = await response.json();
-      
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: data.content || 'Не удалось получить ответ',
-        timestamp: new Date(),
-      }]);
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('text/event-stream') && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.text) {
+                  accumulatedText += parsed.text;
+                  setMessages(prev => prev.map(m => 
+                    m.id === newAssistantId 
+                      ? { ...m, content: accumulatedText }
+                      : m
+                  ));
+                }
+              } catch {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+
+        if (!accumulatedText) {
+          setMessages(prev => prev.map(m => 
+            m.id === newAssistantId 
+              ? { ...m, content: 'Не удалось получить ответ' }
+              : m
+          ));
+        }
+      } else {
+        const data = await response.json();
+        setMessages(prev => prev.map(m => 
+          m.id === newAssistantId 
+            ? { ...m, content: data.content || 'Не удалось получить ответ' }
+            : m
+        ));
+      }
     } catch (error) {
       console.error('Error:', error);
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'Произошла ошибка при регенерации.',
-        timestamp: new Date(),
-      }]);
+      setMessages(prev => prev.map(m => 
+        m.id === newAssistantId 
+          ? { ...m, content: 'Произошла ошибка при регенерации.' }
+          : m
+      ));
     } finally {
       setIsLoading(false);
     }
@@ -1181,7 +1298,19 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                           width: '332px',
                           maxWidth: '100%'
                         }}>
-                          {renderMarkdown(message.content)}
+                          {message.content ? (
+                            <>
+                              {renderMarkdown(message.content)}
+                              {/* Streaming cursor */}
+                              {isLoading && messages[messages.length - 1]?.id === message.id && (
+                                <span className="streaming-cursor" />
+                              )}
+                            </>
+                          ) : isLoading && messages[messages.length - 1]?.id === message.id ? (
+                            <span style={{ color: '#7E7E7E' }}>
+                              Генерирую ответ<span className="streaming-cursor" />
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                       
@@ -1237,38 +1366,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                   )
                 ))}
                 
-                {/* Loading: row, items-center, gap 6px, fill width */}
-                {isLoading && (
-                  <div style={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    width: '100%'
-                  }}>
-                    {/* Spinner: 16x16 */}
-                    <div 
-                      className="animate-spin"
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        border: '2px solid rgba(255,255,255,0.2)',
-                        borderTopColor: '#FFFFFF'
-                      }}
-                    />
-                    {/* Text: Inter 400, 12px, lh 1.4, left, #7E7E7E */}
-                    <span style={{
-                      fontFamily: 'Google Sans, sans-serif',
-                      fontWeight: 400,
-                      fontSize: '12px',
-                      lineHeight: 1.4,
-                      color: '#7E7E7E',
-                      textAlign: 'left'
-                    }}>
-                      Думаю...
-                    </span>
-                  </div>
-                )}
+                {/* Loading indicator removed - now using streaming cursor in message */}
                 
                 <div ref={messagesEndRef} />
               </div>

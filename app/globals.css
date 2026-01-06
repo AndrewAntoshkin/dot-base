@@ -368,6 +368,22 @@
   animation: slideInRight 0.3s ease-out forwards;
 }
 
+/* Streaming cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #FFFFFF;
+  margin-left: 2px;
+  animation: blink 1s infinite;
+  vertical-align: text-bottom;
+}
+
 /* Shimmer animation for skeletons */
 @keyframes shimmer {
   0% {
