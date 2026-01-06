@@ -462,6 +462,22 @@ export default function BrainstormPageClient() {
     const newGenerations: BrainstormGeneration[] = [];
     const existingCount = generations.length;
     
+    // Calculate imageSize based on selected aspect ratio
+    const getImageSizeForAspectRatio = (ratio: string) => {
+      const baseWidth = BASE_CARD_WIDTH;
+      switch (ratio) {
+        case '16:9':
+          return { width: baseWidth, height: Math.round(baseWidth / (16/9)) };
+        case '9:16':
+          return { width: baseWidth, height: Math.round(baseWidth / (9/16)) };
+        case '1:1':
+        default:
+          return { width: baseWidth, height: baseWidth };
+      }
+    };
+    
+    const imageSize = getImageSizeForAspectRatio(selectedAspectRatio);
+    
     for (let i = 0; i < selectedModels.length; i++) {
       const modelId = selectedModels[i];
       const model = CREATE_MODELS_LITE.find(m => m.id === modelId);
@@ -476,6 +492,7 @@ export default function BrainstormPageClient() {
         status: 'pending' as const,
         position,
         prompt: prompt.trim(),
+        imageSize,
       });
     }
     
