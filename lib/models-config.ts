@@ -34,6 +34,7 @@ export interface ModelSetting {
   description?: string;
   placeholder?: string;
   maxFiles?: number;
+  hidden?: boolean;
 }
 
 export type ProviderType = 'replicate' | 'fal';
