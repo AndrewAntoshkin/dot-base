@@ -368,28 +368,6 @@
   animation: slideInRight 0.3s ease-out forwards;
 }
 
-/* Thinking text with shimmer */
-@keyframes thinkingShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.thinking-text {
-  background: linear-gradient(
-    90deg,
-    #666666 0%,
-    #666666 40%,
-    #999999 50%,
-    #666666 60%,
-    #666666 100%
-  );
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: thinkingShimmer 1.5s ease-in-out infinite;
-}
-
 /* Shimmer animation for skeletons */
 @keyframes shimmer {
   0% {
