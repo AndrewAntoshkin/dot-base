@@ -260,6 +260,29 @@ export async function POST(request: NextRequest) {
       
       const stream = new ReadableStream({
         async start(controller) {
+          let isClosed = false;
+          
+          const safeEnqueue = (data: Uint8Array) => {
+            if (!isClosed) {
+              try {
+                controller.enqueue(data);
+              } catch {
+                isClosed = true;
+              }
+            }
+          };
+          
+          const safeClose = () => {
+            if (!isClosed) {
+              isClosed = true;
+              try {
+                controller.close();
+              } catch {
+                // Already closed
+              }
+            }
+          };
+
           try {
             // Use Replicate streaming API
             const prediction = await replicate.predictions.create({
@@ -278,9 +301,9 @@ export async function POST(request: NextRequest) {
                 : Array.isArray(result.output) 
                   ? result.output.join('') 
                   : JSON.stringify(result.output);
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-              controller.close();
+              safeEnqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+              safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+              safeClose();
               return;
             }
 
@@ -319,25 +342,25 @@ export async function POST(request: NextRequest) {
                       if (newText.length > fullText.length) {
                         const delta = newText.slice(fullText.length);
                         fullText = newText;
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`));
+                        safeEnqueue(encoder.encode(`data: ${JSON.stringify({ text: delta })}\n\n`));
                       }
                     }
                   } catch {
                     // Not JSON, might be raw text
                     if (data && data !== '[DONE]') {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: data })}\n\n`));
+                      safeEnqueue(encoder.encode(`data: ${JSON.stringify({ text: data })}\n\n`));
                     }
                   }
                 }
               }
             }
 
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-            controller.close();
+            safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+            safeClose();
           } catch (error) {
             console.error('[Assistant] Stream error:', error);
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Stream error' })}\n\n`));
-            controller.close();
+            safeEnqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Stream error' })}\n\n`));
+            safeClose();
           }
         }
       });

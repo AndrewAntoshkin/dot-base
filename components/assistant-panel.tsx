@@ -1288,16 +1288,20 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                         borderRadius: '16px'
                       }}>
                         {/* Markdown rendered content */}
-                        <div style={{
-                          fontFamily: 'Google Sans, sans-serif',
-                          fontWeight: 400,
-                          fontSize: '14px',
-                          lineHeight: 1.4,
-                          letterSpacing: '-0.01em',
-                          textAlign: 'left',
-                          width: '332px',
-                          maxWidth: '100%'
-                        }}>
+                        <div 
+                          className={isLoading && messages[messages.length - 1]?.id === message.id && message.content ? 'streaming-text' : ''}
+                          style={{
+                            fontFamily: 'Google Sans, sans-serif',
+                            fontWeight: 400,
+                            fontSize: '14px',
+                            lineHeight: 1.4,
+                            letterSpacing: '-0.01em',
+                            textAlign: 'left',
+                            width: '332px',
+                            maxWidth: '100%',
+                            color: '#D9D9D9'
+                          }}
+                        >
                           {message.content ? (
                             <>
                               {renderMarkdown(message.content)}
@@ -1307,9 +1311,16 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                               )}
                             </>
                           ) : isLoading && messages[messages.length - 1]?.id === message.id ? (
-                            <span style={{ color: '#7E7E7E' }}>
-                              Генерирую ответ<span className="streaming-cursor" />
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div className="animate-pulse" style={{
+                                width: '100%',
+                                height: '16px',
+                                background: 'linear-gradient(90deg, #2a2a2a 0%, #3a3a3a 50%, #2a2a2a 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmer 1.5s infinite',
+                                borderRadius: '4px'
+                              }} />
+                            </div>
                           ) : null}
                         </div>
                       </div>
