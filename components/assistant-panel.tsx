@@ -1302,30 +1302,11 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                           }}
                         >
                           {message.content ? (
-                            <div style={{ display: 'inline' }}>
+                            <div className="assistant-text-appear">
                               {renderMarkdown(message.content)}
-                              {/* Streaming cursor - inline with text */}
-                              {isLoading && messages[messages.length - 1]?.id === message.id && (
-                                <span style={{
-                                  display: 'inline-block',
-                                  width: '2px',
-                                  height: '14px',
-                                  background: '#FFFFFF',
-                                  marginLeft: '2px',
-                                  verticalAlign: 'middle',
-                                  animation: 'blink 1s infinite'
-                                }} />
-                              )}
                             </div>
                           ) : isLoading && messages[messages.length - 1]?.id === message.id ? (
-                            <span style={{
-                              background: 'linear-gradient(90deg, #7E7E7E 0%, #7E7E7E 40%, #BBBBBB 50%, #7E7E7E 60%, #7E7E7E 100%)',
-                              backgroundSize: '200% 100%',
-                              WebkitBackgroundClip: 'text',
-                              backgroundClip: 'text',
-                              WebkitTextFillColor: 'transparent',
-                              animation: 'thinkingShimmer 1.5s ease-in-out infinite'
-                            }}>
+                            <span className="thinking-text">
                               Думаю...
                             </span>
                           ) : null}
