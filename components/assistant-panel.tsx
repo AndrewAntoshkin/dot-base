@@ -602,7 +602,19 @@ function renderMarkdown(text: string): React.ReactNode {
     let match;
     let pk = 0;
     while ((match = regex.exec(line)) !== null) {
-      links.push(<DocLink key={pk++} name={match[1]} href={match[2]} />);
+      links.push(
+        <a 
+          key={pk++} 
+          href={match[2]} 
+          style={{ 
+            color: '#FFFFFF', 
+            textDecoration: 'underline',
+            textUnderlineOffset: '2px'
+          }}
+        >
+          {match[1]}
+        </a>
+      );
     }
     return links;
   };
