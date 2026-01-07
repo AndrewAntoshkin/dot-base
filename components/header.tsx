@@ -305,25 +305,23 @@ export function Header() {
               </HeaderTooltip>
             )}
 
-            {/* Docs link - Desktop Only, only for admins */}
-            {isAdmin && (
-              <HeaderTooltip 
-                label="Документация" 
-                description="Руководство по использованию платформы, описание моделей и возможностей"
-                align="right"
+            {/* Docs link - Desktop Only */}
+            <HeaderTooltip 
+              label="Документация" 
+              description="Руководство по использованию платформы, описание моделей и возможностей"
+              align="right"
+            >
+              <Link
+                href="/docs"
+                className={`hidden lg:flex w-9 h-9 rounded-xl items-center justify-center transition-colors border border-[#303030] ${
+                  pathname === '/docs' || pathname.startsWith('/docs/') 
+                    ? 'bg-[#1f1f1f]' 
+                    : 'hover:border-white/50'
+                }`}
               >
-                <Link
-                  href="/docs"
-                  className={`hidden lg:flex w-9 h-9 rounded-xl items-center justify-center transition-colors border border-[#303030] ${
-                    pathname === '/docs' || pathname.startsWith('/docs/') 
-                      ? 'bg-[#1f1f1f]' 
-                      : 'hover:border-white/50'
-                  }`}
-                >
-                  <Image src="/icon-docs-new.svg" alt="Docs" width={16} height={16} />
-                </Link>
-              </HeaderTooltip>
-            )}
+                <Image src="/icon-docs-new.svg" alt="Docs" width={16} height={16} />
+              </Link>
+            </HeaderTooltip>
             
             {/* Assistant button */}
             <HeaderTooltip 
@@ -514,18 +512,16 @@ export function Header() {
             </Link>
           )}
           
-          {/* Docs - only for admins */}
-          {isAdmin && (
-            <Link
-              href="/docs"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
-                pathname === '/docs' || pathname.startsWith('/docs/') ? 'bg-black' : ''
-              }`}
-            >
-              Документация
-            </Link>
-          )}
+          {/* Docs - for all users */}
+          <Link
+            href="/docs"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white ${
+              pathname === '/docs' || pathname.startsWith('/docs/') ? 'bg-black' : ''
+            }`}
+          >
+            Документация
+          </Link>
 
           {/* Dashboard - only for admins */}
           {isAdmin && (
