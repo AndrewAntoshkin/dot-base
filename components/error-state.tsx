@@ -128,18 +128,12 @@ export function ErrorState({
 }: ErrorStateProps) {
   const errorType = getErrorType(errorMessage);
   const errorData = getErrorData(errorType);
-  const Icon = errorData.icon;
   
   const hasActions = onRetry || onChangeParams || onChangeModel;
   
   return (
     <div className={`flex items-center justify-center ${isMobile ? 'flex-1 min-h-[400px]' : 'min-h-[660px]'}`}>
       <div className={`flex flex-col items-center max-w-md px-6 py-8 ${isMobile ? 'bg-[#131313] rounded-2xl w-full' : ''}`}>
-        {/* Indicator */}
-        <div className={`w-16 h-16 rounded-full ${errorData.bgColor} flex items-center justify-center mb-6`}>
-          <Icon className={`w-8 h-8 ${errorData.iconColor}`} />
-        </div>
-        
         {/* Title */}
         <h3 className="font-inter font-semibold text-lg text-white mb-2 text-center">
           {title || errorData.title}
@@ -156,7 +150,7 @@ export function ErrorState({
         </p>
         
         {/* Retry count badge */}
-        {retryCount && retryCount > 0 && (
+        {retryCount !== undefined && retryCount > 0 && (
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a1a1a] rounded-full mb-6">
             <RefreshCw className="w-3 h-3 text-[#6366F1]" />
             <span className="font-inter text-xs text-[#959595]">
@@ -201,6 +195,8 @@ export function ErrorState({
     </div>
   );
 }
+
+
 
 
 

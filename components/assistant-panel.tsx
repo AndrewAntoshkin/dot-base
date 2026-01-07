@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Copy, Check, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
+import { useUser } from '@/contexts/user-context';
 
 interface Message {
   id: string;
@@ -63,6 +64,9 @@ const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label:
   { keywords: ['gen4 image', 'runway image'], modelId: 'gen4-image-turbo', action: 'create', label: 'Gen4 Image', docUrl: '/docs/models/other/gen4-image' },
   
   // === VIDEO CREATE (text-to-video) ===
+  // Generic t2v keywords -> best t2v model
+  { keywords: ['создать видео', 'сгенерировать видео', 'видео из текста', 'text to video', 't2v'], modelId: 'kling-v2.5-turbo-pro-t2v', action: 'video_create', label: 'Kling 2.5 Pro', docUrl: '/docs/models/kling/kling-2-5-pro' },
+  // Specific t2v models
   { keywords: ['veo 3.1', 'veo 3', 'google veo'], modelId: 'veo-3.1-fast', action: 'video_create', label: 'Google Veo 3.1', docUrl: '/docs/models/google/veo-3-1' },
   { keywords: ['kling 2.5'], modelId: 'kling-v2.5-turbo-pro-t2v', action: 'video_create', label: 'Kling 2.5 Pro', docUrl: '/docs/models/kling/kling-2-5-pro' },
   { keywords: ['kling 2.1', 'kling master'], modelId: 'kling-v2.1-master-t2v', action: 'video_create', label: 'Kling 2.1 Master', docUrl: '/docs/models/kling/kling-2-1-master' },
@@ -70,12 +74,20 @@ const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label:
   { keywords: ['kling 1.0', 'kling 1'], modelId: 'kling-1.0-t2v-fal', action: 'video_create', label: 'Kling 1.0', docUrl: '/docs/models/kling/kling-1-0' },
   { keywords: ['hailuo 2.3'], modelId: 'hailuo-2.3-t2v', action: 'video_create', label: 'Hailuo 2.3', docUrl: '/docs/models/hailuo/hailuo-2-3' },
   { keywords: ['hailuo 02', 'hailuo'], modelId: 'hailuo-02-t2v', action: 'video_create', label: 'Hailuo 02', docUrl: '/docs/models/hailuo/hailuo-02' },
-  { keywords: ['seedance 1.5'], modelId: 'seedance-1.5-pro-t2v', action: 'video_create', label: 'Seedance 1.5 Pro', docUrl: '/docs/models/other/seedance-1-5' },
+  { keywords: ['seedance 1.5 pro'], modelId: 'seedance-1.5-pro-t2v', action: 'video_create', label: 'Seedance 1.5 Pro', docUrl: '/docs/models/other/seedance-1-5' },
   { keywords: ['seedance'], modelId: 'seedance-1-pro-t2v', action: 'video_create', label: 'Seedance 1 Pro', docUrl: '/docs/models/other/seedance' },
   { keywords: ['wan 2.5', 'wan'], modelId: 'wan-2.5-t2v', action: 'video_create', label: 'Wan 2.5', docUrl: '/docs/models/other/wan-2-5' },
   
-  // === VIDEO I2V (image-to-video) ===
-  { keywords: ['gen4 turbo', 'runway gen4', 'gen4'], modelId: 'gen4-turbo-i2v', action: 'video_i2v', label: 'Runway Gen4 Turbo', docUrl: '/docs/models/other/runway-gen4' },
+  // === VIDEO I2V (image-to-video) - IMPORTANT: these keywords should match i2v queries ===
+  // Generic i2v keywords -> best i2v model (Kling 2.5)
+  { keywords: ['видео из картинки', 'видео из изображения', 'анимировать изображение', 'анимировать картинку', 'оживить картинку', 'оживить изображение', 'image to video', 'i2v'], modelId: 'kling-v2.5-turbo-pro-i2v', action: 'video_i2v', label: 'Kling 2.5 Pro I2V', docUrl: '/docs/models/kling/kling-2-5-pro' },
+  // Specific i2v models
+  { keywords: ['kling 2.5 i2v', 'kling i2v'], modelId: 'kling-v2.5-turbo-pro-i2v', action: 'video_i2v', label: 'Kling 2.5 Pro I2V', docUrl: '/docs/models/kling/kling-2-5-pro' },
+  { keywords: ['veo i2v', 'veo 3.1 i2v', 'google veo i2v'], modelId: 'veo-3.1-fast-i2v', action: 'video_i2v', label: 'Google Veo 3.1 I2V', docUrl: '/docs/models/google/veo-3-1' },
+  { keywords: ['gen4 turbo', 'runway gen4', 'gen4 i2v'], modelId: 'gen4-turbo-i2v', action: 'video_i2v', label: 'Runway Gen4 Turbo', docUrl: '/docs/models/other/runway-gen4' },
+  { keywords: ['hailuo i2v', 'hailuo 2.3 i2v'], modelId: 'hailuo-2.3-fast-i2v', action: 'video_i2v', label: 'Hailuo 2.3 I2V', docUrl: '/docs/models/hailuo/hailuo-2-3' },
+  { keywords: ['seedance i2v', 'seedance 1.5 i2v'], modelId: 'seedance-1.5-pro-i2v', action: 'video_i2v', label: 'Seedance 1.5 I2V', docUrl: '/docs/models/other/seedance-1-5' },
+  { keywords: ['wan i2v', 'wan 2.5 i2v'], modelId: 'wan-2.5-i2v-fast', action: 'video_i2v', label: 'Wan 2.5 I2V', docUrl: '/docs/models/other/wan-2-5-i2v' },
   
   // === INPAINT ===
   { keywords: ['flux fill', 'flux inpaint'], modelId: 'flux-fill-pro', action: 'inpaint', label: 'Flux Fill Pro', docUrl: '/docs/models/flux/flux-fill-pro' },
@@ -91,6 +103,9 @@ const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label:
   { keywords: ['outpainter'], modelId: 'outpainter', action: 'expand', label: 'Outpainter', docUrl: '/docs/models/edit/outpainter' },
   
   // === UPSCALE ===
+  // Generic upscale keywords -> best upscaler
+  { keywords: ['улучшить качество', 'увеличить разрешение', 'апскейл', 'upscale', 'повысить качество'], modelId: 'clarity-upscaler', action: 'upscale', label: 'Clarity Upscaler', docUrl: '/docs/models/upscale/clarity' },
+  // Specific upscale models
   { keywords: ['clarity upscaler', 'clarity'], modelId: 'clarity-upscaler', action: 'upscale', label: 'Clarity Upscaler', docUrl: '/docs/models/upscale/clarity' },
   { keywords: ['crystal', 'creative upscaler'], modelId: 'crystal-upscaler', action: 'upscale', label: 'Crystal Upscaler', docUrl: '/docs/models/upscale/crystal' },
   { keywords: ['recraft crisp', 'crisp'], modelId: 'recraft-crisp-upscale', action: 'upscale', label: 'Recraft Crisp', docUrl: '/docs/models/recraft/recraft-crisp' },
@@ -109,8 +124,38 @@ const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label:
   { keywords: ['ocr', 'распознавание текста'], modelId: 'deepseek-ocr', action: 'analyze_ocr', label: 'DeepSeek OCR', docUrl: '/docs/models/analyze/ocr' },
 ];
 
+// Check if response contains model recommendation (not just mention)
+function hasModelRecommendation(content: string): boolean {
+  const lowerContent = content.toLowerCase();
+  const recommendationPhrases = [
+    'рекомендую', 'рекомендуем', 'советую', 'советуем',
+    'используйте', 'используй', 'попробуйте', 'попробуй',
+    'лучше всего', 'лучший выбор', 'лучшая модель', 'лучше подходит',
+    'идеально подходит', 'отлично подходит', 'подойдёт', 'подойдет',
+    'выбирайте', 'выбери', 'стоит использовать',
+    'для этого подходит', 'для этой задачи'
+  ];
+  return recommendationPhrases.some(phrase => lowerContent.includes(phrase));
+}
+
+// Check if query/response is about documentation
+function isAboutDocumentation(query: string, response: string): boolean {
+  const combined = (query + ' ' + response).toLowerCase();
+  const docPhrases = [
+    'документац', 'доку', 'docs', 'документ',
+    'подробнее', 'узнать больше', 'как работает', 'как использовать',
+    'инструкц', 'руководств', 'справк'
+  ];
+  return docPhrases.some(phrase => combined.includes(phrase));
+}
+
 // Find model links based on content - sorted by position in text (first mentioned = most relevant)
 function getRelevantModelLinks(content: string): { modelId: string; action: string; label: string; docUrl: string }[] {
+  // Only show models if there's an actual recommendation
+  if (!hasModelRecommendation(content)) {
+    return [];
+  }
+  
   const lowerContent = content.toLowerCase();
   const found: { modelId: string; action: string; label: string; docUrl: string; position: number }[] = [];
   const usedModels = new Set<string>();
@@ -141,8 +186,35 @@ function getRelevantModelLinks(content: string): { modelId: string; action: stri
   // Sort by position in text (first mentioned models are more relevant)
   found.sort((a, b) => a.position - b.position);
 
-  // Limit to 2 most relevant model links
-  return found.slice(0, 2).map(({ position, ...rest }) => rest);
+  // Limit to 3 most relevant model links
+  return found.slice(0, 3).map(({ position, ...rest }) => rest);
+}
+
+// Get relevant documentation links based on content
+function getRelevantDocLinks(content: string): { url: string; label: string }[] {
+  const lowerContent = content.toLowerCase();
+  const found: { url: string; label: string; position: number }[] = [];
+  const usedUrls = new Set<string>();
+
+  for (const doc of DOC_LINKS) {
+    if (usedUrls.has(doc.url)) continue;
+    
+    let earliestPosition = -1;
+    for (const keyword of doc.keywords) {
+      const pos = lowerContent.indexOf(keyword.toLowerCase());
+      if (pos !== -1 && (earliestPosition === -1 || pos < earliestPosition)) {
+        earliestPosition = pos;
+      }
+    }
+    
+    if (earliestPosition !== -1) {
+      found.push({ url: doc.url, label: doc.label, position: earliestPosition });
+      usedUrls.add(doc.url);
+    }
+  }
+
+  found.sort((a, b) => a.position - b.position);
+  return found.slice(0, 3).map(({ position, ...rest }) => rest);
 }
 
 // Documentation links mapping
@@ -179,28 +251,6 @@ const DOC_LINKS: { keywords: string[]; url: string; label: string }[] = [
   { keywords: ['начать', 'быстрый старт', 'как пользоват'], url: '/docs/quickstart', label: 'Быстрый старт' },
 ];
 
-// Find relevant doc links based on content
-function getRelevantDocLinks(content: string): { url: string; label: string }[] {
-  const lowerContent = content.toLowerCase();
-  const found: { url: string; label: string }[] = [];
-  const usedUrls = new Set<string>();
-
-  for (const doc of DOC_LINKS) {
-    if (usedUrls.has(doc.url)) continue;
-    
-    for (const keyword of doc.keywords) {
-      if (lowerContent.includes(keyword.toLowerCase())) {
-        found.push({ url: doc.url, label: doc.label });
-        usedUrls.add(doc.url);
-        break;
-      }
-    }
-  }
-
-  // Limit to 3 most relevant links
-  return found.slice(0, 3);
-}
-
 function formatTimeAgo(date: Date): string {
   const now = new Date();
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -211,168 +261,57 @@ function formatTimeAgo(date: Date): string {
   return date.toLocaleDateString('ru-RU');
 }
 
-// Model link component - styled card for "Try model" links
-function ModelLink({ label, modelId, action, docUrl }: { label: string; modelId: string; action: string; docUrl: string }) {
-  const [hoveredButton, setHoveredButton] = useState<'try' | 'doc' | null>(null);
-  
-  // Build URL based on action type
-  const getModelUrl = () => {
-    // Video actions -> /video page
-    if (action.startsWith('video')) {
-      return `/video?model=${modelId}`;
-    }
-    // Inpaint -> /inpaint page
-    if (action === 'inpaint') {
-      return `/inpaint?model=${modelId}`;
-    }
-    // Expand/Outpaint -> /expand page
-    if (action === 'expand') {
-      return `/expand?model=${modelId}`;
-    }
-    // Analyze -> /analyze page
-    if (action.startsWith('analyze')) {
-      return `/analyze?model=${modelId}`;
-    }
-    // Brainstorm -> /brainstorm page
-    if (action === 'brainstorm') {
-      return `/brainstorm?model=${modelId}`;
-    }
-    // Keyframes -> /keyframes page
-    if (action === 'keyframes') {
-      return `/keyframes?model=${modelId}`;
-    }
-    // Other actions (create, edit, upscale, remove_bg) -> home page with action param
-    if (action !== 'create') {
-      return `/?action=${action}&model=${modelId}`;
-    }
-    // Default: create action -> home page
-    return `/?model=${modelId}`;
-  };
-    
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '4px',
-      width: '100%',
-      maxWidth: '356px',
-      marginTop: '8px',
-      marginBottom: '8px',
-    }}>
-      {/* Model name */}
-      <span style={{
-        fontFamily: 'Google Sans, sans-serif',
-        fontWeight: 600,
-        fontSize: '14px',
-        lineHeight: 1.4,
-        color: '#FFFFFF',
-      }}>
-        {label}
-      </span>
-      
-      {/* Buttons row */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        {/* Try button */}
-        <a 
-          href={getModelUrl()}
-          onMouseEnter={() => setHoveredButton('try')}
-          onMouseLeave={() => setHoveredButton(null)}
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '6px',
-            flex: 1,
-            padding: '8px 12px',
-            background: hoveredButton === 'try' ? '#FFFFFF' : '#333333',
-            borderRadius: '10px',
-            textDecoration: 'none',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <span style={{
-            fontFamily: 'Google Sans, sans-serif',
-            fontWeight: 500,
-            fontSize: '11px',
-            lineHeight: 1.4,
-            textTransform: 'uppercase',
-            color: hoveredButton === 'try' ? '#000000' : '#FFFFFF',
-          }}>
-            Попробовать
-          </span>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 8H13M13 8L8.5 3.5M13 8L8.5 12.5" stroke={hoveredButton === 'try' ? '#000000' : '#FFFFFF'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </a>
-        
-        {/* Doc button */}
-        <a 
-          href={docUrl}
-          onMouseEnter={() => setHoveredButton('doc')}
-          onMouseLeave={() => setHoveredButton(null)}
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '6px',
-            flex: 1,
-            padding: '8px 12px',
-            border: hoveredButton === 'doc' ? '1px solid #FFFFFF' : '1px solid #333333',
-            borderRadius: '10px',
-            textDecoration: 'none',
-            background: 'transparent',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <span style={{
-            fontFamily: 'Google Sans, sans-serif',
-            fontWeight: 500,
-            fontSize: '11px',
-            lineHeight: 1.4,
-            textTransform: 'uppercase',
-            color: '#FFFFFF',
-          }}>
-            Документация
-          </span>
-          <img 
-            src="/icon-arrow-circle-right.svg" 
-            alt="" 
-            style={{ width: '12px', height: '12px' }}
-          />
-        </a>
-      </div>
-    </div>
-  );
+// Build URL based on action type
+function getModelUrl(modelId: string, action: string): string {
+  // Video actions -> /video page
+  if (action.startsWith('video')) {
+    return `/video?model=${modelId}`;
+  }
+  // Inpaint -> /inpaint page
+  if (action === 'inpaint') {
+    return `/inpaint?model=${modelId}`;
+  }
+  // Expand/Outpaint -> /expand page
+  if (action === 'expand') {
+    return `/expand?model=${modelId}`;
+  }
+  // Analyze -> /analyze page
+  if (action.startsWith('analyze')) {
+    return `/analyze?model=${modelId}`;
+  }
+  // Brainstorm -> /brainstorm page
+  if (action === 'brainstorm') {
+    return `/brainstorm?model=${modelId}`;
+  }
+  // Keyframes -> /keyframes page
+  if (action === 'keyframes') {
+    return `/keyframes?model=${modelId}`;
+  }
+  // Other actions (create, edit, upscale, remove_bg) -> home page with action param
+  if (action !== 'create') {
+    return `/?action=${action}&model=${modelId}`;
+  }
+  // Default: create action -> home page
+  return `/?model=${modelId}`;
 }
 
-// Doc link component - styled card for documentation links
-function DocLink({ name, href }: { name: string; href: string }) {
+// Model chip component - small chip with arrow icon
+function ModelChip({ label, modelId, action }: { label: string; modelId: string; action: string }) {
   const [isHovered, setIsHovered] = useState(false);
-  
-  // Clean up the name - remove "Ссылка:", "Ссылка на" etc.
-  const cleanName = name
-    .replace(/^Ссылка:\s*/i, '')
-    .replace(/^Ссылка на\s*/i, '')
-    .replace(/^Ссылка\s*/i, '')
-    .trim();
     
   return (
     <a 
-      href={href}
+      href={getModelUrl(modelId, action)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        width: '100%',
-        maxWidth: '356px',
+        gap: '8px',
         padding: '8px 8px 8px 12px',
         border: isHovered ? '1px solid #FFFFFF' : '1px solid #252525',
         borderRadius: '12px',
         textDecoration: 'none',
-        marginTop: '4px',
-        marginBottom: '12px',
         transition: 'border-color 0.2s ease',
       }}
     >
@@ -384,7 +323,7 @@ function DocLink({ name, href }: { name: string; href: string }) {
         textTransform: 'uppercase',
         color: '#FFFFFF',
       }}>
-        {cleanName}
+        {label}
       </span>
       <img 
         src="/icon-arrow-circle-right.svg" 
@@ -392,6 +331,95 @@ function DocLink({ name, href }: { name: string; href: string }) {
         style={{ width: '16px', height: '16px' }}
       />
     </a>
+  );
+}
+
+// Model chips section - shows recommended models as chips
+function ModelChipsSection({ models }: { models: { modelId: string; action: string; label: string; docUrl: string }[] }) {
+  if (models.length === 0) return null;
+  
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignSelf: 'stretch',
+      gap: '8px',
+      padding: '8px 0',
+    }}>
+      {/* Section title */}
+      <span style={{
+        fontFamily: 'Google Sans, sans-serif',
+        fontWeight: 500,
+        fontSize: '10px',
+        lineHeight: 1.4,
+        letterSpacing: '0.015em',
+        textTransform: 'uppercase',
+        color: '#959595',
+      }}>
+        Рекомендуемые модели
+      </span>
+      
+      {/* Chips row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        {models.map((model, idx) => (
+          <ModelChip 
+            key={idx}
+            label={model.label}
+            modelId={model.modelId}
+            action={model.action}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Documentation section component - shows doc links at the bottom
+function DocumentationSection({ links }: { links: { url: string; label: string }[] }) {
+  if (links.length === 0) return null;
+  
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      padding: '8px 0',
+    }}>
+      {/* Section title */}
+      <span style={{
+        fontFamily: 'Google Sans, sans-serif',
+        fontWeight: 500,
+        fontSize: '10px',
+        lineHeight: 1.4,
+        letterSpacing: '0.015em',
+        textTransform: 'uppercase',
+        color: '#959595',
+      }}>
+        Документация
+      </span>
+      
+      {/* Links */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {links.map((link, idx) => (
+          <a 
+            key={idx}
+            href={link.url}
+            style={{
+              fontFamily: 'Google Sans, sans-serif',
+              fontWeight: 400,
+              fontSize: '14px',
+              lineHeight: 1.4,
+              color: '#FFFFFF',
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px',
+            }}
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -536,22 +564,22 @@ function renderMarkdown(text: string): React.ReactNode {
         const linkText = linkMatch[1];
         const linkHref = linkMatch[2];
         
-        // Check if it's a doc link (/docs/) - render as styled card, not in list
-        if (linkHref.startsWith('/docs/') && !skipModelLinks) {
-          parts.push(<DocLink key={pk++} name={linkText} href={linkHref} />);
-        } else {
-          parts.push(
-            <a 
-              key={pk++} 
-              href={linkHref} 
-              style={{ color: '#60A5FA', textDecoration: 'underline' }}
-              target={linkHref.startsWith('http') ? '_blank' : undefined}
-              rel={linkHref.startsWith('http') ? 'noopener noreferrer' : undefined}
-            >
-              {linkText}
-            </a>
-          );
-        }
+        // All links rendered as white underlined text
+        parts.push(
+          <a 
+            key={pk++} 
+            href={linkHref} 
+            style={{ 
+              color: '#FFFFFF', 
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px'
+            }}
+            target={linkHref.startsWith('http') ? '_blank' : undefined}
+            rel={linkHref.startsWith('http') ? 'noopener noreferrer' : undefined}
+          >
+            {linkText}
+          </a>
+        );
         remaining = remaining.slice(linkMatch.index + linkMatch[0].length);
         continue;
       }
@@ -621,7 +649,8 @@ function renderMarkdown(text: string): React.ReactNode {
 
   // Now process the text with placeholders
   const lines = processedText.split('\n');
-  let listItems: string[] = [];
+  let listItems: { content: string; indent: number }[] = [];
+  let numberedItems: string[] = [];
   let tableRows: string[][] = [];
   let isInTable = false;
 
@@ -643,19 +672,34 @@ function renderMarkdown(text: string): React.ReactNode {
       .map(cell => cell.trim());
   };
 
-  // Helper: flush table
+  // Helper: flush table - inline in content with styled wrapper
   const flushTable = () => {
     if (tableRows.length > 1) {
       const headers = tableRows[0];
       const dataRows = tableRows.slice(1);
       
       elements.push(
-        <div key={key++} style={{ overflowX: 'auto', margin: '12px 0' }}>
+        <div 
+          key={key++} 
+          style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            alignSelf: 'stretch',
+            gap: '10px',
+            padding: '16px',
+            margin: '12px 0',
+            background: 'rgba(23, 23, 23, 0.04)',
+            border: '1px solid #2E2E2E',
+            borderRadius: '16px',
+            overflowX: 'auto'
+          }}
+        >
           <table style={{ 
             width: '100%', 
             borderCollapse: 'collapse', 
-            fontSize: '13px',
-            border: '1px solid #333'
+            fontSize: '13px'
           }}>
             <thead>
               <tr>
@@ -696,34 +740,89 @@ function renderMarkdown(text: string): React.ReactNode {
     isInTable = false;
   };
 
+  // Flush numbered list
+  const flushNumberedList = () => {
+    if (numberedItems.length > 0) {
+      elements.push(
+        <ol key={key++} style={{ 
+          margin: '12px 0', 
+          paddingLeft: '24px', 
+          listStyleType: 'decimal',
+          counterReset: 'item'
+        }}>
+          {numberedItems.map((item, i) => {
+            // Check if item starts with bold text (like "**Заголовок:**")
+            const boldMatch = item.match(/^\*\*([^*]+)\*\*:?\s*(.*)/);
+            if (boldMatch) {
+              return (
+                <li key={i} style={{ 
+                  marginBottom: '12px', 
+                  color: '#D9D9D9',
+                  paddingLeft: '4px'
+                }}>
+                  <strong style={{ color: '#FFFFFF', display: 'block', marginBottom: '4px' }}>
+                    {boldMatch[1]}
+                  </strong>
+                  {boldMatch[2] && (
+                    <span style={{ color: '#B0B0B0' }}>{processInline(boldMatch[2], true)}</span>
+                  )}
+                </li>
+              );
+            }
+            return (
+              <li key={i} style={{ marginBottom: '8px', color: '#D9D9D9', paddingLeft: '4px' }}>
+                {processInline(item, true)}
+              </li>
+            );
+          })}
+        </ol>
+      );
+      numberedItems = [];
+    }
+  };
+  
   const flushList = () => {
     if (listItems.length > 0) {
       // Separate items with doc links from regular items
-      const regularItems: string[] = [];
+      const regularItems: { content: string; indent: number }[] = [];
       const docLinkItems: { text: string; links: React.ReactNode[] }[] = [];
       
       listItems.forEach(item => {
-        if (hasDocLink(item)) {
-          const cleanText = removeDocLinks(item);
-          const links = extractDocLinks(item);
+        if (hasDocLink(item.content)) {
+          const cleanText = removeDocLinks(item.content);
+          const links = extractDocLinks(item.content);
           docLinkItems.push({ text: cleanText, links });
         } else {
           regularItems.push(item);
         }
       });
       
-      // Render regular list items
+      // Render regular list items with indent support
       if (regularItems.length > 0) {
         elements.push(
           <ul key={key++} style={{ margin: '8px 0', paddingLeft: '20px', listStyleType: 'disc' }}>
             {regularItems.map((item, i) => {
-              // Check if item has multiple lines (merged description)
-              if (item.includes('\n')) {
-                const lines = item.split('\n');
+              // Check if item starts with bold text (like "**Категория:**")
+              const boldMatch = item.content.match(/^\*\*([^*]+)\*\*:?\s*(.*)/);
+              const indentStyle = item.indent > 0 ? { 
+                marginLeft: `${item.indent * 16}px`,
+                listStyleType: item.indent === 1 ? 'circle' : 'square'
+              } : {};
+              
+              if (boldMatch) {
                 return (
-                  <li key={i} style={{ marginBottom: '8px', color: '#D9D9D9' }}>
-                    {lines.map((line, j) => (
-                      <div key={j} style={{ marginBottom: j === 0 ? '2px' : 0 }}>
+                  <li key={i} style={{ marginBottom: '6px', color: '#D9D9D9', ...indentStyle }}>
+                    <strong style={{ color: '#FFFFFF' }}>{boldMatch[1]}</strong>
+                    {boldMatch[2] && <span style={{ color: '#B0B0B0' }}>: {processInline(boldMatch[2], true)}</span>}
+                  </li>
+                );
+              } else if (item.content.includes('\n')) {
+                // Multi-line item
+                const lines = item.content.split('\n');
+                return (
+                  <li key={i} style={{ marginBottom: '8px', color: '#D9D9D9', ...indentStyle }}>
+                    {lines.map((line, lIdx) => (
+                      <div key={lIdx} style={{ marginBottom: lIdx === 0 ? '2px' : 0 }}>
                         {processInline(line, true)}
                       </div>
                     ))}
@@ -731,8 +830,8 @@ function renderMarkdown(text: string): React.ReactNode {
                 );
               }
               return (
-                <li key={i} style={{ marginBottom: '4px', color: '#D9D9D9' }}>
-                  {processInline(item, true)}
+                <li key={i} style={{ marginBottom: '4px', color: '#D9D9D9', ...indentStyle }}>
+                  {processInline(item.content, true)}
                 </li>
               );
             })}
@@ -770,6 +869,7 @@ function renderMarkdown(text: string): React.ReactNode {
       }
       // This is a data/header row
       flushList();
+      flushNumberedList();
       tableRows.push(parseTableRow(trimmed));
       isInTable = true;
       continue;
@@ -782,6 +882,7 @@ function renderMarkdown(text: string): React.ReactNode {
     const promptMatch = trimmed.match(/^__PROMPT_BLOCK_(\d+)__$/);
     if (promptMatch) {
       flushList();
+      flushNumberedList();
       const promptIdx = parseInt(promptMatch[1]);
       if (promptBlocks[promptIdx]) {
         elements.push(<PromptBlock key={key++} content={promptBlocks[promptIdx]} blockKey={key} />);
@@ -792,6 +893,7 @@ function renderMarkdown(text: string): React.ReactNode {
     // Check for inline prompt block placeholder (within text)
     if (trimmed.includes('__PROMPT_BLOCK_') && !promptMatch) {
       flushList();
+      flushNumberedList();
       elements.push(
         <div key={key++} style={{ margin: '6px 0' }}>
           {processInline(trimmed)}
@@ -802,6 +904,7 @@ function renderMarkdown(text: string): React.ReactNode {
 
     if (!trimmed) {
       flushList();
+      flushNumberedList();
       elements.push(<div key={key++} style={{ height: '8px' }} />);
       continue;
     }
@@ -815,6 +918,7 @@ function renderMarkdown(text: string): React.ReactNode {
     // Horizontal rule
     if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
       flushList();
+      flushNumberedList();
       elements.push(
         <hr key={key++} style={{ border: 'none', borderTop: '1px solid #333', margin: '16px 0' }} />
       );
@@ -824,6 +928,7 @@ function renderMarkdown(text: string): React.ReactNode {
     // Headers (check from most # to least)
     if (trimmed.startsWith('#### ')) {
       flushList();
+      flushNumberedList();
       elements.push(
         <h5 key={key++} style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', margin: '10px 0 4px 0' }}>
           {processInline(trimmed.slice(5))}
@@ -833,6 +938,7 @@ function renderMarkdown(text: string): React.ReactNode {
     }
     if (trimmed.startsWith('### ')) {
       flushList();
+      flushNumberedList();
       elements.push(
         <h4 key={key++} style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF', margin: '12px 0 6px 0' }}>
           {processInline(trimmed.slice(4))}
@@ -842,6 +948,7 @@ function renderMarkdown(text: string): React.ReactNode {
     }
     if (trimmed.startsWith('## ')) {
       flushList();
+      flushNumberedList();
       elements.push(
         <h3 key={key++} style={{ fontSize: '15px', fontWeight: 600, color: '#FFFFFF', margin: '14px 0 8px 0' }}>
           {processInline(trimmed.slice(3))}
@@ -851,6 +958,7 @@ function renderMarkdown(text: string): React.ReactNode {
     }
     if (trimmed.startsWith('# ')) {
       flushList();
+      flushNumberedList();
       elements.push(
         <h2 key={key++} style={{ fontSize: '16px', fontWeight: 600, color: '#FFFFFF', margin: '16px 0 10px 0' }}>
           {processInline(trimmed.slice(2))}
@@ -859,34 +967,59 @@ function renderMarkdown(text: string): React.ReactNode {
       continue;
     }
 
-    // List items
-    if (trimmed.match(/^[-*•]\s/)) {
-      const itemContent = trimmed.slice(2);
+    // List items - detect indent level by spaces before the marker
+    const listMatch = line.match(/^(\s*)([-*•])\s(.+)/);
+    if (listMatch) {
+      flushNumberedList(); // Flush any pending numbered list
+      const indent = Math.floor(listMatch[1].length / 2); // 2 spaces = 1 indent level
+      const itemContent = listMatch[3];
       
       // Check if this is a description line (Применение:, Почему:, Когда:)
-      // If so, merge with previous list item
+      // If so, merge with previous list item at same or lower indent
       if (listItems.length > 0 && /^(Применение|Почему|Когда использовать|Особенности):/i.test(itemContent)) {
-        // Append to previous item with line break
-        listItems[listItems.length - 1] += '\n' + itemContent;
+        // Find the last item at same or lower indent
+        for (let idx = listItems.length - 1; idx >= 0; idx--) {
+          if (listItems[idx].indent <= indent) {
+            listItems[idx].content += '\n' + itemContent;
+            break;
+          }
+        }
       } else {
-        listItems.push(itemContent);
+        listItems.push({ content: itemContent, indent });
       }
       continue;
     }
     
-    // Numbered list
-    if (trimmed.match(/^\d+\.\s/)) {
+    // Numbered list - collect into group
+    const numberedMatch = trimmed.match(/^\d+\.\s+(.+)/);
+    if (numberedMatch) {
+      flushList(); // Flush any pending bullet list
+      numberedItems.push(numberedMatch[1]);
+      continue;
+    }
+    
+    // Bold line that looks like a section header (e.g., "**Категория:**")
+    if (trimmed.match(/^\*\*[^*]+\*\*:?\s*$/) && !trimmed.startsWith('#')) {
       flushList();
+      flushNumberedList();
+      const headerText = trimmed.replace(/^\*\*/, '').replace(/\*\*:?\s*$/, '');
       elements.push(
-        <div key={key++} style={{ marginBottom: '4px', paddingLeft: '4px', color: '#D9D9D9' }}>
-          {processInline(trimmed)}
-        </div>
+        <h5 key={key++} style={{ 
+          fontSize: '13px', 
+          fontWeight: 600, 
+          color: '#FFFFFF', 
+          margin: '14px 0 6px 0',
+          letterSpacing: '0.01em'
+        }}>
+          {headerText}
+        </h5>
       );
       continue;
     }
 
     // Regular paragraph
     flushList();
+    flushNumberedList();
     elements.push(
       <p key={key++} style={{ margin: '6px 0', color: '#D9D9D9', lineHeight: 1.5 }}>
         {processInline(trimmed)}
@@ -895,6 +1028,7 @@ function renderMarkdown(text: string): React.ReactNode {
   }
 
   flushList();
+  flushNumberedList();
   flushTable();
   return elements;
 }
@@ -908,6 +1042,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { avatarUrl, email: userEmail } = useUser();
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -1301,8 +1436,13 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                 gap: '12px',
                 marginTop: 'auto'
               }}>
-                {messages.map((message) => (
-                  message.role === 'user' ? (
+                {messages.map((message, messageIndex) => {
+                  // Find the previous user message (for context)
+                  const previousUserMessage = message.role === 'assistant' 
+                    ? messages.slice(0, messageIndex).reverse().find(m => m.role === 'user')?.content || ''
+                    : '';
+                  
+                  return message.role === 'user' ? (
                     /* USER MESSAGE: Frame 52 - column, center items-end, fill width */
                     <div 
                       key={message.id}
@@ -1313,11 +1453,12 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                         width: '100%'
                       }}
                     >
-                      {/* Frame 50: row, items-center, padding-right 12px, hug */}
+                      {/* Frame with bubble + avatar */}
                       <div style={{ 
                         display: 'flex',
                         alignItems: 'center',
-                        paddingRight: '12px'
+                        gap: '8px',
+                        justifyContent: 'flex-end'
                       }}>
                         {/* Bubble: row center, gap 10px, padding 8px 12px, bg #212121, border #2E2E2E, radius 12px, max-width 356px */}
                         <div style={{
@@ -1344,6 +1485,36 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                           }}>
                             {message.content}
                           </span>
+                        </div>
+                        
+                        {/* User Avatar - 24x24 circle */}
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '1000px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          background: avatarUrl ? 'transparent' : 'linear-gradient(135deg, #9333ea, #ec4899)'
+                        }}>
+                          {avatarUrl ? (
+                            <img 
+                              src={avatarUrl} 
+                              alt="Avatar" 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <span style={{ color: '#FFFFFF', fontSize: '10px', fontWeight: 500 }}>
+                                {userEmail ? userEmail[0].toUpperCase() : 'U'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -1396,66 +1567,52 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                       </div>
                     </div>
                   ) : (
-                    /* ASSISTANT MESSAGE: Frame 47 - column, gap 8px, padding-left 12px */
+                    /* ASSISTANT MESSAGE - no bubble, just text with header */
                     <div 
                       key={message.id}
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
-                        gap: '8px',
-                        paddingLeft: '12px',
+                        alignSelf: 'stretch',
+                        gap: '12px',
                         width: '100%'
                       }}
                     >
-                      {/* Bubble: 356px, padding 12px, gap 10px */}
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        gap: '10px',
-                        padding: '12px',
-                        width: '356px',
-                        maxWidth: '100%',
-                        background: 'rgba(23, 23, 23, 0.04)',
-                        border: '1px solid #2E2E2E',
-                        borderRadius: '16px'
+                      {/* Header: BASECRAFT AI */}
+                      <span style={{
+                        fontFamily: 'Google Sans, sans-serif',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        lineHeight: 1.33,
+                        color: '#7E7E7E'
                       }}>
-                        {/* Markdown rendered content */}
-                        <div style={{
-                          fontFamily: 'Google Sans, sans-serif',
-                          fontWeight: 400,
-                          fontSize: '14px',
-                          lineHeight: 1.4,
-                          letterSpacing: '-0.01em',
-                          textAlign: 'left',
-                          width: '332px',
-                          maxWidth: '100%'
-                        }}>
-                          {renderMarkdown(message.content)}
-                        </div>
-                        
-                        {/* Model links - auto-detected from content */}
-                        {(() => {
-                          const modelLinks = getRelevantModelLinks(message.content);
-                          if (modelLinks.length === 0) return null;
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {modelLinks.map((link, idx) => (
-                                <ModelLink 
-                                  key={idx}
-                                  label={link.label}
-                                  modelId={link.modelId}
-                                  action={link.action}
-                                  docUrl={link.docUrl}
-                                />
-                              ))}
-                            </div>
-                          );
-                        })()}
+                        BASECRAFT AI
+                      </span>
+                      
+                      {/* Markdown rendered content - no bubble */}
+                      <div style={{
+                        fontFamily: 'Google Sans, sans-serif',
+                        fontWeight: 400,
+                        fontSize: '14px',
+                        lineHeight: 1.4,
+                        letterSpacing: '-0.01em',
+                        textAlign: 'left',
+                        color: '#D9D9D9',
+                        maxWidth: '100%'
+                      }}>
+                        {renderMarkdown(message.content)}
                       </div>
                       
-                      {/* Actions UNDER bubble: row, gap 4px */}
+                      {/* Documentation section - only if relevant */}
+                      {isAboutDocumentation(previousUserMessage, message.content) && (
+                        <DocumentationSection links={getRelevantDocLinks(message.content)} />
+                      )}
+                      
+                      {/* Model chips section - only if actually recommended */}
+                      <ModelChipsSection models={getRelevantModelLinks(message.content)} />
+                  
+                      {/* Actions: row, gap 4px */}
                       <div style={{ 
                         display: 'flex',
                         alignItems: 'center',
@@ -1504,8 +1661,8 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                         </button>
                       </div>
                     </div>
-                  )
-                ))}
+                  );
+                })}
                 
                 {/* Loading: row, items-center, gap 6px, fill width */}
                 {isLoading && (
@@ -1698,3 +1855,4 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
     </>
   );
 }
+
