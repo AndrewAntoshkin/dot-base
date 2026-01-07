@@ -33,6 +33,68 @@ const SUGGESTIONS = [
   'Как сделать видео из картинки?',
 ];
 
+// Model links mapping - for "Try it" buttons
+const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label: string; docUrl: string }[] = [
+  // Flux models
+  { keywords: ['flux 2 max', 'flux max', 'flux-2-max'], modelId: 'flux-2-max', action: 'create', label: 'Flux 2 Max', docUrl: '/docs/models/flux/flux-2-max' },
+  { keywords: ['flux 2 pro', 'flux-2-pro'], modelId: 'flux-2-pro', action: 'create', label: 'Flux 2 Pro', docUrl: '/docs/models/flux/flux-2-pro' },
+  { keywords: ['flux 1.1 pro', 'flux 1-1 pro', 'flux-1-1-pro'], modelId: 'flux-1-1-pro', action: 'create', label: 'Flux 1.1 Pro', docUrl: '/docs/models/flux/flux-1-1-pro' },
+  { keywords: ['flux kontext max', 'flux-kontext-max'], modelId: 'flux-kontext-max', action: 'create', label: 'Flux Kontext Max', docUrl: '/docs/models/flux/flux-kontext-max' },
+  { keywords: ['flux kontext fast', 'flux-kontext-fast'], modelId: 'flux-kontext-fast', action: 'create', label: 'Flux Kontext Fast', docUrl: '/docs/models/flux/flux-kontext-fast' },
+  { keywords: ['flux fill', 'flux-fill-pro'], modelId: 'flux-fill-pro', action: 'inpaint', label: 'Flux Fill Pro', docUrl: '/docs/models/flux/flux-fill-pro' },
+  // Ideogram
+  { keywords: ['ideogram', 'ideogram v3', 'ideogram-v3'], modelId: 'ideogram-v3', action: 'create', label: 'Ideogram V3', docUrl: '/docs/models/ideogram/ideogram-v3' },
+  // Recraft
+  { keywords: ['recraft v3', 'recraft-v3'], modelId: 'recraft-v3', action: 'create', label: 'Recraft V3', docUrl: '/docs/models/recraft/recraft-v3' },
+  { keywords: ['recraft crisp', 'recraft-crisp'], modelId: 'recraft-crisp', action: 'create', label: 'Recraft Crisp', docUrl: '/docs/models/recraft/recraft-crisp' },
+  // Seedream
+  { keywords: ['seedream 4.5', 'seedream-4-5'], modelId: 'seedream-4-5', action: 'create', label: 'Seedream 4.5', docUrl: '/docs/models/seedream/seedream-4-5' },
+  { keywords: ['seedream 4', 'seedream-4'], modelId: 'seedream-4', action: 'create', label: 'Seedream 4', docUrl: '/docs/models/seedream/seedream-4' },
+  // Google
+  { keywords: ['imagen 4', 'imagen-4', 'google imagen'], modelId: 'imagen-4', action: 'create', label: 'Google Imagen 4', docUrl: '/docs/models/google/imagen-4' },
+  { keywords: ['veo 3.1', 'veo-3-1', 'google veo'], modelId: 'veo-3-1', action: 'video_create', label: 'Google Veo 3.1', docUrl: '/docs/models/google/veo-3-1' },
+  // Video - Kling
+  { keywords: ['kling 2.5', 'kling-2-5-pro'], modelId: 'kling-2-5-pro', action: 'video_create', label: 'Kling 2.5 Pro', docUrl: '/docs/models/kling/kling-2-5-pro' },
+  { keywords: ['kling 2.1', 'kling-2-1-master'], modelId: 'kling-2-1-master', action: 'video_create', label: 'Kling 2.1 Master', docUrl: '/docs/models/kling/kling-2-1-master' },
+  { keywords: ['kling 2.0', 'kling-2-0'], modelId: 'kling-2-0', action: 'video_create', label: 'Kling 2.0', docUrl: '/docs/models/kling/kling-2-0' },
+  // Video - Hailuo
+  { keywords: ['hailuo 2.3', 'hailuo-2-3'], modelId: 'hailuo-2-3', action: 'video_create', label: 'Hailuo 2.3', docUrl: '/docs/models/hailuo/hailuo-2-3' },
+  { keywords: ['hailuo 02', 'hailuo-02'], modelId: 'hailuo-02', action: 'video_create', label: 'Hailuo 02', docUrl: '/docs/models/hailuo/hailuo-02' },
+  // Video - Seedance
+  { keywords: ['seedance 1.5', 'seedance-1-5'], modelId: 'seedance-1-5', action: 'video_create', label: 'Seedance 1.5 Pro', docUrl: '/docs/models/other/seedance-1-5' },
+  { keywords: ['seedance'], modelId: 'seedance', action: 'video_create', label: 'Seedance', docUrl: '/docs/models/other/seedance' },
+  // Upscale
+  { keywords: ['clarity upscaler', 'clarity'], modelId: 'clarity', action: 'upscale', label: 'Clarity Upscaler', docUrl: '/docs/models/upscale/clarity' },
+  { keywords: ['creative upscaler', 'crystal'], modelId: 'crystal', action: 'upscale', label: 'Creative Upscaler', docUrl: '/docs/models/upscale/crystal' },
+  // Remove BG
+  { keywords: ['birefnet', 'удаление фона'], modelId: 'birefnet', action: 'remove_bg', label: 'BiRefNet', docUrl: '/docs/models/remove-bg/birefnet' },
+  // Other
+  { keywords: ['runway gen4', 'runway-gen4'], modelId: 'runway-gen4', action: 'video_create', label: 'Runway Gen4', docUrl: '/docs/models/other/runway-gen4' },
+  { keywords: ['wan 2.5', 'wan-2-5'], modelId: 'wan-2-5', action: 'video_create', label: 'Wan 2.5', docUrl: '/docs/models/other/wan-2-5' },
+];
+
+// Find model links based on content
+function getRelevantModelLinks(content: string): { modelId: string; action: string; label: string; docUrl: string }[] {
+  const lowerContent = content.toLowerCase();
+  const found: { modelId: string; action: string; label: string; docUrl: string }[] = [];
+  const usedModels = new Set<string>();
+
+  for (const model of MODEL_LINKS) {
+    if (usedModels.has(model.modelId)) continue;
+    
+    for (const keyword of model.keywords) {
+      if (lowerContent.includes(keyword.toLowerCase())) {
+        found.push({ modelId: model.modelId, action: model.action, label: model.label, docUrl: model.docUrl });
+        usedModels.add(model.modelId);
+        break;
+      }
+    }
+  }
+
+  // Limit to 2 most relevant model links
+  return found.slice(0, 2);
+}
+
 // Documentation links mapping
 const DOC_LINKS: { keywords: string[]; url: string; label: string }[] = [
   // Models - Flux
@@ -97,6 +159,118 @@ function formatTimeAgo(date: Date): string {
   if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`;
   return date.toLocaleDateString('ru-RU');
+}
+
+// Model link component - styled card for "Try model" links
+function ModelLink({ label, modelId, action, docUrl }: { label: string; modelId: string; action: string; docUrl: string }) {
+  const [hoveredButton, setHoveredButton] = useState<'try' | 'doc' | null>(null);
+  
+  // Build URL based on action type
+  const getModelUrl = () => {
+    if (action.startsWith('video')) {
+      return `/video?model=${modelId}`;
+    } else if (action === 'inpaint') {
+      return `/inpaint?model=${modelId}`;
+    } else if (action === 'upscale' || action === 'remove_bg') {
+      return `/?action=${action}&model=${modelId}`;
+    }
+    return `/?model=${modelId}`;
+  };
+    
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+      width: '100%',
+      maxWidth: '356px',
+      marginTop: '8px',
+      marginBottom: '8px',
+    }}>
+      {/* Model name */}
+      <span style={{
+        fontFamily: 'Google Sans, sans-serif',
+        fontWeight: 600,
+        fontSize: '14px',
+        lineHeight: 1.4,
+        color: '#FFFFFF',
+      }}>
+        {label}
+      </span>
+      
+      {/* Buttons row */}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Try button */}
+        <a 
+          href={getModelUrl()}
+          onMouseEnter={() => setHoveredButton('try')}
+          onMouseLeave={() => setHoveredButton(null)}
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '6px',
+            flex: 1,
+            padding: '8px 12px',
+            background: hoveredButton === 'try' ? '#FFFFFF' : '#333333',
+            borderRadius: '10px',
+            textDecoration: 'none',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <span style={{
+            fontFamily: 'Google Sans, sans-serif',
+            fontWeight: 500,
+            fontSize: '11px',
+            lineHeight: 1.4,
+            textTransform: 'uppercase',
+            color: hoveredButton === 'try' ? '#000000' : '#FFFFFF',
+          }}>
+            Попробовать
+          </span>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 8H13M13 8L8.5 3.5M13 8L8.5 12.5" stroke={hoveredButton === 'try' ? '#000000' : '#FFFFFF'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+        
+        {/* Doc button */}
+        <a 
+          href={docUrl}
+          onMouseEnter={() => setHoveredButton('doc')}
+          onMouseLeave={() => setHoveredButton(null)}
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '6px',
+            flex: 1,
+            padding: '8px 12px',
+            border: hoveredButton === 'doc' ? '1px solid #FFFFFF' : '1px solid #333333',
+            borderRadius: '10px',
+            textDecoration: 'none',
+            background: 'transparent',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <span style={{
+            fontFamily: 'Google Sans, sans-serif',
+            fontWeight: 500,
+            fontSize: '11px',
+            lineHeight: 1.4,
+            textTransform: 'uppercase',
+            color: '#FFFFFF',
+          }}>
+            Документация
+          </span>
+          <img 
+            src="/icon-arrow-circle-right.svg" 
+            alt="" 
+            style={{ width: '12px', height: '12px' }}
+          />
+        </a>
+      </div>
+    </div>
+  );
 }
 
 // Doc link component - styled card for documentation links
@@ -1188,6 +1362,25 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                         }}>
                           {renderMarkdown(message.content)}
                         </div>
+                        
+                        {/* Model links - auto-detected from content */}
+                        {(() => {
+                          const modelLinks = getRelevantModelLinks(message.content);
+                          if (modelLinks.length === 0) return null;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {modelLinks.map((link, idx) => (
+                                <ModelLink 
+                                  key={idx}
+                                  label={link.label}
+                                  modelId={link.modelId}
+                                  action={link.action}
+                                  docUrl={link.docUrl}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                       
                       {/* Actions UNDER bubble: row, gap 4px */}
