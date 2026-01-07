@@ -34,43 +34,77 @@ const SUGGESTIONS = [
 ];
 
 // Model links mapping - for "Try it" buttons
+// IMPORTANT: modelId must match exactly with id in models-config.ts
 const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label: string; docUrl: string }[] = [
+  // === IMAGE CREATE ===
   // Flux models
-  { keywords: ['flux 2 max', 'flux max', 'flux-2-max'], modelId: 'flux-2-max', action: 'create', label: 'Flux 2 Max', docUrl: '/docs/models/flux/flux-2-max' },
-  { keywords: ['flux 2 pro', 'flux-2-pro'], modelId: 'flux-2-pro', action: 'create', label: 'Flux 2 Pro', docUrl: '/docs/models/flux/flux-2-pro' },
-  { keywords: ['flux 1.1 pro', 'flux 1-1 pro', 'flux-1-1-pro'], modelId: 'flux-1-1-pro', action: 'create', label: 'Flux 1.1 Pro', docUrl: '/docs/models/flux/flux-1-1-pro' },
-  { keywords: ['flux kontext max', 'flux-kontext-max'], modelId: 'flux-kontext-max', action: 'create', label: 'Flux Kontext Max', docUrl: '/docs/models/flux/flux-kontext-max' },
-  { keywords: ['flux kontext fast', 'flux-kontext-fast'], modelId: 'flux-kontext-fast', action: 'create', label: 'Flux Kontext Fast', docUrl: '/docs/models/flux/flux-kontext-fast' },
-  { keywords: ['flux fill', 'flux-fill-pro'], modelId: 'flux-fill-pro', action: 'inpaint', label: 'Flux Fill Pro', docUrl: '/docs/models/flux/flux-fill-pro' },
-  // Ideogram
-  { keywords: ['ideogram', 'ideogram v3', 'ideogram-v3'], modelId: 'ideogram-v3', action: 'create', label: 'Ideogram V3', docUrl: '/docs/models/ideogram/ideogram-v3' },
-  // Recraft
-  { keywords: ['recraft v3', 'recraft-v3'], modelId: 'recraft-v3', action: 'create', label: 'Recraft V3', docUrl: '/docs/models/recraft/recraft-v3' },
-  { keywords: ['recraft crisp', 'recraft-crisp'], modelId: 'recraft-crisp', action: 'create', label: 'Recraft Crisp', docUrl: '/docs/models/recraft/recraft-crisp' },
+  { keywords: ['flux 2 max', 'flux max'], modelId: 'flux-2-max', action: 'create', label: 'Flux 2 Max', docUrl: '/docs/models/flux/flux-2-max' },
+  { keywords: ['flux 2 pro'], modelId: 'flux-2-pro', action: 'create', label: 'Flux 2 Pro', docUrl: '/docs/models/flux/flux-2-pro' },
+  { keywords: ['flux 1.1 pro', 'flux 1.1'], modelId: 'flux-1.1-pro', action: 'create', label: 'Flux 1.1 Pro', docUrl: '/docs/models/flux/flux-1-1-pro' },
+  { keywords: ['flux kontext max'], modelId: 'flux-kontext-max', action: 'create', label: 'Flux Kontext Max', docUrl: '/docs/models/flux/flux-kontext-max' },
+  { keywords: ['flux kontext fast'], modelId: 'flux-kontext-fast', action: 'create', label: 'Flux Kontext Fast', docUrl: '/docs/models/flux/flux-kontext-fast' },
   // Seedream
-  { keywords: ['seedream 4.5', 'seedream-4-5'], modelId: 'seedream-4-5', action: 'create', label: 'Seedream 4.5', docUrl: '/docs/models/seedream/seedream-4-5' },
-  { keywords: ['seedream 4', 'seedream-4'], modelId: 'seedream-4', action: 'create', label: 'Seedream 4', docUrl: '/docs/models/seedream/seedream-4' },
+  { keywords: ['seedream 4.5'], modelId: 'seedream-4.5', action: 'create', label: 'Seedream 4.5', docUrl: '/docs/models/seedream/seedream-4-5' },
+  { keywords: ['seedream 4', 'seedream'], modelId: 'seedream-4', action: 'create', label: 'Seedream 4', docUrl: '/docs/models/seedream/seedream-4' },
+  // Ideogram
+  { keywords: ['ideogram', 'ideogram v3', 'текст на изображ'], modelId: 'ideogram-v3-turbo', action: 'create', label: 'Ideogram V3', docUrl: '/docs/models/ideogram/ideogram-v3' },
   // Google
-  { keywords: ['imagen 4', 'imagen-4', 'google imagen'], modelId: 'imagen-4', action: 'create', label: 'Google Imagen 4', docUrl: '/docs/models/google/imagen-4' },
-  { keywords: ['veo 3.1', 'veo-3-1', 'google veo'], modelId: 'veo-3-1', action: 'video_create', label: 'Google Veo 3.1', docUrl: '/docs/models/google/veo-3-1' },
-  // Video - Kling
-  { keywords: ['kling 2.5', 'kling-2-5-pro'], modelId: 'kling-2-5-pro', action: 'video_create', label: 'Kling 2.5 Pro', docUrl: '/docs/models/kling/kling-2-5-pro' },
-  { keywords: ['kling 2.1', 'kling-2-1-master'], modelId: 'kling-2-1-master', action: 'video_create', label: 'Kling 2.1 Master', docUrl: '/docs/models/kling/kling-2-1-master' },
-  { keywords: ['kling 2.0', 'kling-2-0'], modelId: 'kling-2-0', action: 'video_create', label: 'Kling 2.0', docUrl: '/docs/models/kling/kling-2-0' },
-  // Video - Hailuo
-  { keywords: ['hailuo 2.3', 'hailuo-2-3'], modelId: 'hailuo-2-3', action: 'video_create', label: 'Hailuo 2.3', docUrl: '/docs/models/hailuo/hailuo-2-3' },
-  { keywords: ['hailuo 02', 'hailuo-02'], modelId: 'hailuo-02', action: 'video_create', label: 'Hailuo 02', docUrl: '/docs/models/hailuo/hailuo-02' },
-  // Video - Seedance
-  { keywords: ['seedance 1.5', 'seedance-1-5'], modelId: 'seedance-1-5', action: 'video_create', label: 'Seedance 1.5 Pro', docUrl: '/docs/models/other/seedance-1-5' },
-  { keywords: ['seedance'], modelId: 'seedance', action: 'video_create', label: 'Seedance', docUrl: '/docs/models/other/seedance' },
-  // Upscale
-  { keywords: ['clarity upscaler', 'clarity'], modelId: 'clarity', action: 'upscale', label: 'Clarity Upscaler', docUrl: '/docs/models/upscale/clarity' },
-  { keywords: ['creative upscaler', 'crystal'], modelId: 'crystal', action: 'upscale', label: 'Creative Upscaler', docUrl: '/docs/models/upscale/crystal' },
-  // Remove BG
-  { keywords: ['birefnet', 'удаление фона'], modelId: 'birefnet', action: 'remove_bg', label: 'BiRefNet', docUrl: '/docs/models/remove-bg/birefnet' },
-  // Other
-  { keywords: ['runway gen4', 'runway-gen4'], modelId: 'runway-gen4', action: 'video_create', label: 'Runway Gen4', docUrl: '/docs/models/other/runway-gen4' },
-  { keywords: ['wan 2.5', 'wan-2-5'], modelId: 'wan-2-5', action: 'video_create', label: 'Wan 2.5', docUrl: '/docs/models/other/wan-2-5' },
+  { keywords: ['imagen 4', 'imagen', 'google imagen'], modelId: 'imagen-4-ultra', action: 'create', label: 'Google Imagen 4', docUrl: '/docs/models/google/imagen-4' },
+  // Recraft
+  { keywords: ['recraft v3'], modelId: 'recraft-v3', action: 'create', label: 'Recraft V3', docUrl: '/docs/models/recraft/recraft-v3' },
+  { keywords: ['recraft svg', 'векторн'], modelId: 'recraft-v3-svg', action: 'create', label: 'Recraft V3 SVG', docUrl: '/docs/models/recraft/recraft-v3-svg' },
+  // Other create
+  { keywords: ['stable diffusion', 'sd 3.5', 'sd3'], modelId: 'sd-3.5-large', action: 'create', label: 'Stable Diffusion 3.5', docUrl: '/docs/models/other/sd-3-5' },
+  { keywords: ['minimax image', 'minimax'], modelId: 'minimax-image-01', action: 'create', label: 'MiniMax Image', docUrl: '/docs/models/other/minimax-image' },
+  { keywords: ['nano banana', 'banana'], modelId: 'nano-banana-pro', action: 'create', label: 'Nano Banana Pro', docUrl: '/docs/models/other/nano-banana' },
+  { keywords: ['reve create', 'reve image'], modelId: 'reve-create', action: 'create', label: 'Reve Create', docUrl: '/docs/models/other/reve-create' },
+  { keywords: ['gen4 image', 'runway image'], modelId: 'gen4-image-turbo', action: 'create', label: 'Gen4 Image', docUrl: '/docs/models/other/gen4-image' },
+  
+  // === VIDEO CREATE (text-to-video) ===
+  { keywords: ['veo 3.1', 'veo 3', 'google veo'], modelId: 'veo-3.1-fast', action: 'video_create', label: 'Google Veo 3.1', docUrl: '/docs/models/google/veo-3-1' },
+  { keywords: ['kling 2.5'], modelId: 'kling-v2.5-turbo-pro-t2v', action: 'video_create', label: 'Kling 2.5 Pro', docUrl: '/docs/models/kling/kling-2-5-pro' },
+  { keywords: ['kling 2.1', 'kling master'], modelId: 'kling-v2.1-master-t2v', action: 'video_create', label: 'Kling 2.1 Master', docUrl: '/docs/models/kling/kling-2-1-master' },
+  { keywords: ['kling 2.0', 'kling 2'], modelId: 'kling-v2.0-t2v', action: 'video_create', label: 'Kling 2.0', docUrl: '/docs/models/kling/kling-2-0' },
+  { keywords: ['kling 1.0', 'kling 1'], modelId: 'kling-1.0-t2v-fal', action: 'video_create', label: 'Kling 1.0', docUrl: '/docs/models/kling/kling-1-0' },
+  { keywords: ['hailuo 2.3'], modelId: 'hailuo-2.3-t2v', action: 'video_create', label: 'Hailuo 2.3', docUrl: '/docs/models/hailuo/hailuo-2-3' },
+  { keywords: ['hailuo 02', 'hailuo'], modelId: 'hailuo-02-t2v', action: 'video_create', label: 'Hailuo 02', docUrl: '/docs/models/hailuo/hailuo-02' },
+  { keywords: ['seedance 1.5'], modelId: 'seedance-1.5-pro-t2v', action: 'video_create', label: 'Seedance 1.5 Pro', docUrl: '/docs/models/other/seedance-1-5' },
+  { keywords: ['seedance'], modelId: 'seedance-1-pro-t2v', action: 'video_create', label: 'Seedance 1 Pro', docUrl: '/docs/models/other/seedance' },
+  { keywords: ['wan 2.5', 'wan'], modelId: 'wan-2.5-t2v', action: 'video_create', label: 'Wan 2.5', docUrl: '/docs/models/other/wan-2-5' },
+  
+  // === VIDEO I2V (image-to-video) ===
+  { keywords: ['gen4 turbo', 'runway gen4', 'gen4'], modelId: 'gen4-turbo-i2v', action: 'video_i2v', label: 'Runway Gen4 Turbo', docUrl: '/docs/models/other/runway-gen4' },
+  
+  // === INPAINT ===
+  { keywords: ['flux fill', 'flux inpaint'], modelId: 'flux-fill-pro', action: 'inpaint', label: 'Flux Fill Pro', docUrl: '/docs/models/flux/flux-fill-pro' },
+  { keywords: ['bria genfill', 'genfill'], modelId: 'bria-genfill-inpaint', action: 'inpaint', label: 'Bria GenFill', docUrl: '/docs/models/edit/bria-genfill' },
+  { keywords: ['bria eraser', 'eraser'], modelId: 'bria-eraser-inpaint', action: 'inpaint', label: 'Bria Eraser', docUrl: '/docs/models/edit/bria-eraser' },
+  
+  // === EDIT ===
+  { keywords: ['reve edit', 'reve редакт'], modelId: 'reve-edit', action: 'edit', label: 'Reve Edit', docUrl: '/docs/models/edit/reve-edit' },
+  { keywords: ['flux kontext edit', 'kontext edit'], modelId: 'flux-kontext-max-edit', action: 'edit', label: 'Flux Kontext Edit', docUrl: '/docs/models/flux/flux-kontext-max' },
+  
+  // === EXPAND (Outpaint) ===
+  { keywords: ['bria expand', 'expand', 'расшир'], modelId: 'bria-expand', action: 'expand', label: 'Bria Expand', docUrl: '/docs/models/edit/bria-expand' },
+  { keywords: ['outpainter'], modelId: 'outpainter', action: 'expand', label: 'Outpainter', docUrl: '/docs/models/edit/outpainter' },
+  
+  // === UPSCALE ===
+  { keywords: ['clarity upscaler', 'clarity'], modelId: 'clarity-upscaler', action: 'upscale', label: 'Clarity Upscaler', docUrl: '/docs/models/upscale/clarity' },
+  { keywords: ['crystal', 'creative upscaler'], modelId: 'crystal-upscaler', action: 'upscale', label: 'Crystal Upscaler', docUrl: '/docs/models/upscale/crystal' },
+  { keywords: ['recraft crisp', 'crisp'], modelId: 'recraft-crisp-upscale', action: 'upscale', label: 'Recraft Crisp', docUrl: '/docs/models/recraft/recraft-crisp' },
+  { keywords: ['real-esrgan', 'esrgan', 'real esrgan'], modelId: 'real-esrgan', action: 'upscale', label: 'Real-ESRGAN', docUrl: '/docs/models/upscale/real-esrgan' },
+  { keywords: ['magic refiner', 'refiner'], modelId: 'magic-image-refiner', action: 'upscale', label: 'Magic Image Refiner', docUrl: '/docs/models/upscale/magic-refiner' },
+  
+  // === REMOVE BG ===
+  { keywords: ['birefnet', 'удалить фон', 'удаление фона', 'убрать фон'], modelId: 'birefnet', action: 'remove_bg', label: 'BiRefNet', docUrl: '/docs/models/remove-bg/birefnet' },
+  { keywords: ['bria background', 'bria remove'], modelId: 'bria-remove-background', action: 'remove_bg', label: 'Bria Background Remover', docUrl: '/docs/models/remove-bg/bria' },
+  
+  // === ANALYZE ===
+  { keywords: ['moondream', 'анализ изображ'], modelId: 'moondream2', action: 'analyze_describe', label: 'Moondream', docUrl: '/docs/models/analyze/moondream' },
+  { keywords: ['llava'], modelId: 'llava-13b', action: 'analyze_describe', label: 'LLaVA', docUrl: '/docs/models/analyze/llava' },
+  { keywords: ['blip', 'blip-2'], modelId: 'blip-2', action: 'analyze_describe', label: 'BLIP-2', docUrl: '/docs/models/analyze/blip2' },
+  { keywords: ['clip interrogator', 'clip'], modelId: 'clip-interrogator', action: 'analyze_prompt', label: 'CLIP Interrogator', docUrl: '/docs/models/analyze/clip-interrogator' },
+  { keywords: ['ocr', 'распознавание текста'], modelId: 'deepseek-ocr', action: 'analyze_ocr', label: 'DeepSeek OCR', docUrl: '/docs/models/analyze/ocr' },
 ];
 
 // Find model links based on content
@@ -167,13 +201,35 @@ function ModelLink({ label, modelId, action, docUrl }: { label: string; modelId:
   
   // Build URL based on action type
   const getModelUrl = () => {
+    // Video actions -> /video page
     if (action.startsWith('video')) {
       return `/video?model=${modelId}`;
-    } else if (action === 'inpaint') {
+    }
+    // Inpaint -> /inpaint page
+    if (action === 'inpaint') {
       return `/inpaint?model=${modelId}`;
-    } else if (action === 'upscale' || action === 'remove_bg') {
+    }
+    // Expand/Outpaint -> /expand page
+    if (action === 'expand') {
+      return `/expand?model=${modelId}`;
+    }
+    // Analyze -> /analyze page
+    if (action.startsWith('analyze')) {
+      return `/analyze?model=${modelId}`;
+    }
+    // Brainstorm -> /brainstorm page
+    if (action === 'brainstorm') {
+      return `/brainstorm?model=${modelId}`;
+    }
+    // Keyframes -> /keyframes page
+    if (action === 'keyframes') {
+      return `/keyframes?model=${modelId}`;
+    }
+    // Other actions (create, edit, upscale, remove_bg) -> home page with action param
+    if (action !== 'create') {
       return `/?action=${action}&model=${modelId}`;
     }
+    // Default: create action -> home page
     return `/?model=${modelId}`;
   };
     
