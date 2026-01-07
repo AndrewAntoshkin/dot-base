@@ -37,22 +37,24 @@ const SUGGESTIONS = [
 // IMPORTANT: modelId must match exactly with id in models-config.ts
 const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label: string; docUrl: string }[] = [
   // === IMAGE CREATE ===
-  // Flux models
+  // Flux models - more specific first
   { keywords: ['flux 2 max', 'flux max'], modelId: 'flux-2-max', action: 'create', label: 'Flux 2 Max', docUrl: '/docs/models/flux/flux-2-max' },
   { keywords: ['flux 2 pro'], modelId: 'flux-2-pro', action: 'create', label: 'Flux 2 Pro', docUrl: '/docs/models/flux/flux-2-pro' },
   { keywords: ['flux 1.1 pro', 'flux 1.1'], modelId: 'flux-1.1-pro', action: 'create', label: 'Flux 1.1 Pro', docUrl: '/docs/models/flux/flux-1-1-pro' },
   { keywords: ['flux kontext max'], modelId: 'flux-kontext-max', action: 'create', label: 'Flux Kontext Max', docUrl: '/docs/models/flux/flux-kontext-max' },
   { keywords: ['flux kontext fast'], modelId: 'flux-kontext-fast', action: 'create', label: 'Flux Kontext Fast', docUrl: '/docs/models/flux/flux-kontext-fast' },
-  // Seedream
+  { keywords: ['flux', 'фотореализм'], modelId: 'flux-2-max', action: 'create', label: 'Flux 2 Max', docUrl: '/docs/models/flux/flux-2-max' }, // generic "flux" -> best flux model
+  // Seedream - more specific first
   { keywords: ['seedream 4.5'], modelId: 'seedream-4.5', action: 'create', label: 'Seedream 4.5', docUrl: '/docs/models/seedream/seedream-4-5' },
-  { keywords: ['seedream 4', 'seedream'], modelId: 'seedream-4', action: 'create', label: 'Seedream 4', docUrl: '/docs/models/seedream/seedream-4' },
+  { keywords: ['seedream 4'], modelId: 'seedream-4', action: 'create', label: 'Seedream 4', docUrl: '/docs/models/seedream/seedream-4' },
+  { keywords: ['seedream'], modelId: 'seedream-4.5', action: 'create', label: 'Seedream 4.5', docUrl: '/docs/models/seedream/seedream-4-5' }, // generic -> best version
   // Ideogram
   { keywords: ['ideogram', 'ideogram v3', 'текст на изображ'], modelId: 'ideogram-v3-turbo', action: 'create', label: 'Ideogram V3', docUrl: '/docs/models/ideogram/ideogram-v3' },
   // Google
   { keywords: ['imagen 4', 'imagen', 'google imagen'], modelId: 'imagen-4-ultra', action: 'create', label: 'Google Imagen 4', docUrl: '/docs/models/google/imagen-4' },
-  // Recraft
-  { keywords: ['recraft v3'], modelId: 'recraft-v3', action: 'create', label: 'Recraft V3', docUrl: '/docs/models/recraft/recraft-v3' },
-  { keywords: ['recraft svg', 'векторн'], modelId: 'recraft-v3-svg', action: 'create', label: 'Recraft V3 SVG', docUrl: '/docs/models/recraft/recraft-v3-svg' },
+  // Recraft - more specific keywords first to avoid false matches
+  { keywords: ['recraft svg', 'векторн', 'векторная графика'], modelId: 'recraft-v3-svg', action: 'create', label: 'Recraft V3 SVG', docUrl: '/docs/models/recraft/recraft-v3-svg' },
+  { keywords: ['recraft v3', 'recraft', 'иллюстрац'], modelId: 'recraft-v3', action: 'create', label: 'Recraft V3', docUrl: '/docs/models/recraft/recraft-v3' },
   // Other create
   { keywords: ['stable diffusion', 'sd 3.5', 'sd3'], modelId: 'sd-3.5-large', action: 'create', label: 'Stable Diffusion 3.5', docUrl: '/docs/models/other/sd-3-5' },
   { keywords: ['minimax image', 'minimax'], modelId: 'minimax-image-01', action: 'create', label: 'MiniMax Image', docUrl: '/docs/models/other/minimax-image' },
@@ -107,26 +109,40 @@ const MODEL_LINKS: { keywords: string[]; modelId: string; action: string; label:
   { keywords: ['ocr', 'распознавание текста'], modelId: 'deepseek-ocr', action: 'analyze_ocr', label: 'DeepSeek OCR', docUrl: '/docs/models/analyze/ocr' },
 ];
 
-// Find model links based on content
+// Find model links based on content - sorted by position in text (first mentioned = most relevant)
 function getRelevantModelLinks(content: string): { modelId: string; action: string; label: string; docUrl: string }[] {
   const lowerContent = content.toLowerCase();
-  const found: { modelId: string; action: string; label: string; docUrl: string }[] = [];
+  const found: { modelId: string; action: string; label: string; docUrl: string; position: number }[] = [];
   const usedModels = new Set<string>();
 
   for (const model of MODEL_LINKS) {
     if (usedModels.has(model.modelId)) continue;
     
+    let earliestPosition = -1;
     for (const keyword of model.keywords) {
-      if (lowerContent.includes(keyword.toLowerCase())) {
-        found.push({ modelId: model.modelId, action: model.action, label: model.label, docUrl: model.docUrl });
-        usedModels.add(model.modelId);
-        break;
+      const pos = lowerContent.indexOf(keyword.toLowerCase());
+      if (pos !== -1 && (earliestPosition === -1 || pos < earliestPosition)) {
+        earliestPosition = pos;
       }
+    }
+    
+    if (earliestPosition !== -1) {
+      found.push({ 
+        modelId: model.modelId, 
+        action: model.action, 
+        label: model.label, 
+        docUrl: model.docUrl,
+        position: earliestPosition
+      });
+      usedModels.add(model.modelId);
     }
   }
 
+  // Sort by position in text (first mentioned models are more relevant)
+  found.sort((a, b) => a.position - b.position);
+
   // Limit to 2 most relevant model links
-  return found.slice(0, 2);
+  return found.slice(0, 2).map(({ position, ...rest }) => rest);
 }
 
 // Documentation links mapping
