@@ -28,8 +28,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ conversations: [], total: 0 });
     }
 
-    // Build query
-    let query = supabase
+    // Build query - use type assertion to bypass strict typing for new tables
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query = (supabase as any)
       .from('assistant_conversations')
       .select('*', { count: 'exact' })
       .eq('user_id', profile.id)
@@ -89,7 +90,8 @@ export async function POST(request: NextRequest) {
     const previewText = firstUserMessage?.content?.slice(0, 150) || null;
     const previewImage = firstUserMessage?.images?.[0] || null;
 
-    const { data: conversation, error: convError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conversation, error: convError } = await (supabase as any)
       .from('assistant_conversations')
       .insert({
         user_id: profile.id,
@@ -115,7 +117,8 @@ export async function POST(request: NextRequest) {
         context: m.context || null
       }));
 
-      const { error: msgError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: msgError } = await (supabase as any)
         .from('assistant_messages')
         .insert(messagesToInsert);
 

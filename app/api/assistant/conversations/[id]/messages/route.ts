@@ -35,7 +35,8 @@ export async function POST(
     }
 
     // Verify conversation belongs to user
-    const { data: conversation } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conversation } = await (supabase as any)
       .from('assistant_conversations')
       .select('id')
       .eq('id', conversationId)
@@ -48,7 +49,8 @@ export async function POST(
     }
 
     // Insert message
-    const { data: message, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: message, error } = await (supabase as any)
       .from('assistant_messages')
       .insert({
         conversation_id: conversationId,

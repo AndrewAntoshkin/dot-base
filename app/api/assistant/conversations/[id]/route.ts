@@ -29,7 +29,8 @@ export async function GET(
     }
 
     // Get conversation
-    const { data: conversation, error: convError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conversation, error: convError } = await (supabase as any)
       .from('assistant_conversations')
       .select('*')
       .eq('id', id)
@@ -42,7 +43,8 @@ export async function GET(
     }
 
     // Get messages
-    const { data: messages, error: msgError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: messages, error: msgError } = await (supabase as any)
       .from('assistant_messages')
       .select('*')
       .eq('conversation_id', id)
@@ -105,7 +107,8 @@ export async function PATCH(
     }
 
     // Update conversation
-    const { data: conversation, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conversation, error } = await (supabase as any)
       .from('assistant_conversations')
       .update(updateData)
       .eq('id', id)
@@ -153,7 +156,8 @@ export async function DELETE(
     }
 
     // Soft delete
-    const { error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
       .from('assistant_conversations')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
