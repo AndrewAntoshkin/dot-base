@@ -11,7 +11,7 @@ export async function GET(
     const authClient = await createServerSupabaseClient();
     const { data: { user } } = await authClient.auth.getUser();
     
-    if (!user) {
+    if (!user || !user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -72,7 +72,7 @@ export async function PATCH(
     const authClient = await createServerSupabaseClient();
     const { data: { user } } = await authClient.auth.getUser();
     
-    if (!user) {
+    if (!user || !user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -135,7 +135,7 @@ export async function DELETE(
     const authClient = await createServerSupabaseClient();
     const { data: { user } } = await authClient.auth.getUser();
     
-    if (!user) {
+    if (!user || !user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

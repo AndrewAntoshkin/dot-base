@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const authClient = await createServerSupabaseClient();
     const { data: { user } } = await authClient.auth.getUser();
     
-    if (!user) {
+    if (!user || !user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const authClient = await createServerSupabaseClient();
     const { data: { user } } = await authClient.auth.getUser();
     
-    if (!user) {
+    if (!user || !user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
