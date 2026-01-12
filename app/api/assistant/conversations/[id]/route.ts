@@ -22,7 +22,7 @@ export async function GET(
       .from('users')
       .select('id')
       .eq('email', user.email)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -85,7 +85,7 @@ export async function PATCH(
       .from('users')
       .select('id')
       .eq('email', user.email)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -146,7 +146,7 @@ export async function DELETE(
       .from('users')
       .select('id')
       .eq('email', user.email)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

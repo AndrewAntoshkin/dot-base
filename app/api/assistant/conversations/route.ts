@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('id')
       .eq('email', user.email)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!profile) {
       return NextResponse.json({ conversations: [], total: 0 });
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('id')
       .eq('email', user.email)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

@@ -28,7 +28,7 @@ export async function POST(
       .from('users')
       .select('id')
       .eq('email', user.email)
-      .single();
+      .single() as { data: { id: string } | null };
 
     if (!profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
