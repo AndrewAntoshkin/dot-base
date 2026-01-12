@@ -4,12 +4,81 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, WifiOff, Check, ChevronDown } from 'lucide-react';
+import { Loader2, WifiOff, Wifi, Check, ChevronDown } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { AssistantPanel } from './assistant-panel';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import { AnnouncementBanner } from './announcement-banner';
+
+// Network Status Indicator Component
+function NetworkStatusIndicator({ isOffline, networkError }: { isOffline: boolean; networkError: string | null }) {
+  const [connectionType, setConnectionType] = useState<string | null>(null);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
+  
+  useEffect(() => {
+    // Check Network Information API
+    const connection = (navigator as any).connection || 
+                       (navigator as any).mozConnection || 
+                       (navigator as any).webkitConnection;
+    
+    if (connection) {
+      const updateConnectionInfo = () => {
+        setConnectionType(connection.effectiveType);
+        const slowTypes = ['slow-2g', '2g', '3g'];
+        setIsSlowConnection(slowTypes.includes(connection.effectiveType));
+      };
+      
+      updateConnectionInfo();
+      connection.addEventListener('change', updateConnectionInfo);
+      
+      return () => {
+        connection.removeEventListener('change', updateConnectionInfo);
+      };
+    }
+  }, []);
+  
+  // Offline
+  if (isOffline) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full">
+        <WifiOff className="w-3.5 h-3.5 text-red-500" />
+        <span className="hidden sm:inline font-inter text-xs text-red-500">
+          Офлайн
+        </span>
+      </div>
+    );
+  }
+  
+  // Network error
+  if (networkError) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full">
+        <WifiOff className="w-3.5 h-3.5 text-yellow-500" />
+        <span className="hidden sm:inline font-inter text-xs text-yellow-500">
+          Проблемы с сетью
+        </span>
+      </div>
+    );
+  }
+  
+  // Slow connection (2G/3G)
+  if (isSlowConnection && connectionType) {
+    return (
+      <div 
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-full cursor-help"
+        title={`Обнаружено медленное соединение (${connectionType.toUpperCase()}). Загрузка может быть медленной.`}
+      >
+        <Wifi className="w-3.5 h-3.5 text-orange-500" />
+        <span className="hidden sm:inline font-inter text-xs text-orange-500">
+          {connectionType.toUpperCase()}
+        </span>
+      </div>
+    );
+  }
+  
+  return null;
+}
 
 // Navigation items with descriptions
 const NAV_ITEMS = [
@@ -226,14 +295,7 @@ export function Header() {
           {/* Right section - Workspace, Dashboard, Count, Avatar */}
           <div className="flex items-center gap-2 flex-1 justify-end">
             {/* Network status indicator */}
-            {(isOffline || networkError) && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full">
-                <WifiOff className="w-3.5 h-3.5 text-yellow-500" />
-                <span className="hidden sm:inline font-inter text-xs text-yellow-500">
-                  {isOffline ? 'Офлайн' : 'Проблемы с сетью'}
-                </span>
-              </div>
-            )}
+            <NetworkStatusIndicator isOffline={isOffline} networkError={networkError} />
 
             {/* Workspace Switcher - Desktop Only, only if more than 1 workspace */}
             {workspaces.length > 1 && (

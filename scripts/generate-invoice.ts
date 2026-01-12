@@ -455,3 +455,4 @@ function generateMarkdown(data: InvoiceData): string {
 generateInvoice().catch(console.error);
 
 
+

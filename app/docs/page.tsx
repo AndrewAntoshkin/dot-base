@@ -6,6 +6,11 @@ import { ArrowRight } from 'lucide-react';
 
 const QUICK_LINKS = [
   {
+    title: 'BASECRAFT AI',
+    description: 'Персональный помощник: выбор модели, промпты, советы',
+    href: '/docs/assistant',
+  },
+  {
     title: 'Модели',
     description: 'Обзор всех AI-моделей: FLUX, Kling, Hailuo, SeeDream и другие',
     href: '/docs/models',
@@ -19,11 +24,6 @@ const QUICK_LINKS = [
     title: 'Prompt Engineering',
     description: 'Как писать эффективные промпты для лучших результатов',
     href: '/docs/prompts',
-  },
-  {
-    title: 'Tips & Tricks',
-    description: 'Практические советы от опытных пользователей',
-    href: '/docs/tips',
   },
 ];
 
@@ -115,6 +115,13 @@ export default function DocsPage() {
       {/* Navigation */}
       <DocsSection title="Навигация по документации">
         <div className="space-y-2">
+          <Link href="/docs/assistant" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
+            <div>
+              <span className="text-sm font-medium text-white font-inter">AI Ассистент</span>
+              <span className="text-xs text-[#959595] font-inter ml-2">— персональный помощник, промпты, выбор модели</span>
+            </div>
+            <ArrowRight className="w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
+          </Link>
           <Link href="/docs/models" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
             <div>
               <span className="text-sm font-medium text-white font-inter">Модели</span>

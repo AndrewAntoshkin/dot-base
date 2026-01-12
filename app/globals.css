@@ -378,6 +378,18 @@
   }
 }
 
+/* Simple pulse animation for indicators */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+}
+
 /* Skeleton pulse - smooth breathing animation with visible contrast */
 @keyframes skeleton-pulse {
   0%, 100% {
@@ -401,6 +413,43 @@
   100% {
     background-position: -200% 0;
   }
+}
+
+/* Text shimmer animation (ChatGPT-like) */
+@keyframes text-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.text-shimmer {
+  color: #666666 !important;
+  background: linear-gradient(
+    90deg,
+    #666666 0%,
+    #666666 40%,
+    #aaaaaa 50%,
+    #666666 60%,
+    #666666 100%
+  ) !important;
+  background-size: 400% 100% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: text-shimmer 2s linear infinite !important;
+}
+
+/* Line clamp with ellipsis */
+.line-clamp-2 {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  word-break: break-word !important;
 }
 
 /* Marquee animation for landing page */

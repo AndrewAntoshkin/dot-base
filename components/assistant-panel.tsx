@@ -10,6 +10,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   images?: string[];
+  videos?: string[];
   timestamp: Date;
 }
 
@@ -1045,12 +1046,64 @@ function renderMarkdown(text: string): React.ReactNode {
   return elements;
 }
 
+// Chat history item type
+interface ChatHistoryItem {
+  id: string;
+  title: string;
+  date: Date;
+  isFavorite: boolean;
+  previewImage?: string;
+}
+
+// Empty chat history - will be populated from API in the future
+// TODO: Implement API integration to load real chat history
+
+// Group chats by month
+function groupChatsByMonth(chats: ChatHistoryItem[]): { month: string; year: number; chats: ChatHistoryItem[] }[] {
+  const months = ['ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ', 'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ', 'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ'];
+  const groups: Map<string, ChatHistoryItem[]> = new Map();
+  
+  chats.forEach(chat => {
+    const key = `${chat.date.getFullYear()}-${chat.date.getMonth()}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(chat);
+  });
+  
+  return Array.from(groups.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, items]) => {
+      const [year, month] = key.split('-').map(Number);
+      return { month: months[month], year, chats: items };
+    });
+}
+
+// Active request type for queue
+interface ActiveRequest {
+  id: string;
+  query: string;
+  startedAt: Date;
+  conversationId?: string; // Track which conversation this request belongs to
+}
+
 export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [attachedVideos, setAttachedVideos] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [view, setView] = useState<'dialog' | 'history'>('dialog');
+  const [historyTab, setHistoryTab] = useState<'all' | 'favorites'>('all');
+  const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
+  const [allHistoryCount, setAllHistoryCount] = useState(0); // Total count of all chats
+  const [favoritesCount, setFavoritesCount] = useState(0); // Count of favorite chats
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [activeRequests, setActiveRequests] = useState<ActiveRequest[]>([]);
+  const conversationIdRef = useRef<string | null>(null); // Ref to track current conversation for concurrent requests
+  const conversationCreationPromiseRef = useRef<Promise<string | null> | null>(null); // Lock for conversation creation
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1079,6 +1132,188 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
+  // Load chat history from API
+  const loadHistory = async (favoritesOnly = false) => {
+    setHistoryLoading(true);
+    try {
+      // Always load all history to get correct counts
+      const allResponse = await fetch('/api/assistant/conversations');
+      if (allResponse.ok) {
+        const allData = await allResponse.json();
+        const allItems: ChatHistoryItem[] = (allData.conversations || []).map((conv: {
+          id: string;
+          title: string | null;
+          preview_text: string | null;
+          is_favorite: boolean;
+          preview_image_url: string | null;
+          created_at: string;
+        }) => ({
+          id: conv.id,
+          title: conv.title || conv.preview_text || 'Новый чат',
+          date: new Date(conv.created_at),
+          isFavorite: conv.is_favorite,
+          previewImage: conv.preview_image_url
+        }));
+        
+        // Update counts
+        setAllHistoryCount(allItems.length);
+        setFavoritesCount(allItems.filter(c => c.isFavorite).length);
+        
+        // Set filtered list based on tab
+        if (favoritesOnly) {
+          setChatHistory(allItems.filter(c => c.isFavorite));
+        } else {
+          setChatHistory(allItems);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading history:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Save current conversation to API
+  const saveCurrentConversation = async () => {
+    if (messages.length === 0) return null;
+    
+    try {
+      // If we have an existing conversation, just return its ID
+      if (currentConversationId) {
+        return currentConversationId;
+      }
+      
+      // Create new conversation
+      const response = await fetch('/api/assistant/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content,
+            images: m.images
+          }))
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentConversationId(data.conversation.id);
+        return data.conversation.id;
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+    }
+    return null;
+  };
+
+  // Start new chat (save current if needed)
+  const startNewChat = async () => {
+    // Save current conversation in background if has messages
+    if (messages.length > 0) {
+      saveCurrentConversation();
+    }
+    
+    // Reset state for new chat
+    setMessages([]);
+    setCurrentConversationId(null);
+    conversationIdRef.current = null; // Reset ref too
+    conversationCreationPromiseRef.current = null; // Reset creation lock
+    setInput('');
+    setAttachedImages([]);
+    setView('dialog');
+  };
+
+  // Load a conversation from history
+  const loadConversation = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/assistant/conversations/${conversationId}`);
+      if (response.ok) {
+        const data = await response.json();
+        const loadedMessages: Message[] = (data.messages || []).map((m: {
+          id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          images: string[] | null;
+          created_at: string;
+        }) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          images: m.images || undefined,
+          timestamp: new Date(m.created_at)
+        }));
+        
+        setMessages(loadedMessages);
+        setCurrentConversationId(conversationId);
+        conversationIdRef.current = conversationId; // Set ref too
+        setView('dialog');
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    }
+  };
+
+  // Toggle favorite status
+  const toggleFavorite = async (conversationId: string, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`/api/assistant/conversations/${conversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_favorite: !currentStatus })
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setChatHistory(prev => prev.map(chat => 
+          chat.id === conversationId 
+            ? { ...chat, isFavorite: !currentStatus }
+            : chat
+        ));
+        // Update favorites count
+        setFavoritesCount(prev => currentStatus ? prev - 1 : prev + 1);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  // Delete conversation
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      // Find the chat to check if it was a favorite
+      const chatToDelete = chatHistory.find(c => c.id === conversationId);
+      
+      const response = await fetch(`/api/assistant/conversations/${conversationId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        // Remove from local state
+        setChatHistory(prev => prev.filter(chat => chat.id !== conversationId));
+        // Update counts
+        setAllHistoryCount(prev => prev - 1);
+        if (chatToDelete?.isFavorite) {
+          setFavoritesCount(prev => prev - 1);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+    }
+  };
+
+  // Sync conversation ID ref with state
+  useEffect(() => {
+    conversationIdRef.current = currentConversationId;
+  }, [currentConversationId]);
+
+  // Load history when switching to history view
+  useEffect(() => {
+    if (view === 'history') {
+      loadHistory(historyTab === 'favorites');
+    }
+  }, [view, historyTab]);
+
   const handleCopy = async (content: string, id: string) => {
     await navigator.clipboard.writeText(content);
     setCopiedId(id);
@@ -1088,12 +1323,40 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
+    
     Array.from(files).forEach(file => {
+      // Check file size limits
+      const maxImageSize = 7 * 1024 * 1024; // 7MB for images
+      const maxVideoSize = 100 * 1024 * 1024; // 100MB for videos (reasonable limit for base64)
+      
       if (file.type.startsWith('image/')) {
+        if (file.size > maxImageSize) {
+          alert(`Изображение "${file.name}" слишком большое. Максимум 7MB.`);
+          return;
+        }
+        if (attachedImages.length >= 10) {
+          alert('Максимум 10 изображений');
+          return;
+        }
         const reader = new FileReader();
         reader.onload = (ev) => {
           const result = ev.target?.result as string;
           setAttachedImages(prev => [...prev, result]);
+        };
+        reader.readAsDataURL(file);
+      } else if (file.type.startsWith('video/')) {
+        if (file.size > maxVideoSize) {
+          alert(`Видео "${file.name}" слишком большое. Максимум 100MB.`);
+          return;
+        }
+        if (attachedVideos.length >= 10) {
+          alert('Максимум 10 видео');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const result = ev.target?.result as string;
+          setAttachedVideos(prev => [...prev, result]);
         };
         reader.readAsDataURL(file);
       }
@@ -1105,20 +1368,97 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
     setAttachedImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const sendMessage = async (content: string, images?: string[]) => {
-    if (isLoading) return;
+  const removeAttachedVideo = (index: number) => {
+    setAttachedVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const sendMessage = async (content: string, images?: string[], videos?: string[]) => {
+    const requestId = Date.now().toString();
+    
+    // Capture the user's message content immediately - this is the source of truth
+    const userMessageContent = content;
+    const userMessageImages = images;
+    const userMessageVideos = videos;
     
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: requestId,
       role: 'user',
-      content,
-      images,
+      content: userMessageContent,
+      images: userMessageImages,
+      videos: userMessageVideos,
       timestamp: new Date(),
     };
 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
+    
+    // Get current conversation ID from ref (handles concurrent requests correctly)
+    let convId = conversationIdRef.current;
+    let createdConversation = false; // Track if THIS request created the conversation
+    
+    // If no conversation exists, create one NOW (before async operations)
+    // Use a lock to prevent multiple concurrent requests from creating multiple conversations
+    if (!convId) {
+      // Check if another request is already creating a conversation
+      if (conversationCreationPromiseRef.current) {
+        // Wait for the existing creation to complete
+        convId = await conversationCreationPromiseRef.current;
+        // We didn't create it, so we need to add our message
+      } else {
+        // We're the first - create the conversation WITH our message
+        const createConversation = async (): Promise<string | null> => {
+          try {
+            const convResponse = await fetch('/api/assistant/conversations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messages: [
+                  { role: 'user', content: userMessageContent, images: userMessageImages, videos: userMessageVideos }
+                ]
+              })
+            });
+            if (convResponse.ok) {
+              const convData = await convResponse.json();
+              const newConvId = convData.conversation.id;
+              conversationIdRef.current = newConvId;
+              setCurrentConversationId(newConvId);
+              setAllHistoryCount(prev => prev + 1);
+              return newConvId;
+            }
+          } catch (error) {
+            console.error('Error creating conversation:', error);
+          }
+          return null;
+        };
+        
+        // Store the promise so concurrent requests can wait on it
+        conversationCreationPromiseRef.current = createConversation();
+        convId = await conversationCreationPromiseRef.current;
+        createdConversation = true; // We created it, our message is already included
+        // Clear the promise after completion
+        conversationCreationPromiseRef.current = null;
+      }
+    }
+    
+    // If we have a conversation and we didn't just create it (our message is already included), 
+    // save the user message to the existing conversation
+    if (convId && !createdConversation) {
+      fetch(`/api/assistant/conversations/${convId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user', content: userMessageContent, images: userMessageImages, videos: userMessageVideos })
+      }).catch(console.error);
+    }
+
+    // Add to active requests queue with the EXACT content the user typed
+    // Include conversation ID to filter duplicates in history
+    setActiveRequests(prev => [...prev, {
+      id: requestId,
+      query: userMessageContent.slice(0, 150),
+      startedAt: new Date(),
+      conversationId: convId || undefined
+    }]);
 
     try {
       const response = await fetch('/api/assistant/chat', {
@@ -1126,8 +1466,9 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          images: images || userMessage.images,
-          context: context,  // Передаём контекст пользователя
+          images: userMessageImages,
+          videos: userMessageVideos,
+          context: context,
         }),
       });
 
@@ -1144,6 +1485,15 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Save assistant message to conversation
+      if (convId) {
+        fetch(`/api/assistant/conversations/${convId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'assistant', content: assistantMessage.content })
+        }).catch(console.error);
+      }
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: Message = {
@@ -1155,6 +1505,8 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      // Remove from active requests queue
+      setActiveRequests(prev => prev.filter(r => r.id !== requestId));
     }
   };
 
@@ -1164,19 +1516,22 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && attachedImages.length === 0) || isLoading) return;
+    if (!input.trim() && attachedImages.length === 0 && attachedVideos.length === 0) return;
 
     const content = input.trim();
     const images = attachedImages.length > 0 ? [...attachedImages] : undefined;
+    const videos = attachedVideos.length > 0 ? [...attachedVideos] : undefined;
     
     setInput('');
     setAttachedImages([]);
+    setAttachedVideos([]);
+    
     // Reset textarea height
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
     
-    await sendMessage(content, images);
+    await sendMessage(content, images, videos);
   };
 
   const handleRegenerate = async (messageId: string) => {
@@ -1258,48 +1613,192 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
           flexDirection: 'column'
         }}
       >
-        {/* Header: row, center, gap 24px, padding 16px 20px */}
+        {/* Header: row, space-between, items center, gap 16px, padding 16px 20px */}
         <div 
           style={{ 
             display: 'flex',
             flexDirection: 'row',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '24px',
+            gap: '16px',
             padding: '16px 20px',
             flexShrink: 0
           }}
         >
-          {/* Title container: flex 1 */}
-          <div style={{ flex: 1 }}>
-            {/* Title: Inter 600, 14px, lh 22px, #7E7E7E */}
+          {/* Left section: hug content width */}
+          <div style={{ 
+            minWidth: '72px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            {view === 'dialog' ? (
+              <>
+              {/* History button */}
+              <button
+                onClick={() => setView('history')}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  padding: '8px',
+                  border: '1px solid #313131',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="История чатов"
+              >
+                <Image 
+                  src="/icon-clock-history.svg" 
+                  alt="History" 
+                  width={16} 
+                  height={16}
+                />
+              </button>
+              {/* New chat button */}
+              <button
+                onClick={startNewChat}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  padding: '8px',
+                  border: '1px solid #313131',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Новый чат"
+              >
+                <Image 
+                  src="/icon-plus-new-chat.svg" 
+                  alt="New chat" 
+                  width={16} 
+                  height={16}
+                />
+              </button>
+              </>
+            ) : (
+              /* Back button + New chat button */
+              <>
+                <button
+                  onClick={() => setView('dialog')}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    padding: '8px',
+                    border: '1px solid #313131',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Назад"
+                >
+                  <Image 
+                    src="/icon-arrow-left.svg" 
+                    alt="Back" 
+                    width={16} 
+                    height={16}
+                  />
+                </button>
+                <button
+                  onClick={startNewChat}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    padding: '8px',
+                    border: '1px solid #313131',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Новый чат"
+                >
+                  <Image 
+                    src="/icon-plus-new-chat.svg" 
+                    alt="New chat" 
+                    width={16} 
+                    height={16}
+                  />
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* Center section: logo + title */}
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            {view === 'dialog' ? (
+              <>
+                <Image 
+                  src="/assistant-logo.svg" 
+                  alt="" 
+                  width={21} 
+                  height={24}
+                  style={{ opacity: 0.9 }}
+                />
             <span style={{ 
               fontFamily: 'Google Sans, sans-serif',
               fontWeight: 600,
               fontSize: '14px',
-              lineHeight: '22px',
-              color: '#7E7E7E'
+                  lineHeight: 1.57,
+                  color: '#FFFFFF'
             }}>
               BASECRAFT AI
             </span>
+              </>
+            ) : (
+              <>
+                <Image 
+                  src="/icon-clock-history.svg" 
+                  alt="" 
+                  width={16} 
+                  height={16}
+                />
+                <span style={{ 
+                  fontFamily: 'Google Sans, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  lineHeight: 1.57,
+                  color: '#FFFFFF'
+                }}>
+                  ИСТОРИЯ
+                </span>
+              </>
+            )}
           </div>
           
-          {/* Close wrapper: 32x32 center */}
+          {/* Right section: 72px width, close button aligned right */}
           <div style={{ 
-            width: '32px', 
-            height: '32px', 
+            width: '72px',
             display: 'flex', 
+            justifyContent: 'flex-end',
             alignItems: 'center', 
-            justifyContent: 'center'
+            gap: '8px'
           }}>
-            {/* Close button: 36x36, padding 8px, border #2F2F2F, radius 8px */}
+            {/* Close button: 32x32, padding 8px, border #313131, radius 10px */}
             <button
               onClick={onClose}
               style={{
-                width: '36px',
-                height: '36px',
+                width: '32px',
+                height: '32px',
                 padding: '8px',
-                border: '1px solid #2F2F2F',
-                borderRadius: '8px',
+                border: '1px solid #313131',
+                borderRadius: '10px',
                 background: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
@@ -1307,7 +1806,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                 cursor: 'pointer'
               }}
             >
-              {/* Icon: 10x10 */}
+              {/* Icon: 10x10 cross */}
               <Image 
                 src="/close-x-icon.svg" 
                 alt="Close" 
@@ -1317,6 +1816,124 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
             </button>
           </div>
         </div>
+
+        {/* History Tabs - only shown in history view */}
+        {view === 'history' && (
+          <div 
+            style={{ 
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: '12px',
+              padding: '0 20px',
+              borderBottom: '1px solid #2E2E2E',
+              flexShrink: 0
+            }}
+          >
+            {/* All messages tab */}
+            <button
+              onClick={() => setHistoryTab('all')}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: '8px',
+                padding: '10px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: historyTab === 'all' ? '2px solid #FFFFFF' : '2px solid transparent',
+                cursor: 'pointer',
+                marginBottom: '-1px'
+              }}
+            >
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 0'
+              }}>
+                <span style={{
+                  fontFamily: 'Google Sans, sans-serif',
+                  fontWeight: historyTab === 'all' ? 500 : 400,
+                  fontSize: '14px',
+                  lineHeight: 1.43,
+                  color: historyTab === 'all' ? '#FFFFFF' : '#959595'
+                }}>
+                  Все сообщения
+                </span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '0 6px',
+                  height: '20px',
+                  background: '#2C2C2C',
+                  borderRadius: '6px'
+                }}>
+                  <span style={{
+                    fontFamily: 'Google Sans, sans-serif',
+                    fontWeight: 500,
+                    fontSize: '10px',
+                    lineHeight: 2,
+                    color: '#FFFFFF'
+                  }}>
+                    {allHistoryCount}
+                  </span>
+                </div>
+              </div>
+            </button>
+            
+            {/* Favorites tab */}
+            <button
+              onClick={() => setHistoryTab('favorites')}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: '8px',
+                padding: '10px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: historyTab === 'favorites' ? '2px solid #FFFFFF' : '2px solid transparent',
+                cursor: 'pointer',
+                marginBottom: '-1px'
+              }}
+            >
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 0'
+              }}>
+                <span style={{
+                  fontFamily: 'Google Sans, sans-serif',
+                  fontWeight: historyTab === 'favorites' ? 500 : 400,
+                  fontSize: '14px',
+                  lineHeight: 1.43,
+                  color: historyTab === 'favorites' ? '#FFFFFF' : '#959595'
+                }}>
+                  Избранные
+                </span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '0 6px',
+                  height: '20px',
+                  background: '#2C2C2C',
+                  borderRadius: '6px'
+                }}>
+                  <span style={{
+                    fontFamily: 'Google Sans, sans-serif',
+                    fontWeight: 500,
+                    fontSize: '10px',
+                    lineHeight: 2,
+                    color: '#FFFFFF'
+                  }}>
+                    {favoritesCount}
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Content: column, gap 16px, padding 20px, flex 1 */}
         <div 
@@ -1329,7 +1946,324 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
             minHeight: 0
           }}
         >
-          {/* Messages area: column, gap 12px, justify flex-end, flex 1, SCROLLABLE */}
+          {view === 'history' ? (
+            /* History view content */
+            <div 
+              style={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                flex: '1 1 0',
+                minHeight: 0,
+                overflowY: 'auto',
+                overflowX: 'hidden'
+              }}
+            >
+              {(() => {
+                // Get current month name for active requests
+                const currentMonth = ['ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ', 'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ', 'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ'][new Date().getMonth()];
+                const filteredChats = historyTab === 'favorites' 
+                  ? chatHistory.filter(c => c.isFavorite)
+                  : chatHistory;
+                const grouped = groupChatsByMonth(filteredChats);
+                
+                if (historyLoading) {
+                  return (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: 1,
+                      gap: '12px',
+                      color: '#7E7E7E'
+                    }}>
+                      <span style={{ fontSize: '14px' }}>Загрузка...</span>
+                    </div>
+                  );
+                }
+                
+                if (filteredChats.length === 0 && activeRequests.length === 0) {
+                  return (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: 1,
+                      gap: '12px',
+                      color: '#7E7E7E'
+                    }}>
+                      <span style={{ fontSize: '14px' }}>
+                        {historyTab === 'favorites' ? 'Нет избранных чатов' : 'История пуста'}
+                      </span>
+                    </div>
+                  );
+                }
+                
+                // Check if current month already exists in groups
+                const hasCurrentMonth = grouped.some(g => g.month === currentMonth);
+                
+                // If we have active requests but no current month group, add it first
+                const allGroups = (activeRequests.length > 0 && !hasCurrentMonth && historyTab !== 'favorites')
+                  ? [{ month: currentMonth, chats: [] }, ...grouped]
+                  : grouped;
+                
+                return allGroups.map((group, groupIdx) => (
+                  <div key={groupIdx} style={{ 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {/* Month header */}
+                    <span style={{
+                      fontFamily: 'Google Sans, sans-serif',
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      lineHeight: 1.4,
+                      color: '#7E7E7E',
+                      textAlign: 'left'
+                    }}>
+                      {group.month}
+                    </span>
+                    
+                    {/* Chat items */}
+                    <div style={{ 
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px'
+                    }}>
+                      {/* Active requests for current month */}
+                      {group.month === currentMonth && historyTab !== 'favorites' && activeRequests.map((request) => (
+                        <div
+                          key={`active-${request.id}`}
+                          onClick={() => setView('dialog')}
+                          style={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            padding: '12px 12px 12px 16px',
+                            background: 'transparent',
+                            border: '1px solid #252525',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.borderColor = '#404040'}
+                          onMouseLeave={(e) => e.currentTarget.style.borderColor = '#252525'}
+                        >
+                          {/* Top row: title with shimmer */}
+                          <div 
+                            className="text-shimmer line-clamp-2"
+                            style={{
+                              fontFamily: 'Google Sans, sans-serif',
+                              fontWeight: 400,
+                              fontSize: '14px',
+                              lineHeight: '1.4',
+                              letterSpacing: '-0.01em'
+                            }}
+                          >
+                            {request.query || 'Текущий запрос'}
+                          </div>
+                          
+                          {/* Bottom row: loading indicator */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <div style={{
+                              width: '16px',
+                              height: '16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <div style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: '#FFFFFF',
+                                animation: 'pulse 1.5s ease-in-out infinite'
+                              }} />
+                            </div>
+                            <span style={{
+                              fontFamily: 'Google Sans, sans-serif',
+                              fontWeight: 400,
+                              fontSize: '12px',
+                              lineHeight: 1.4,
+                              color: '#7E7E7E'
+                            }}>
+                              Генерация ответа...
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {group.chats
+                        .filter(chat => !activeRequests.some(r => r.conversationId === chat.id))
+                        .map((chat) => (
+                        <div
+                          key={chat.id}
+                          style={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            padding: '12px 12px 12px 16px',
+                            background: 'transparent',
+                            border: '1px solid #252525',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'border-color 0.2s'
+                          }}
+                          onClick={() => loadConversation(chat.id)}
+                          onMouseEnter={(e) => e.currentTarget.style.borderColor = '#404040'}
+                          onMouseLeave={(e) => e.currentTarget.style.borderColor = '#252525'}
+                        >
+                          {/* Action buttons - top right */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            display: 'flex',
+                            gap: '4px'
+                          }}>
+                            {/* Favorite button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(chat.id, chat.isFavorite);
+                              }}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                padding: '8px',
+                                background: '#181818',
+                                border: '1px solid #2F2F2F',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.style.backgroundColor = '#252525';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.style.backgroundColor = '#181818';
+                              }}
+                              title={chat.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                            >
+                              {chat.isFavorite ? (
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M2.76621 8.76621L7.69289 13.6929C7.86193 13.8619 8.13807 13.8619 8.30711 13.6929L13.2338 8.76621C14.4661 7.53393 14.4661 5.53274 13.2338 4.30046C12.0015 3.06818 10.0003 3.06818 8.76804 4.30046L8 5.06851L7.23196 4.30046C5.99968 3.06818 3.99849 3.06818 2.76621 4.30046C1.53393 5.53274 1.53393 7.53393 2.76621 8.76621Z" fill="#FA5252" stroke="#FA5252" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              ) : (
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M2.76621 8.76621L7.69289 13.6929C7.86193 13.8619 8.13807 13.8619 8.30711 13.6929L13.2338 8.76621C14.4661 7.53393 14.4661 5.53274 13.2338 4.30046C12.0015 3.06818 10.0003 3.06818 8.76804 4.30046L8 5.06851L7.23196 4.30046C5.99968 3.06818 3.99849 3.06818 2.76621 4.30046C1.53393 5.53274 1.53393 7.53393 2.76621 8.76621Z" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </button>
+                            {/* Delete button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteConversation(chat.id);
+                              }}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                padding: '8px',
+                                background: '#181818',
+                                border: '1px solid #2F2F2F',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.style.backgroundColor = '#252525';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.style.backgroundColor = '#181818';
+                              }}
+                              title="Удалить"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M2 4H14M5.33333 4V2.66667C5.33333 2.29848 5.63181 2 6 2H10C10.3682 2 10.6667 2.29848 10.6667 2.66667V4M12.6667 4V13.3333C12.6667 13.7015 12.3682 14 12 14H4C3.63181 14 3.33333 13.7015 3.33333 13.3333V4H12.6667Z" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                          
+                          {/* Top row: title + optional image */}
+                          <div style={{
+                            display: 'flex',
+                            gap: '20px',
+                            paddingRight: '76px'
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div 
+                                className="line-clamp-2"
+                                style={{
+                                  fontFamily: 'Google Sans, sans-serif',
+                                  fontWeight: 400,
+                                  fontSize: '14px',
+                                  lineHeight: 1.4,
+                                  letterSpacing: '-0.01em',
+                                  color: '#D9D9D9'
+                                }}
+                              >
+                                {chat.title}
+                              </div>
+                            </div>
+                            {chat.previewImage && (
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                background: '#181818',
+                                border: '1px solid #2F2F2F',
+                                flexShrink: 0
+                              }}>
+                                <img 
+                                  src={chat.previewImage} 
+                                  alt="" 
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Date */}
+                          <span style={{
+                            fontFamily: 'Google Sans, sans-serif',
+                            fontWeight: 400,
+                            fontSize: '12px',
+                            lineHeight: 1.4,
+                            color: '#7E7E7E'
+                          }}>
+                            {chat.date.getDate()} {['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][chat.date.getMonth()]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+          ) : (
+          /* Dialog view - Messages area: column, gap 12px, justify flex-end, flex 1, SCROLLABLE */
           <div 
             style={{ 
               display: 'flex',
@@ -1393,7 +2327,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                       color: '#7E7E7E',
                       textAlign: 'center'
                     }}>
-                      Помогу с промптами, анализом картинок и вопросами
+                      Помогу с промптами, анализом картинок или видео, а также с любыми вопросами по работе сервиса
                     </span>
                   </div>
                 </div>
@@ -1713,8 +2647,12 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
               </div>
             )}
           </div>
+          )
+          }
 
           {/* Input area: column, gap 28px, padding 12px 16px, bg #212121, border #2B2B2B, radius 20px */}
+          {/* Only show in dialog view */}
+          {view === 'dialog' && (
           <div 
             style={{
               display: 'flex',
@@ -1728,16 +2666,17 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
             }}
           >
             
-            {/* Attached images */}
-            {attachedImages.length > 0 && (
+            {/* Attached images and videos */}
+            {(attachedImages.length > 0 || attachedVideos.length > 0) && (
               <div style={{ 
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: '8px'
               }}>
+                {/* Images */}
                 {attachedImages.map((img, idx) => (
                   <div 
-                    key={idx} 
+                    key={`img-${idx}`} 
                     className="group"
                     style={{ 
                       position: 'relative',
@@ -1754,6 +2693,63 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                     }} />
                     <button
                       onClick={() => removeAttachedImage(idx)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Image src="/close-x-icon.svg" alt="Remove" width={16} height={16} />
+                    </button>
+                  </div>
+                ))}
+                {/* Videos */}
+                {attachedVideos.map((video, idx) => (
+                  <div 
+                    key={`vid-${idx}`} 
+                    className="group"
+                    style={{ 
+                      position: 'relative',
+                      width: '64px', 
+                      height: '64px', 
+                      borderRadius: '8px', 
+                      overflow: 'hidden',
+                      background: '#1a1a1a'
+                    }}
+                  >
+                    <video 
+                      src={video} 
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover' 
+                      }}
+                      muted
+                    />
+                    {/* Video icon overlay */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '4px',
+                      right: '4px',
+                      background: 'rgba(0,0,0,0.7)',
+                      borderRadius: '4px',
+                      padding: '2px 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+                        <polygon points="5 3 19 12 5 21 5 3" fill="#fff"/>
+                      </svg>
+                    </div>
+                    <button
+                      onClick={() => removeAttachedVideo(idx)}
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
                       style={{
                         position: 'absolute',
@@ -1817,7 +2813,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   multiple
                   onChange={handleFileSelect}
                   style={{ display: 'none' }}
@@ -1845,7 +2841,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
               {/* Right: send button */}
               <button
                 onClick={() => handleSubmit()}
-                disabled={(!input.trim() && attachedImages.length === 0) || isLoading}
+                disabled={(!input.trim() && attachedImages.length === 0 && attachedVideos.length === 0) || isLoading}
                 className="disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   padding: '5.65px',
@@ -1862,6 +2858,7 @@ export function AssistantPanel({ isOpen, onClose, context }: AssistantPanelProps
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     </>

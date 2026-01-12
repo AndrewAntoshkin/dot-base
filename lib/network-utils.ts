@@ -26,9 +26,9 @@ export function isSlowConnection(): boolean {
 // Получить рекомендуемый timeout на основе типа соединения
 export function getRecommendedTimeout(): number {
   if (isSlowConnection()) {
-    return 60000; // 60 секунд для медленного соединения
+    return 90000; // 90 секунд для медленного соединения (было 60)
   }
-  return 30000; // 30 секунд по умолчанию
+  return 45000; // 45 секунд по умолчанию (было 30)
 }
 
 interface FetchWithTimeoutOptions extends RequestInit {

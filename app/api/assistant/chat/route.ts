@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { messages, images, context } = body;
-    console.log('[Assistant] Messages count:', messages?.length, 'Context:', context ? 'YES' : 'NO');
+    const { messages, images, videos, context } = body;
+    console.log('[Assistant] Messages count:', messages?.length, 'Context:', context ? 'YES' : 'NO', 'Images:', images?.length || 0, 'Videos:', videos?.length || 0);
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Messages required' }, { status: 400 });
@@ -226,9 +226,10 @@ export async function POST(request: NextRequest) {
     }
     prompt += 'Assistant:';
 
-    // Prepare input for Gemini 3 Pro
+    // Prepare input for Gemini 2.5 Flash
     // Согласно документации Replicate:
-    // - images: array (не image!) - до 10 изображений по 7MB каждое
+    // - images: array - до 10 изображений по 7MB каждое
+    // - videos: array - до 10 видео по 45 минут каждое
     // - system_instruction (не system_prompt!)
     // - prompt: string
     // - thinking_level: "low" | "high" - уровень рассуждений (low = быстрее)
@@ -241,12 +242,15 @@ export async function POST(request: NextRequest) {
     };
 
     // Add images if provided (for image analysis)
-    // ВАЖНО: images должен быть массивом!
     if (images && images.length > 0) {
-      console.log('[Assistant] Images provided, count:', images.length, 'first length:', images[0]?.length || 0);
-      input.images = images; // Массив изображений
-    } else {
-      console.log('[Assistant] No images provided');
+      console.log('[Assistant] Images provided, count:', images.length);
+      input.images = images;
+    }
+
+    // Add videos if provided (for video analysis)
+    if (videos && videos.length > 0) {
+      console.log('[Assistant] Videos provided, count:', videos.length);
+      input.videos = videos;
     }
 
     console.log('[Assistant] Calling Gemini 2.5 Flash with prompt length:', prompt.length);

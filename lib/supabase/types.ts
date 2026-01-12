@@ -256,6 +256,70 @@ export interface Database {
           invited_by?: string | null;
         };
       };
+      assistant_conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string | null;
+          is_favorite: boolean;
+          preview_text: string | null;
+          preview_image_url: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string | null;
+          is_favorite?: boolean;
+          preview_text?: string | null;
+          preview_image_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string | null;
+          is_favorite?: boolean;
+          preview_text?: string | null;
+          preview_image_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+      };
+      assistant_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          images: string[] | null;
+          context: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          images?: string[] | null;
+          context?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          role?: 'user' | 'assistant';
+          content?: string;
+          images?: string[] | null;
+          context?: Json | null;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       admin_stats: {
@@ -299,6 +363,31 @@ export interface Database {
           member_role: WorkspaceMemberRole;
           member_count: number;
         }>;
+      };
+      get_assistant_history: {
+        Args: { 
+          p_user_id: string;
+          p_favorites_only?: boolean;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: Array<{
+          id: string;
+          title: string | null;
+          preview_text: string | null;
+          preview_image_url: string | null;
+          is_favorite: boolean;
+          created_at: string;
+          updated_at: string;
+          message_count: number;
+        }>;
+      };
+      toggle_conversation_favorite: {
+        Args: { 
+          p_conversation_id: string;
+          p_user_id: string;
+        };
+        Returns: boolean;
       };
     };
     Enums: {};
@@ -367,5 +456,50 @@ export interface GenerationWithUser {
     email: string | null;
     telegram_first_name: string | null;
   };
+}
+
+// ============================================
+// Assistant Chat History Types
+// ============================================
+
+export type AssistantMessageRole = 'user' | 'assistant';
+
+export interface AssistantConversation {
+  id: string;
+  user_id: string;
+  title: string | null;
+  is_favorite: boolean;
+  preview_text: string | null;
+  preview_image_url: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface AssistantMessage {
+  id: string;
+  conversation_id: string;
+  role: AssistantMessageRole;
+  content: string;
+  images: string[] | null;
+  context: Json | null;
+  created_at: string;
+}
+
+// For history list display
+export interface AssistantConversationPreview {
+  id: string;
+  title: string | null;
+  preview_text: string | null;
+  preview_image_url: string | null;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+// For loading full conversation
+export interface AssistantConversationWithMessages extends AssistantConversation {
+  messages: AssistantMessage[];
 }
 

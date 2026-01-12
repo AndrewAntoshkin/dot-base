@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { fetchWithTimeout, isOnline, subscribeToNetworkChanges, getNetworkDiagnostics } from '@/lib/network-utils';
+import { fetchWithTimeout, isOnline, isSlowConnection, subscribeToNetworkChanges, getNetworkDiagnostics } from '@/lib/network-utils';
 
 interface Generation {
   id: string;
@@ -29,11 +29,40 @@ interface GenerationsContextType {
 
 const GenerationsContext = createContext<GenerationsContextType | undefined>(undefined);
 
-// Адаптивные интервалы polling (оптимизированы для снижения Disk IO)
-const POLLING_ACTIVE = 5000;       // 5 сек - есть активные генерации (было 3)
-const POLLING_IDLE = 60000;        // 60 сек - нет активных генераций (было 30)
-const POLLING_BACKGROUND = 120000; // 120 сек - вкладка в фоне (было 60)
-const POLLING_ERROR = 60000;       // 60 сек - при ошибках соединения (было 45)
+// Адаптивные интервалы polling (оптимизированы для мобильного интернета)
+// Определяем интервалы на основе типа соединения
+const getPollingIntervals = () => {
+  // Проверяем Network Information API
+  const connection = typeof navigator !== 'undefined' 
+    ? (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection
+    : null;
+  
+  const isSlow = connection?.effectiveType === 'slow-2g' || 
+                 connection?.effectiveType === '2g' || 
+                 connection?.effectiveType === '3g';
+  
+  if (isSlow) {
+    return {
+      active: 15000,     // 15 сек для медленного соединения
+      idle: 120000,      // 2 мин
+      background: 300000, // 5 мин
+      error: 120000,     // 2 мин
+    };
+  }
+  
+  return {
+    active: 5000,       // 5 сек - быстрое соединение
+    idle: 60000,        // 60 сек
+    background: 120000, // 2 мин
+    error: 60000,       // 60 сек
+  };
+};
+
+const intervals = getPollingIntervals();
+const POLLING_ACTIVE = intervals.active;
+const POLLING_IDLE = intervals.idle;
+const POLLING_BACKGROUND = intervals.background;
+const POLLING_ERROR = intervals.error;
 const MAX_CONSECUTIVE_ERRORS = 3;
 
 /**
@@ -134,13 +163,19 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     
+    // Определяем timeout на основе типа соединения
+    const isSlow = isSlowConnection();
+    const syncTimeout = isSlow ? 20000 : 10000;
+    const listTimeout = isSlow ? 30000 : 15000;
+    
     try {
       // Сначала синхронизируем статусы с Replicate (только если есть активные)
-      if (hasActiveRef.current) {
+      // На медленном соединении пропускаем sync чтобы не блокировать UI
+      if (hasActiveRef.current && !isSlow) {
         try {
           await fetchWithTimeout('/api/generations/sync-status', {
             method: 'POST',
-            timeout: 10000,
+            timeout: syncTimeout,
             retries: 0,
             credentials: 'include',
           });
@@ -153,8 +188,8 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
       // Use skipCounts=true to avoid 4 extra COUNT queries on each poll
       // Context only needs the list for badge/unviewed count
       const response = await fetchWithTimeout('/api/generations/list?limit=20&skipCounts=true', {
-        timeout: 15000, // 15 секунд timeout
-        retries: 1,
+        timeout: listTimeout,
+        retries: isSlow ? 0 : 1, // Не делаем retry на медленном соединении
         credentials: 'include',
         signal: abortController.signal,
       });

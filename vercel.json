@@ -1,4 +1,5 @@
 {
+  "regions": ["fra1"],
   "functions": {
     "app/api/upload/route.ts": {
       "maxDuration": 60
@@ -23,8 +24,37 @@
     },
     "app/api/keyframes/status/[id]/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/health/route.ts": {
+      "maxDuration": 5
+    },
+    "app/api/generations/list/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/generations/sync-status/route.ts": {
+      "maxDuration": 30
     }
   },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-DNS-Prefetch-Control",
+          "value": "on"
+        }
+      ]
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/cleanup",

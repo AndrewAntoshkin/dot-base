@@ -165,12 +165,13 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - only when needed
   // Add timeout to prevent 504 errors when Supabase is slow
+  // Увеличен timeout для мобильного интернета (5 сек вместо 2)
   let user = null;
   let authFailed = false;
   
   try {
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Auth timeout')), 2000) // 2 sec timeout
+      setTimeout(() => reject(new Error('Auth timeout')), 5000) // 5 sec timeout for mobile
     );
     const authPromise = supabase.auth.getUser();
     const result = await Promise.race([authPromise, timeoutPromise]) as { data: { user: any } };

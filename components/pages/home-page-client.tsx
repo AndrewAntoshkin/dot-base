@@ -10,6 +10,7 @@ import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType } from '@/lib/models-lite';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
+import { fetchWithTimeout, isSlowConnection } from '@/lib/network-utils';
 import type { SettingsFormRef } from '@/components/settings-form';
 import type { SessionGeneration } from '@/components/recent-generations';
 
@@ -279,14 +280,19 @@ function HomeContent() {
     
     if (processingGens.length === 0) return;
 
+    // Адаптивный интервал polling для мобильного интернета
+    const interval = isSlowConnection() ? 10000 : 5000;
+
     const pollInterval = setInterval(async () => {
       for (const gen of processingGens) {
         // Пропускаем текущую генерацию - она обновляется через OutputPanel
         if (gen.id === currentGenerationId) continue;
         
         try {
-          const response = await fetch(`/api/generations/${gen.id}`, {
+          const response = await fetchWithTimeout(`/api/generations/${gen.id}`, {
             credentials: 'include',
+            timeout: isSlowConnection() ? 20000 : 10000,
+            retries: 0, // Не делаем retry для polling
           });
           
           if (response.ok) {
@@ -305,12 +311,12 @@ function HomeContent() {
           }
         } catch (error: any) {
           // Тихо игнорируем сетевые ошибки - они не критичны для polling
-          if (error?.name !== 'TypeError' && !error?.message?.includes('network')) {
+          if (error?.name !== 'TypeError' && !error?.message?.includes('network') && error?.name !== 'AbortError') {
             console.warn('[Session] Poll error for', gen.id);
           }
         }
       }
-    }, 5000); // Poll every 5 seconds
+    }, interval);
 
     return () => clearInterval(pollInterval);
   }, [sessionGenerations, currentGenerationId]);
@@ -333,7 +339,7 @@ function HomeContent() {
         return;
       }
       
-      const response = await fetch('/api/generations/create', {
+      const response = await fetchWithTimeout('/api/generations/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -344,6 +350,8 @@ function HomeContent() {
           settings: settings,
           workspace_id: selectedWorkspaceId,
         }),
+        timeout: isSlowConnection() ? 60000 : 30000,
+        retries: 1,
       });
 
       if (response.ok) {
