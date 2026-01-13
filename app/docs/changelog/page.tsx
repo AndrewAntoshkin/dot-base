@@ -12,7 +12,6 @@ const CHANGELOG = [
       { type: 'new', text: 'Избранные чаты — добавляйте важные диалоги в избранное' },
       { type: 'new', text: 'Группировка чатов по месяцам для удобной навигации' },
       { type: 'improvement', text: 'Улучшено отображение прикреплённых изображений и видео в чате' },
-      { type: 'improvement', text: 'Переработан дизайн документации в стиле Vercel' },
       { type: 'improvement', text: 'Добавлена панель "На этой странице" с навигацией по разделам' },
     ],
   },
@@ -145,9 +144,16 @@ const getChangeLabel = (type: string) => {
   }
 };
 
+// Генерируем ToC из версий
+const TABLE_OF_CONTENTS = CHANGELOG.map(release => ({
+  id: `v${release.version.replace(/\./g, '-')}`,
+  title: `v${release.version}`,
+  level: 2,
+}));
+
 export default function ChangelogPage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Changelog' },
@@ -163,6 +169,7 @@ export default function ChangelogPage() {
           {CHANGELOG.map((release, index) => (
             <div 
               key={release.version}
+              id={`v${release.version.replace(/\./g, '-')}`}
               className="relative pl-6 border-l-2 border-[#2f2f2f]"
             >
               {/* Timeline dot */}
