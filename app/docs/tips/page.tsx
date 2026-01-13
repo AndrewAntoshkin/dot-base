@@ -124,9 +124,29 @@ const DOS_AND_DONTS = {
   ],
 };
 
+const TABLE_OF_CONTENTS = [
+  { id: 'speed', title: 'Скорость', level: 2 },
+  { id: 'quality', title: 'Качество', level: 2 },
+  { id: 'text', title: 'Текст', level: 2 },
+  { id: 'video', title: 'Видео', level: 2 },
+  { id: 'styles', title: 'Стили', level: 2 },
+  { id: 'edit', title: 'Редактирование', level: 2 },
+  { id: 'recommendations', title: 'Рекомендации', level: 2 },
+];
+
+// Map category names to ids
+const CATEGORY_TO_ID: Record<string, string> = {
+  'Скорость генерации': 'speed',
+  'Качество результата': 'quality',
+  'Работа с текстом': 'text',
+  'Видеогенерация': 'video',
+  'Стили и эстетика': 'styles',
+  'Редактирование': 'edit',
+};
+
 export default function TipsPage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Tips & Tricks' },
@@ -142,7 +162,7 @@ export default function TipsPage() {
 
       {/* Tips by Category */}
       {TIPS.map((category) => (
-        <DocsSection key={category.category} title={category.category}>
+        <DocsSection key={category.category} title={category.category} id={CATEGORY_TO_ID[category.category]}>
           <div className="space-y-3">
             {category.tips.map((tip, index) => (
               <div 
@@ -158,7 +178,7 @@ export default function TipsPage() {
       ))}
 
       {/* Do's and Don'ts */}
-      <DocsSection title="Рекомендации">
+      <DocsSection title="Рекомендации" id="recommendations">
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
             <h4 className="text-sm font-medium text-white font-inter mb-3">

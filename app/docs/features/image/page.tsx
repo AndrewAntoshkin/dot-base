@@ -33,9 +33,17 @@ const USE_CASES = [
   'NFT и генеративное искусство',
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'how-it-works', title: 'Как это работает', level: 2 },
+  { id: 'models', title: 'Модели', level: 2 },
+  { id: 'params', title: 'Параметры', level: 2 },
+  { id: 'use-cases', title: 'Применение', level: 2 },
+  { id: 'tips', title: 'Советы', level: 2 },
+];
+
 export default function ImageFeaturePage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Функции', href: '/docs/features' },
         { label: 'Image' },
@@ -50,11 +58,11 @@ export default function ImageFeaturePage() {
       </DocsInfoBox>
 
       {/* How it works */}
-      <DocsSection title="Как это работает">
+      <DocsSection title="Как это работает" id="how-it-works">
         <div className="grid grid-cols-4 gap-4">
           {WORKFLOW_STEPS.map((item) => (
             <div key={item.step} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] text-center">
-              <div className="w-10 h-10 rounded-full bg-[#303030] flex items-center justify-center mx-auto mb-3">
+              <div className="w-10 h-10 rounded-full border border-[#333] flex items-center justify-center mx-auto mb-3">
                 <span className="text-lg font-bold text-white font-inter">{item.step}</span>
               </div>
               <h4 className="text-sm font-bold text-white font-inter mb-1">{item.title}</h4>
@@ -65,7 +73,7 @@ export default function ImageFeaturePage() {
       </DocsSection>
 
       {/* Supported Models */}
-      <DocsSection title="Поддерживаемые модели">
+      <DocsSection title="Поддерживаемые модели" id="models">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#d5d5d5]">
@@ -89,7 +97,7 @@ export default function ImageFeaturePage() {
       </DocsSection>
 
       {/* Parameters */}
-      <DocsSection title="Основные параметры">
+      <DocsSection title="Основные параметры" id="params">
         <div className="space-y-3">
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
             <h4 className="text-sm font-bold text-white font-inter mb-2">Prompt</h4>
@@ -116,7 +124,7 @@ export default function ImageFeaturePage() {
       </DocsSection>
 
       {/* Use Cases */}
-      <DocsSection title="Применение">
+      <DocsSection title="Применение" id="use-cases">
         <div className="grid grid-cols-2 gap-2">
           {USE_CASES.map((useCase) => (
             <div key={useCase} className="flex items-center gap-2 p-3 bg-transparent rounded-xl border border-[#2f2f2f]">
@@ -128,7 +136,7 @@ export default function ImageFeaturePage() {
       </DocsSection>
 
       {/* Tips */}
-      <DocsSection title="Советы">
+      <DocsSection title="Советы" id="tips">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
           <p className="text-sm text-[#959595] font-inter">
             <span className="text-white font-medium">Для фотореализма:</span> используйте FLUX 2 Max или Imagen 4 Ultra, добавляйте "photorealistic, raw photo, DSLR"
@@ -144,7 +152,7 @@ export default function ImageFeaturePage() {
 
       {/* CTA */}
       <div className="p-6 bg-transparent rounded-2xl border border-[#2f2f2f] text-center">
-        <Link href="/" className="inline-block px-6 py-3 bg-white text-black rounded-full font-inter font-bold text-sm hover:bg-[#e0e0e0] transition-colors">
+        <Link href="/" className="inline-block px-6 py-3 text-white border border-[#444] rounded-xl hover:border-white text-sm transition-colors transition-colors">
           Попробовать Image
         </Link>
       </div>

@@ -236,6 +236,7 @@
   display: none;
 }
 
+
 /* Page transition animations - desktop only */
 @keyframes fadeInUp {
   from {

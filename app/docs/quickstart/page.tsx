@@ -79,9 +79,16 @@ const COMMON_MISTAKES = [
   },
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'steps', title: 'Шаг за шагом', level: 2 },
+  { id: 'first-prompts', title: 'Первые промпты', level: 2 },
+  { id: 'mistakes', title: 'Частые ошибки', level: 2 },
+  { id: 'next', title: 'Что дальше?', level: 2 },
+];
+
 export default function QuickStartPage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Quick Start' },
@@ -96,23 +103,23 @@ export default function QuickStartPage() {
       </DocsInfoBox>
 
       {/* Steps */}
-      <DocsSection title="Шаг за шагом">
-        <div className="space-y-4">
+      <DocsSection title="Шаг за шагом" id="steps">
+        <div className="space-y-3">
           {STEPS.map((step, index) => (
             <div 
               key={step.number}
-              className="p-5 bg-transparent rounded-xl border border-[#2f2f2f]"
+              className="p-4 rounded-xl border border-[#262626] hover:border-[#444] transition-colors"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#303030] flex items-center justify-center flex-shrink-0">
-                  <span className="text-lg font-bold text-white font-inter">{step.number}</span>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl border border-[#333] flex items-center justify-center flex-shrink-0 text-[13px] font-medium text-[#888]">
+                  {step.number}
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-base font-bold text-white font-inter mb-2">{step.title}</h3>
-                  <p className="text-sm text-[#959595] font-inter mb-3">{step.description}</p>
-                  <div className="p-3 bg-[#1a1a1a] rounded-lg">
-                    <span className="text-xs text-[#707070] font-inter uppercase">Совет: </span>
-                    <span className="text-sm text-[#b0b0b0] font-inter">{step.tip}</span>
+                  <h3 className="text-[14px] font-medium text-white mb-1">{step.title}</h3>
+                  <p className="text-[13px] text-[#888] mb-3">{step.description}</p>
+                  <div className="p-3 rounded-xl border border-[#262626] bg-[#0a0a0a]">
+                    <span className="text-[12px] text-[#666] uppercase mr-2">Совет:</span>
+                    <span className="text-[13px] text-[#888]">{step.tip}</span>
                   </div>
                 </div>
               </div>
@@ -122,18 +129,18 @@ export default function QuickStartPage() {
       </DocsSection>
 
       {/* First Prompts */}
-      <DocsSection title="Ваши первые промпты">
-        <p className="text-sm text-[#959595] font-inter mb-4">
+      <DocsSection title="Ваши первые промпты" id="first-prompts">
+        <p className="text-[13px] text-[#888] mb-4">
           Скопируйте один из этих промптов для первой генерации:
         </p>
         <div className="space-y-3">
           {FIRST_PROMPTS.map((item) => (
-            <div key={item.category} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
+            <div key={item.category} className="p-4 rounded-xl border border-[#262626]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-white font-inter">{item.category}</span>
-                <span className="px-2 py-1 bg-[#303030] rounded text-xs text-[#b0b0b0] font-inter">{item.model}</span>
+                <span className="text-[14px] font-medium text-white">{item.category}</span>
+                <span className="px-2 py-1 border border-[#333] rounded text-[12px] text-[#666]">{item.model}</span>
               </div>
-              <code className="block p-3 bg-[#1a1a1a] rounded-lg text-sm text-[#b0b0b0] font-inter">
+              <code className="block p-3 bg-[#0a0a0a] border border-[#262626] rounded-xl text-[13px] text-[#888] font-mono">
                 {item.prompt}
               </code>
             </div>
@@ -142,56 +149,56 @@ export default function QuickStartPage() {
       </DocsSection>
 
       {/* Common Mistakes */}
-      <DocsSection title="Частые ошибки новичков">
-        <div className="space-y-4">
+      <DocsSection title="Частые ошибки новичков" id="mistakes">
+        <div className="space-y-3">
           {COMMON_MISTAKES.map((mistake, i) => (
-            <div key={i} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
+            <div key={i} className="p-4 rounded-xl border border-[#262626]">
               <div className="grid grid-cols-2 gap-4 mb-3">
                 <div>
-                  <span className="text-xs text-red-400 font-inter uppercase mb-1 block">Плохо</span>
-                  <code className="block p-2 bg-[#1a1a1a] rounded text-sm text-[#959595] font-inter line-through">
+                  <span className="text-[12px] text-[#666] uppercase mb-1 block">Плохо</span>
+                  <code className="block p-2 bg-[#0a0a0a] border border-[#262626] rounded text-[13px] text-[#666] font-mono line-through">
                     {mistake.wrong}
                   </code>
                 </div>
                 <div>
-                  <span className="text-xs text-white font-inter uppercase mb-1 block">Хорошо</span>
-                  <code className="block p-2 bg-[#1a1a1a] rounded text-sm text-[#b0b0b0] font-inter">
+                  <span className="text-[12px] text-white uppercase mb-1 block">Хорошо</span>
+                  <code className="block p-2 bg-[#0a0a0a] border border-[#262626] rounded text-[13px] text-[#888] font-mono">
                     {mistake.right}
                   </code>
                 </div>
               </div>
-              <p className="text-sm text-[#707070] font-inter">{mistake.reason}</p>
+              <p className="text-[13px] text-[#666]">{mistake.reason}</p>
             </div>
           ))}
         </div>
       </DocsSection>
 
       {/* What's Next */}
-      <DocsSection title="Что дальше?">
-        <div className="grid grid-cols-3 gap-4">
+      <DocsSection title="Что дальше?" id="next">
+        <div className="grid grid-cols-3 gap-3">
           <Link 
             href="/docs/models"
-            className="p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group"
+            className="p-4 rounded-xl border border-[#262626] hover:border-[#444] hover:bg-[#0a0a0a] transition-all group"
           >
-            <Image className="w-6 h-6 text-white mb-3" />
-            <h4 className="text-sm font-bold text-white font-inter mb-1">Изучите модели</h4>
-            <p className="text-xs text-[#959595] font-inter">Узнайте особенности каждой модели</p>
+            <Image className="w-5 h-5 text-[#666] group-hover:text-white mb-3 transition-colors" />
+            <h4 className="text-[14px] font-medium text-white mb-1">Изучите модели</h4>
+            <p className="text-[13px] text-[#666] group-hover:text-[#888] transition-colors">Узнайте особенности каждой модели</p>
           </Link>
           <Link 
             href="/docs/prompts"
-            className="p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group"
+            className="p-4 rounded-xl border border-[#262626] hover:border-[#444] hover:bg-[#0a0a0a] transition-all group"
           >
-            <Wand2 className="w-6 h-6 text-white mb-3" />
-            <h4 className="text-sm font-bold text-white font-inter mb-1">Prompt Engineering</h4>
-            <p className="text-xs text-[#959595] font-inter">Научитесь писать эффективные промпты</p>
+            <Wand2 className="w-5 h-5 text-[#666] group-hover:text-white mb-3 transition-colors" />
+            <h4 className="text-[14px] font-medium text-white mb-1">Prompt Engineering</h4>
+            <p className="text-[13px] text-[#666] group-hover:text-[#888] transition-colors">Научитесь писать эффективные промпты</p>
           </Link>
           <Link 
             href="/docs/tips"
-            className="p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group"
+            className="p-4 rounded-xl border border-[#262626] hover:border-[#444] hover:bg-[#0a0a0a] transition-all group"
           >
-            <CheckCircle className="w-6 h-6 text-white mb-3" />
-            <h4 className="text-sm font-bold text-white font-inter mb-1">Tips & Tricks</h4>
-            <p className="text-xs text-[#959595] font-inter">Секреты опытных пользователей</p>
+            <CheckCircle className="w-5 h-5 text-[#666] group-hover:text-white mb-3 transition-colors" />
+            <h4 className="text-[14px] font-medium text-white mb-1">Tips & Tricks</h4>
+            <p className="text-[13px] text-[#666] group-hover:text-[#888] transition-colors">Секреты опытных пользователей</p>
           </Link>
         </div>
       </DocsSection>

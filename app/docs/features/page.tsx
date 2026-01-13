@@ -71,9 +71,14 @@ const FEATURES = [
   },
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'all-features', title: 'Все функции', level: 2 },
+  { id: 'comparison', title: 'Сравнение', level: 2 },
+];
+
 export default function FeaturesPage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Функции' },
@@ -84,7 +89,7 @@ export default function FeaturesPage() {
       </DocsTitle>
 
       {/* Features Grid */}
-      <DocsSection title="Все функции">
+      <DocsSection title="Все функции" id="all-features">
         <div className="space-y-3">
           {FEATURES.map((feature) => (
             <Link 
@@ -105,7 +110,7 @@ export default function FeaturesPage() {
                       {feature.models.map((model) => (
                         <span 
                           key={model} 
-                          className="px-2 py-1 bg-[#303030] rounded-lg text-xs text-[#959595] font-inter"
+                          className="px-2 py-1 border border-[#333] rounded-xl text-xs text-[#959595] font-inter"
                         >
                           {model}
                         </span>
@@ -121,7 +126,7 @@ export default function FeaturesPage() {
       </DocsSection>
 
       {/* Quick Comparison */}
-      <DocsSection title="Быстрое сравнение">
+      <DocsSection title="Быстрое сравнение" id="comparison">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#d5d5d5]">

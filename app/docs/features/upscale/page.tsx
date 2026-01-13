@@ -10,9 +10,16 @@ const SUPPORTED_MODELS = [
   { name: 'Crystal', scale: '2x', desc: 'Быстрый апскейлер для простых задач.' },
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'how-it-works', title: 'Как это работает', level: 2 },
+  { id: 'models', title: 'Модели', level: 2 },
+  { id: 'use-cases', title: 'Применение', level: 2 },
+  { id: 'tips', title: 'Советы', level: 2 },
+];
+
 export default function UpscaleFeaturePage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Функции', href: '/docs/features' },
         { label: 'Upscale' },
@@ -27,19 +34,19 @@ export default function UpscaleFeaturePage() {
       </DocsInfoBox>
 
       {/* How it works */}
-      <DocsSection title="Как это работает">
+      <DocsSection title="Как это работает" id="how-it-works">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
           <ol className="space-y-3">
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
-              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">1</span>
+              <span className="w-6 h-6 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0 text-white text-xs">1</span>
               Загрузите изображение которое хотите увеличить
             </li>
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
-              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">2</span>
+              <span className="w-6 h-6 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0 text-white text-xs">2</span>
               Выберите модель и масштаб увеличения (2x или 4x)
             </li>
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
-              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">3</span>
+              <span className="w-6 h-6 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0 text-white text-xs">3</span>
               Запустите генерацию и получите увеличенное изображение с улучшенными деталями
             </li>
           </ol>
@@ -47,7 +54,7 @@ export default function UpscaleFeaturePage() {
       </DocsSection>
 
       {/* Supported Models */}
-      <DocsSection title="Поддерживаемые модели">
+      <DocsSection title="Поддерживаемые модели" id="models">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#d5d5d5]">
@@ -69,7 +76,7 @@ export default function UpscaleFeaturePage() {
       </DocsSection>
 
       {/* Use Cases */}
-      <DocsSection title="Применение">
+      <DocsSection title="Применение" id="use-cases">
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 bg-transparent rounded-xl border border-[#2f2f2f]">
             <span className="text-sm text-[#959595] font-inter">Подготовка к печати</span>
@@ -87,7 +94,7 @@ export default function UpscaleFeaturePage() {
       </DocsSection>
 
       {/* Tips */}
-      <DocsSection title="Советы">
+      <DocsSection title="Советы" id="tips">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
           <p className="text-sm text-[#959595] font-inter">
             <span className="text-white font-medium">Real-ESRGAN для аниме:</span> лучше всего работает с иллюстрациями и аниме-артом.
@@ -103,7 +110,7 @@ export default function UpscaleFeaturePage() {
 
       {/* CTA */}
       <div className="p-6 bg-transparent rounded-2xl border border-[#2f2f2f] text-center">
-        <Link href="/upscale" className="inline-block px-6 py-3 bg-white text-black rounded-full font-inter font-bold text-sm hover:bg-[#e0e0e0] transition-colors">
+        <Link href="/upscale" className="inline-block px-6 py-3 text-white border border-[#444] rounded-xl hover:border-white text-sm transition-colors transition-colors">
           Попробовать Upscale
         </Link>
       </div>

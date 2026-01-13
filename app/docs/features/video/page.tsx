@@ -34,9 +34,17 @@ const USE_CASES = [
   'Эффекты и переходы',
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'modes', title: 'Режимы работы', level: 2 },
+  { id: 'models', title: 'Модели', level: 2 },
+  { id: 'params', title: 'Параметры', level: 2 },
+  { id: 'use-cases', title: 'Применение', level: 2 },
+  { id: 'tips', title: 'Советы', level: 2 },
+];
+
 export default function VideoFeaturePage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Функции', href: '/docs/features' },
         { label: 'Video' },
@@ -51,13 +59,13 @@ export default function VideoFeaturePage() {
       </DocsInfoBox>
 
       {/* Modes */}
-      <DocsSection title="Режимы работы">
+      <DocsSection title="Режимы работы" id="modes">
         <div className="grid grid-cols-2 gap-4">
           {MODES.map((mode) => (
             <div key={mode.name} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
               <h4 className="text-base font-bold text-white font-inter mb-2">{mode.name}</h4>
               <p className="text-sm text-[#959595] font-inter mb-3">{mode.desc}</p>
-              <div className="p-3 bg-[#1a1a1a] rounded-lg">
+              <div className="p-3 bg-[#1a1a1a] rounded-xl">
                 <span className="text-xs text-[#707070] font-inter">Совет: </span>
                 <span className="text-sm text-[#b0b0b0] font-inter">{mode.tip}</span>
               </div>
@@ -67,7 +75,7 @@ export default function VideoFeaturePage() {
       </DocsSection>
 
       {/* Supported Models */}
-      <DocsSection title="Поддерживаемые модели">
+      <DocsSection title="Поддерживаемые модели" id="models">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#d5d5d5]">
@@ -91,7 +99,7 @@ export default function VideoFeaturePage() {
       </DocsSection>
 
       {/* Parameters */}
-      <DocsSection title="Основные параметры">
+      <DocsSection title="Основные параметры" id="params">
         <div className="space-y-3">
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
             <h4 className="text-sm font-bold text-white font-inter mb-2">Duration</h4>
@@ -117,7 +125,7 @@ export default function VideoFeaturePage() {
       </DocsSection>
 
       {/* Use Cases */}
-      <DocsSection title="Применение">
+      <DocsSection title="Применение" id="use-cases">
         <div className="grid grid-cols-2 gap-2">
           {USE_CASES.map((useCase) => (
             <div key={useCase} className="flex items-center gap-2 p-3 bg-transparent rounded-xl border border-[#2f2f2f]">
@@ -129,7 +137,7 @@ export default function VideoFeaturePage() {
       </DocsSection>
 
       {/* Tips */}
-      <DocsSection title="Советы">
+      <DocsSection title="Советы" id="tips">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
           <p className="text-sm text-[#959595] font-inter">
             <span className="text-white font-medium">Image-to-Video лучше:</span> даёт больше контроля. Сначала сгенерируйте идеальный кадр, затем оживите.
@@ -145,7 +153,7 @@ export default function VideoFeaturePage() {
 
       {/* CTA */}
       <div className="p-6 bg-transparent rounded-2xl border border-[#2f2f2f] text-center">
-        <Link href="/video" className="inline-block px-6 py-3 bg-white text-black rounded-full font-inter font-bold text-sm hover:bg-[#e0e0e0] transition-colors">
+        <Link href="/video" className="inline-block px-6 py-3 text-white border border-[#444] rounded-xl hover:border-white text-sm transition-colors transition-colors">
           Попробовать Video
         </Link>
       </div>

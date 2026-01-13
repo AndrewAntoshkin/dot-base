@@ -113,9 +113,15 @@ const QUICK_FIXES = [
   },
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'faq', title: 'Частые вопросы', level: 2 },
+  { id: 'issues', title: 'Решение проблем', level: 2 },
+  { id: 'quick-fixes', title: 'Быстрые исправления', level: 2 },
+];
+
 export default function TroubleshootingPage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Troubleshooting' },
@@ -126,7 +132,7 @@ export default function TroubleshootingPage() {
       </DocsTitle>
 
       {/* FAQ */}
-      <DocsSection title="Частые вопросы">
+      <DocsSection title="Частые вопросы" id="faq">
         <div className="space-y-4">
           {FAQ.map((item, i) => (
             <div key={i} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
@@ -143,7 +149,7 @@ export default function TroubleshootingPage() {
       </DocsSection>
 
       {/* Common Issues */}
-      <DocsSection title="Решение проблем">
+      <DocsSection title="Решение проблем" id="issues">
         <div className="space-y-4">
           {COMMON_ISSUES.map((item) => (
             <div key={item.issue} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
@@ -165,7 +171,7 @@ export default function TroubleshootingPage() {
       </DocsSection>
 
       {/* Quick Fixes */}
-      <DocsSection title="Быстрые исправления">
+      <DocsSection title="Быстрые исправления" id="quick-fixes">
         <DocsInfoBox type="tip">
           Добавьте эти ключевые слова в промпт для быстрого решения типичных проблем.
         </DocsInfoBox>

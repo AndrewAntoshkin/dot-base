@@ -114,9 +114,18 @@ const EXAMPLE_PROMPTS = [
   },
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'methodology', title: 'Методология', level: 2 },
+  { id: 'structure', title: 'Структура промпта', level: 2 },
+  { id: 'styles', title: 'Стили', level: 2 },
+  { id: 'quality', title: 'Качество', level: 2 },
+  { id: 'examples', title: 'Примеры', level: 2 },
+  { id: 'principles', title: 'Главные принципы', level: 2 },
+];
+
 export default function PromptsPage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Prompt Engineering' },
@@ -131,14 +140,14 @@ export default function PromptsPage() {
       </DocsInfoBox>
 
       {/* Phases */}
-      <DocsSection title="Методология: 4 фазы">
+      <DocsSection title="Методология: 4 фазы" id="methodology">
         <div className="space-y-4">
           {PHASES.map((phase) => {
             const Icon = phase.icon;
             return (
               <div key={phase.number} className="p-5 bg-transparent rounded-xl border border-[#2f2f2f]">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#303030] flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl border border-[#333] flex items-center justify-center flex-shrink-0">
                     <span className="text-lg font-bold text-white font-inter">{phase.number}</span>
                   </div>
                   <div className="flex-1">
@@ -154,7 +163,7 @@ export default function PromptsPage() {
                         </li>
                       ))}
                     </ul>
-                    <div className="p-3 bg-[#1a1a1a] rounded-lg">
+                    <div className="p-3 bg-[#1a1a1a] rounded-xl">
                       <span className="text-xs text-[#707070] font-inter uppercase">Совет: </span>
                       <span className="text-sm text-[#b0b0b0] font-inter">{phase.tip}</span>
                     </div>
@@ -167,13 +176,13 @@ export default function PromptsPage() {
       </DocsSection>
 
       {/* Structure */}
-      <DocsSection title="Структура промпта">
+      <DocsSection title="Структура промпта" id="structure">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] mb-4">
           <div className="flex items-center gap-2 mb-3">
             <BookOpen className="w-5 h-5 text-white" />
             <span className="text-sm font-bold text-white font-inter">Формула</span>
           </div>
-          <code className="block p-3 bg-[#1a1a1a] rounded-lg text-sm text-[#b0b0b0] font-mono">
+          <code className="block p-3 bg-[#1a1a1a] rounded-xl text-sm text-[#b0b0b0] font-mono">
             [Субъект] + [Действие] + [Окружение] + [Стиль] + [Качество]
           </code>
         </div>
@@ -199,14 +208,14 @@ export default function PromptsPage() {
       </DocsSection>
 
       {/* Style Keywords */}
-      <DocsSection title="Ключевые слова стилей">
+      <DocsSection title="Ключевые слова стилей" id="styles">
         <div className="grid grid-cols-2 gap-3">
           {Object.entries(STYLE_KEYWORDS).map(([style, keywords]) => (
             <div key={style} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
               <span className="text-sm font-bold text-white font-inter block mb-2">{style}</span>
               <div className="flex flex-wrap gap-1">
                 {keywords.map((kw) => (
-                  <span key={kw} className="px-2 py-1 bg-[#303030] rounded text-xs text-[#b0b0b0] font-mono">
+                  <span key={kw} className="px-2 py-1 border border-[#333] rounded text-xs text-[#b0b0b0] font-mono">
                     {kw}
                   </span>
                 ))}
@@ -217,11 +226,11 @@ export default function PromptsPage() {
       </DocsSection>
 
       {/* Quality Keywords */}
-      <DocsSection title="Ключевые слова качества">
+      <DocsSection title="Ключевые слова качества" id="quality">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
           <div className="flex flex-wrap gap-2">
             {QUALITY_KEYWORDS.map((kw) => (
-              <span key={kw} className="px-2 py-1 bg-[#303030] rounded text-xs text-[#b0b0b0] font-mono">
+              <span key={kw} className="px-2 py-1 border border-[#333] rounded text-xs text-[#b0b0b0] font-mono">
                 {kw}
               </span>
             ))}
@@ -260,12 +269,12 @@ export default function PromptsPage() {
       </div>
 
       {/* Examples */}
-      <DocsSection title="Примеры промптов">
+      <DocsSection title="Примеры промптов" id="examples">
         <div className="space-y-3">
           {EXAMPLE_PROMPTS.map((example) => (
             <div key={example.category} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
               <div className="text-sm font-bold text-white font-inter mb-2">{example.category}</div>
-              <code className="block p-3 bg-[#1a1a1a] rounded-lg text-sm text-[#b0b0b0] font-inter leading-relaxed">
+              <code className="block p-3 bg-[#1a1a1a] rounded-xl text-sm text-[#b0b0b0] font-inter leading-relaxed">
                 {example.prompt}
               </code>
             </div>
@@ -274,7 +283,7 @@ export default function PromptsPage() {
       </DocsSection>
 
       {/* Key Principles */}
-      <DocsSection title="Главные принципы">
+      <DocsSection title="Главные принципы" id="principles">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
           <p className="text-sm text-[#959595] font-inter">
             <span className="text-white font-medium">Английский язык:</span> модели обучены на английских данных. Русский работает, но английский лучше.

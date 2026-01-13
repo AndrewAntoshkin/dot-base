@@ -1,156 +1,148 @@
 'use client';
 
-import { DocsShell, DocsBreadcrumb, DocsTitle, DocsSection, DocsFooter } from '@/components/docs/docs-shell';
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { 
+  DocsShell, 
+  DocsBreadcrumb, 
+  DocsTitle, 
+  DocsSection, 
+  DocsFooter,
+  DocsQuickLinks,
+  DocsQuickLink,
+  DocsFeatureGrid,
+  DocsFeatureCard,
+  DocsStats,
+  DocsNavList,
+  DocsParagraph
+} from '@/components/docs/docs-shell';
+import { 
+  Sparkles, 
+  Layers, 
+  Wand2, 
+  PenTool,
+  Image,
+  Video,
+  Eraser,
+  ArrowUpRight
+} from 'lucide-react';
 
 const QUICK_LINKS = [
   {
-    title: 'BASECRAFT AI',
-    description: 'Персональный помощник: выбор модели, промпты, советы',
-    href: '/docs/assistant',
+    title: 'Быстрый старт',
+    href: '/docs/quickstart',
   },
   {
-    title: 'Модели',
-    description: 'Обзор всех AI-моделей: FLUX, Kling, Hailuo, SeeDream и другие',
+    title: 'Работа с моделями',
     href: '/docs/models',
   },
   {
-    title: 'Функции',
-    description: 'Image, Video, Inpaint, Outpaint, Upscale и другие возможности',
-    href: '/docs/features',
+    title: 'AI Ассистент BASECRAFT',
+    href: '/docs/assistant',
   },
   {
     title: 'Prompt Engineering',
-    description: 'Как писать эффективные промпты для лучших результатов',
     href: '/docs/prompts',
+  },
+  {
+    title: 'Советы и хитрости',
+    href: '/docs/tips',
   },
 ];
 
-const FEATURES_OVERVIEW = [
-  { name: 'Image', description: 'Генерация изображений из текста' },
-  { name: 'Video', description: 'Создание видео из текста/изображения' },
-  { name: 'Edit', description: 'Редактирование по описанию' },
-  { name: 'Upscale', description: 'Увеличение разрешения' },
+const FEATURES = [
+  { name: 'Image', description: 'Генерация изображений из текста', icon: <Image className="w-4 h-4" />, href: '/docs/features/image' },
+  { name: 'Video', description: 'Создание видео из текста/изображения', icon: <Video className="w-4 h-4" />, href: '/docs/features/video' },
+  { name: 'Inpaint', description: 'Редактирование областей изображения', icon: <Eraser className="w-4 h-4" />, href: '/docs/features/inpaint' },
+  { name: 'Upscale', description: 'Увеличение разрешения', icon: <ArrowUpRight className="w-4 h-4" />, href: '/docs/features/upscale' },
 ];
 
 const STATS = [
-  { value: '40+', label: 'Моделей' },
+  { value: '50+', label: 'Моделей' },
   { value: '10', label: 'Функций' },
-  { value: '7', label: 'Семейств моделей' },
+  { value: '11', label: 'Провайдеров' },
+];
+
+const NAV_ITEMS = [
+  { href: '/docs/assistant', title: 'AI Ассистент', description: 'персональный помощник, промпты, выбор модели' },
+  { href: '/docs/models', title: 'Модели', description: 'FLUX, Kling, Hailuo, SeeDream, Recraft, Google, Runway, Luma' },
+  { href: '/docs/features', title: 'Функции', description: 'Image, Video, Keyframes, Inpaint, Outpaint, Upscale' },
+  { href: '/docs/prompts', title: 'Prompt Engineering', description: 'структура, ключевые слова, примеры' },
+  { href: '/docs/changelog', title: 'Changelog', description: 'история обновлений платформы' },
+];
+
+const TABLE_OF_CONTENTS = [
+  { id: 'quick-references', title: 'Быстрый старт', level: 2 },
+  { id: 'about', title: 'Что такое BASE', level: 2 },
+  { id: 'features', title: 'Основные функции', level: 2 },
+  { id: 'navigation', title: 'Навигация', level: 2 },
 ];
 
 export default function DocsPage() {
   return (
-    <DocsShell showBanner bannerText="Документация постоянно обновляется" bannerLink="/docs/changelog">
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
-        { label: 'Документация' },
+        { label: 'Docs', href: '/docs' },
       ]} />
       
-      <DocsTitle description="Добро пожаловать в документацию BASE — платформы для AI-генерации изображений и видео. Здесь вы найдёте всё необходимое для эффективной работы.">
-        Добро пожаловать
+      <DocsTitle 
+        description="BASE — платформа для AI-генерации изображений и видео. Здесь вы найдёте всё необходимое для эффективной работы."
+        lastUpdated="13 января 2026"
+      >
+        Документация BASE
       </DocsTitle>
 
-      {/* Hero */}
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {STATS.map((stat) => (
-          <div key={stat.label} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] text-center">
-            <div className="text-3xl font-bold text-white font-inter mb-1">{stat.value}</div>
-            <div className="text-sm text-[#959595] font-inter">{stat.label}</div>
-          </div>
-        ))}
-      </div>
+      <DocsParagraph>
+        Создавайте изображения и видео с помощью более чем 50 моделей от ведущих разработчиков: 
+        Black Forest Labs (FLUX), Kuaishou (Kling), MiniMax (Hailuo), ByteDance (SeeDream), 
+        Google (Veo, Imagen), Runway ML, Luma и других.
+      </DocsParagraph>
 
-      {/* Quick Links */}
-      <DocsSection title="Быстрый старт">
-        <div className="grid grid-cols-2 gap-4">
+      {/* Stats */}
+      <DocsStats stats={STATS} />
+
+      {/* Quick References */}
+      <DocsSection title="Быстрый старт" id="quick-references">
+        <DocsQuickLinks>
           {QUICK_LINKS.map((link) => (
-            <Link 
-              key={link.title}
+            <DocsQuickLink
+              key={link.href}
               href={link.href}
-              className="group p-1 border border-[#252525] rounded-2xl hover:border-[#3a3a3a] transition-colors"
-            >
-              <div className="relative h-[100px] bg-transparent rounded-xl p-4 flex flex-col justify-between">
-                <div>
-                  <span className="text-xs font-medium text-white uppercase tracking-wide">
-                    {link.title}
-                  </span>
-                  <p className="text-xs text-[#959595] mt-1">{link.description}</p>
-                </div>
-                <ArrowRight className="absolute bottom-4 right-4 w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </Link>
+              title={link.title}
+            />
           ))}
-        </div>
+        </DocsQuickLinks>
+      </DocsSection>
+
+      {/* Features */}
+      <DocsSection title="Основные функции" id="features">
+        <DocsFeatureGrid>
+          {FEATURES.map((feature) => (
+            <DocsFeatureCard
+              key={feature.name}
+              href={feature.href}
+              title={feature.name}
+              description={feature.description}
+              icon={feature.icon}
+            />
+          ))}
+        </DocsFeatureGrid>
       </DocsSection>
 
       {/* What is BASE */}
-      <DocsSection title="Что такое BASE">
-        <p className="text-sm text-[#959595] font-inter leading-relaxed mb-4">
-          BASE — это платформа для генерации AI-контента, объединяющая лучшие модели для создания 
-          изображений и видео. Мы предоставляем доступ к более чем 40 моделям от ведущих разработчиков: 
-          Black Forest Labs (FLUX), Kuaishou (Kling), MiniMax (Hailuo), ByteDance (SeeDream), 
-          Google (Veo, Imagen) и других.
-        </p>
-        <p className="text-sm text-[#959595] font-inter leading-relaxed">
+      <DocsSection title="Что такое BASE" id="about">
+        <DocsParagraph>
+        BASE — это платформа для генерации AI-контента, объединяющая лучшие модели для создания 
+        изображений и видео. Мы предоставляем доступ к более чем 50 моделям от ведущих разработчиков.
+        </DocsParagraph>
+        <DocsParagraph>
           Платформа поддерживает полный цикл работы с контентом: от генерации и редактирования 
           до апскейла и удаления фона. Интуитивный интерфейс, система воркспейсов и история 
           генераций помогают организовать рабочий процесс.
-        </p>
-      </DocsSection>
-
-      {/* Features Overview */}
-      <DocsSection title="Основные функции">
-        <div className="grid grid-cols-2 gap-3">
-          {FEATURES_OVERVIEW.map((feature) => (
-            <div key={feature.name} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
-              <div className="text-sm font-medium text-white font-inter mb-1">{feature.name}</div>
-              <div className="text-xs text-[#959595] font-inter">{feature.description}</div>
-            </div>
-          ))}
-        </div>
+        </DocsParagraph>
       </DocsSection>
 
       {/* Navigation */}
-      <DocsSection title="Навигация по документации">
-        <div className="space-y-2">
-          <Link href="/docs/assistant" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
-            <div>
-              <span className="text-sm font-medium text-white font-inter">AI Ассистент</span>
-              <span className="text-xs text-[#959595] font-inter ml-2">— персональный помощник, промпты, выбор модели</span>
-            </div>
-            <ArrowRight className="w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
-          </Link>
-          <Link href="/docs/models" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
-            <div>
-              <span className="text-sm font-medium text-white font-inter">Модели</span>
-              <span className="text-xs text-[#959595] font-inter ml-2">— FLUX, Kling, Hailuo, SeeDream, Recraft, Google, Ideogram</span>
-            </div>
-            <ArrowRight className="w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
-          </Link>
-          <Link href="/docs/features" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
-            <div>
-              <span className="text-sm font-medium text-white font-inter">Функции</span>
-              <span className="text-xs text-[#959595] font-inter ml-2">— Image, Video, Keyframes, Inpaint, Outpaint, Upscale</span>
-            </div>
-            <ArrowRight className="w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
-          </Link>
-          <Link href="/docs/prompts" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
-            <div>
-              <span className="text-sm font-medium text-white font-inter">Prompt Engineering</span>
-              <span className="text-xs text-[#959595] font-inter ml-2">— структура, ключевые слова, примеры</span>
-            </div>
-            <ArrowRight className="w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
-          </Link>
-          <Link href="/docs/changelog" className="flex items-center justify-between p-4 bg-transparent hover:bg-[#2a2a2a] rounded-xl border border-[#2f2f2f] transition-colors group">
-            <div>
-              <span className="text-sm font-medium text-white font-inter">Changelog</span>
-              <span className="text-xs text-[#959595] font-inter ml-2">— история обновлений платформы</span>
-            </div>
-            <ArrowRight className="w-4 h-4 text-white opacity-50 group-hover:opacity-100 transition-opacity" />
-          </Link>
-        </div>
+      <DocsSection title="Навигация по документации" id="navigation">
+        <DocsNavList items={NAV_ITEMS} />
       </DocsSection>
 
       <DocsFooter />

@@ -277,7 +277,7 @@ function IdeaCard({
       <div className="flex items-center justify-between">
         <button
           onClick={onVote}
-          className={`flex items-center gap-1 px-1.5 py-0.5 border rounded-md text-xs font-inter transition-colors ${
+          className={`flex items-center gap-1 px-1.5 py-0.5 border rounded-lg text-xs font-inter transition-colors ${
             hasVoted 
               ? 'border-white/50 text-white bg-white/10' 
               : 'border-[#252525] text-white hover:border-white/30'
@@ -409,8 +409,15 @@ export default function RoadmapPage() {
     return false;
   };
 
+  const TABLE_OF_CONTENTS = [
+    { id: 'next-steps', title: 'Ближайшие шаги', level: 2 },
+    { id: 'planned', title: 'Запланировано', level: 2 },
+    { id: 'suggest', title: 'Предложения', level: 2 },
+    { id: 'ideas', title: 'Идеи', level: 2 },
+  ];
+
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Документация', href: '/docs' },
         { label: 'Roadmap' },
@@ -421,7 +428,7 @@ export default function RoadmapPage() {
       </DocsTitle>
 
       {/* Ближайшие шаги */}
-      <DocsSection title="Ближайшие шаги">
+      <DocsSection title="Ближайшие шаги" id="next-steps">
         <p className="text-sm text-[#959595] font-inter leading-relaxed">
           Мы активно работаем над улучшением платформы. В ближайшее время планируем добавить новые модели, 
           улучшить интерфейс и расширить возможности генерации. Следите за обновлениями!
@@ -429,7 +436,7 @@ export default function RoadmapPage() {
       </DocsSection>
 
       {/* Запланировано */}
-      <DocsSection title="Запланировано">
+      <DocsSection title="Запланировано" id="planned">
         <p className="text-sm text-[#959595] font-inter leading-relaxed mb-4">
           Функции и улучшения, над которыми мы работаем:
         </p>
@@ -456,7 +463,7 @@ export default function RoadmapPage() {
       </DocsSection>
 
       {/* Предложите свою идею */}
-      <DocsSection title="Предложите свою идею">
+      <DocsSection title="Предложите свою идею" id="suggest">
         <p className="text-sm text-[#959595] font-inter leading-relaxed">
           Добавить новую модель генерации<br />
           Улучшить качество upscale<br />
@@ -473,14 +480,14 @@ export default function RoadmapPage() {
         </p>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2.5 bg-[#303030] hover:bg-[#404040] rounded-xl text-sm text-white font-inter font-bold transition-colors"
+          className="px-4 py-2.5 border border-[#333] hover:bg-[#404040] rounded-xl text-sm text-white font-inter font-bold transition-colors"
         >
           Предложить
         </button>
       </div>
 
       {/* Идеи */}
-      <DocsSection title="Идеи">
+      <DocsSection title="Идеи" id="ideas">
         {isLoading ? (
           <div className="text-sm text-[#959595] font-inter">Загрузка...</div>
         ) : ideas.length === 0 ? (

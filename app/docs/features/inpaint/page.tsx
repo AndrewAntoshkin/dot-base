@@ -9,9 +9,16 @@ const SUPPORTED_MODELS = [
   { name: 'Bria Eraser', desc: 'Специализируется на удалении объектов без замены.' },
 ];
 
+const TABLE_OF_CONTENTS = [
+  { id: 'how-it-works', title: 'Как это работает', level: 2 },
+  { id: 'models', title: 'Модели', level: 2 },
+  { id: 'use-cases', title: 'Применение', level: 2 },
+  { id: 'tips', title: 'Советы', level: 2 },
+];
+
 export default function InpaintFeaturePage() {
   return (
-    <DocsShell>
+    <DocsShell tableOfContents={TABLE_OF_CONTENTS}>
       <DocsBreadcrumb items={[
         { label: 'Функции', href: '/docs/features' },
         { label: 'Inpaint' },
@@ -26,11 +33,11 @@ export default function InpaintFeaturePage() {
       </DocsInfoBox>
 
       {/* How it works */}
-      <DocsSection title="Как это работает">
+      <DocsSection title="Как это работает" id="how-it-works">
         <div className="space-y-4">
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#303030] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border border-[#333] flex items-center justify-center">
                 <span className="text-sm font-bold text-white">1</span>
               </div>
               <h4 className="text-sm font-bold text-white font-inter">Загрузите изображение</h4>
@@ -41,7 +48,7 @@ export default function InpaintFeaturePage() {
           </div>
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#303030] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border border-[#333] flex items-center justify-center">
                 <span className="text-sm font-bold text-white">2</span>
               </div>
               <h4 className="text-sm font-bold text-white font-inter">Нарисуйте маску</h4>
@@ -52,7 +59,7 @@ export default function InpaintFeaturePage() {
           </div>
           <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#303030] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border border-[#333] flex items-center justify-center">
                 <span className="text-sm font-bold text-white">3</span>
               </div>
               <h4 className="text-sm font-bold text-white font-inter">Опишите замену</h4>
@@ -65,7 +72,7 @@ export default function InpaintFeaturePage() {
       </DocsSection>
 
       {/* Supported Models */}
-      <DocsSection title="Поддерживаемые модели">
+      <DocsSection title="Поддерживаемые модели" id="models">
         <div className="space-y-3">
           {SUPPORTED_MODELS.map((model) => (
             <div key={model.name} className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
@@ -77,7 +84,7 @@ export default function InpaintFeaturePage() {
       </DocsSection>
 
       {/* Use Cases */}
-      <DocsSection title="Применение">
+      <DocsSection title="Применение" id="use-cases">
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 bg-transparent rounded-xl border border-[#2f2f2f]">
             <span className="text-sm text-[#959595] font-inter">Удаление лишних объектов</span>
@@ -95,7 +102,7 @@ export default function InpaintFeaturePage() {
       </DocsSection>
 
       {/* Tips */}
-      <DocsSection title="Советы">
+      <DocsSection title="Советы" id="tips">
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] space-y-3">
           <p className="text-sm text-[#959595] font-inter">
             <span className="text-white font-medium">Точная маска:</span> рисуйте маску аккуратно, захватывая только нужную область. Слишком большая маска = непредсказуемый результат.
@@ -111,7 +118,7 @@ export default function InpaintFeaturePage() {
 
       {/* CTA */}
       <div className="p-6 bg-transparent rounded-2xl border border-[#2f2f2f] text-center">
-        <Link href="/inpaint" className="inline-block px-6 py-3 bg-white text-black rounded-full font-inter font-bold text-sm hover:bg-[#e0e0e0] transition-colors">
+        <Link href="/inpaint" className="inline-block px-6 py-3 text-white border border-[#444] rounded-xl hover:border-white text-sm transition-colors transition-colors">
           Попробовать Inpaint
         </Link>
       </div>

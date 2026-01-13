@@ -127,6 +127,36 @@ const GLOSSARY_TERMS = [
     category: 'Модели'
   },
   {
+    term: 'FLUX',
+    definition: 'Семейство моделей от Black Forest Labs на основе архитектуры Rectified Flow. Включает FLUX 2 Max, FLUX 2 Pro, FLUX Kontext. Отличается высоким качеством следования промптам.',
+    category: 'Модели'
+  },
+  {
+    term: 'Kling',
+    definition: 'Семейство видео-моделей от Kuaishou. Kling 2.5 PRO, Kling 2.1 Master и другие версии известны реалистичной физикой движений и высоким качеством.',
+    category: 'Модели'
+  },
+  {
+    term: 'Hailuo (MiniMax)',
+    definition: 'Видео-модели от MiniMax, также известные как MiniMax Video. Отличаются плавными движениями и способностью к длинным генерациям.',
+    category: 'Модели'
+  },
+  {
+    term: 'Recraft',
+    definition: 'Модели от Recraft AI для генерации изображений и векторной графики (SVG). Особенно хороши для дизайна и иллюстраций.',
+    category: 'Модели'
+  },
+  {
+    term: 'Imagen',
+    definition: 'Семейство моделей от Google для генерации изображений. Imagen 4 отличается высокой детализацией и точностью следования промптам.',
+    category: 'Модели'
+  },
+  {
+    term: 'Veo',
+    definition: 'Видео-модель от Google. Veo 3.1 поддерживает генерацию видео высокого качества с хорошим пониманием физики мира.',
+    category: 'Модели'
+  },
+  {
     term: 'Style Transfer',
     definition: 'Применение визуального стиля одного изображения к содержимому другого. Модель сохраняет объекты, но меняет художественную манеру.',
     category: 'Режимы'
@@ -170,6 +200,41 @@ const GLOSSARY_TERMS = [
     term: '3D VAE',
     definition: 'Расширенная версия VAE, учитывающая временное измерение для обработки видео. Обеспечивает консистентность между кадрами и плавность движений.',
     category: 'Видео'
+  },
+  {
+    term: 'Keyframe',
+    definition: 'Ключевой кадр видео. В контексте генерации — режим создания видео по сегментам, где каждый сегмент имеет начальный и конечный кадр.',
+    category: 'Видео'
+  },
+  {
+    term: 'Camera Motion',
+    definition: 'Параметр движения камеры в видео: zoom in/out, pan left/right, tilt up/down. Позволяет задать динамику без движения объектов.',
+    category: 'Видео'
+  },
+  {
+    term: 'Duration',
+    definition: 'Длительность генерируемого видео в секундах. Типичные значения: 5-10 секунд для одного сегмента.',
+    category: 'Видео'
+  },
+  {
+    term: 'Rectified Flow',
+    definition: 'Архитектура генеративных моделей, используемая в FLUX. Обеспечивает более прямые траектории в latent space и лучшее качество при меньшем количестве шагов.',
+    category: 'Архитектура'
+  },
+  {
+    term: 'ControlNet',
+    definition: 'Дополнительная нейросеть для управления композицией генерации через скетчи, карты глубины, позы и другие направляющие изображения.',
+    category: 'Архитектура'
+  },
+  {
+    term: 'Reference Image',
+    definition: 'Изображение-референс, используемое для сохранения стиля, персонажа или продукта в генерации. Модель учитывает визуальные характеристики референса.',
+    category: 'Режимы'
+  },
+  {
+    term: 'Kontext',
+    definition: 'Технология редактирования изображений от Black Forest Labs. FLUX Kontext позволяет модифицировать существующие изображения по текстовому описанию.',
+    category: 'Режимы'
   }
 ];
 
@@ -259,10 +324,10 @@ export default function GlossaryPage() {
             <button
               key={category.id}
               onClick={() => setActiveCategory(category.id)}
-              className={`px-3 py-1.5 rounded-lg font-inter text-sm transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-[13px] transition-colors border ${
                 activeCategory === category.id
-                  ? 'bg-white text-black font-medium'
-                  : 'bg-transparent text-[#959595] hover:text-white border border-[#2f2f2f]'
+                  ? 'border-white text-white'
+                  : 'border-[#333] text-[#888] hover:text-white hover:border-[#555]'
               }`}
             >
               {category.label}
@@ -278,12 +343,12 @@ export default function GlossaryPage() {
 
       {/* Alphabet Navigation */}
       {letters.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="flex flex-wrap gap-1.5 mb-8">
           {letters.map(letter => (
             <a
               key={letter}
               href={`#letter-${letter}`}
-              className="w-8 h-8 flex items-center justify-center bg-transparent rounded-lg text-white font-inter font-medium text-sm hover:bg-[#303030] transition-colors border border-[#2f2f2f]"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-[#888] text-[13px] hover:text-white hover:bg-[#1a1a1a] transition-colors border border-[#262626]"
             >
               {letter}
             </a>
@@ -308,35 +373,35 @@ export default function GlossaryPage() {
             <div key={letter} id={`letter-${letter}`}>
               {/* Letter Header */}
               <div className="flex items-center gap-4 mb-4">
-                <span className="w-10 h-10 flex items-center justify-center bg-transparent rounded-xl text-white font-inter font-bold text-lg border border-[#2f2f2f]">
+                <span className="w-8 h-8 flex items-center justify-center rounded-lg text-white text-[14px] font-medium border border-[#333]">
                   {letter}
                 </span>
-                <div className="flex-1 h-px bg-[#2f2f2f]" />
+                <div className="flex-1 h-px bg-[#262626]" />
               </div>
 
-              {/* Terms */}
-              <div className="space-y-3">
-                {groupedTerms[letter].map(item => (
-                  <div 
-                    key={item.term}
-                    className="p-4 bg-transparent rounded-xl border border-[#2f2f2f] hover:border-[#3f3f3f] transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-white font-inter font-semibold">{item.term}</h3>
-                          <span className="px-2 py-0.5 bg-[#303030] rounded text-xs text-[#959595] font-inter">
-                            {item.category}
-                          </span>
+                {/* Terms */}
+                <div className="space-y-2">
+                  {groupedTerms[letter].map(item => (
+                    <div 
+                      key={item.term}
+                      className="p-4 rounded-xl border border-[#262626] hover:border-[#444] transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-white text-[14px] font-medium">{item.term}</h3>
+                            <span className="px-2 py-0.5 border border-[#333] rounded text-[11px] text-[#666]">
+                              {item.category}
+                            </span>
+                          </div>
+                          <p className="text-[13px] text-[#888] leading-relaxed">
+                            {item.definition}
+                          </p>
                         </div>
-                        <p className="text-sm text-[#959595] font-inter leading-relaxed">
-                          {item.definition}
-                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
             </div>
           ))}
         </div>

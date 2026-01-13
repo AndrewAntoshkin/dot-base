@@ -24,15 +24,15 @@ export default function EditFeaturePage() {
         <div className="p-4 bg-transparent rounded-xl border border-[#2f2f2f]">
           <ol className="space-y-3">
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
-              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">1</span>
+              <span className="w-6 h-6 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0 text-white text-xs">1</span>
               Загрузите изображение которое хотите отредактировать
             </li>
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
-              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">2</span>
+              <span className="w-6 h-6 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0 text-white text-xs">2</span>
               Опишите желаемые изменения текстом: "сделай волосы рыжими", "добавь очки", "измени фон на пляж"
             </li>
             <li className="flex items-start gap-3 text-sm text-[#959595] font-inter">
-              <span className="w-6 h-6 rounded-full bg-[#303030] flex items-center justify-center flex-shrink-0 text-white text-xs">3</span>
+              <span className="w-6 h-6 rounded-full border border-[#333] flex items-center justify-center flex-shrink-0 text-white text-xs">3</span>
               Получите отредактированное изображение с сохранением общей композиции
             </li>
           </ol>
@@ -116,7 +116,7 @@ export default function EditFeaturePage() {
 
       {/* CTA */}
       <div className="p-6 bg-transparent rounded-2xl border border-[#2f2f2f] text-center">
-        <Link href="/edit" className="inline-block px-6 py-3 bg-white text-black rounded-full font-inter font-bold text-sm hover:bg-[#e0e0e0] transition-colors">
+        <Link href="/edit" className="inline-block px-6 py-3 text-white border border-[#444] rounded-xl hover:border-white text-sm transition-colors transition-colors">
           Попробовать Edit
         </Link>
       </div>

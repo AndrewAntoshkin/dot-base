@@ -4,6 +4,19 @@ import { DocsShell, DocsBreadcrumb, DocsTitle, DocsSection, DocsFooter } from '@
 
 const CHANGELOG = [
   {
+    version: '0.2.4',
+    date: '2026-01-13',
+    title: 'AI Ассистент: История чатов и улучшения',
+    changes: [
+      { type: 'new', text: 'История диалогов с ассистентом — все чаты сохраняются автоматически' },
+      { type: 'new', text: 'Избранные чаты — добавляйте важные диалоги в избранное' },
+      { type: 'new', text: 'Группировка чатов по месяцам для удобной навигации' },
+      { type: 'improvement', text: 'Улучшено отображение прикреплённых изображений и видео в чате' },
+      { type: 'improvement', text: 'Переработан дизайн документации в стиле Vercel' },
+      { type: 'improvement', text: 'Добавлена панель "На этой странице" с навигацией по разделам' },
+    ],
+  },
+  {
     version: '0.2.3',
     date: '2025-12-27',
     title: 'Kling: Motion Control + Edit Video',
@@ -158,7 +171,7 @@ export default function ChangelogPage() {
               <div className="p-5 bg-transparent rounded-xl border border-[#2f2f2f]">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="px-2 py-1 bg-[#303030] rounded-lg text-sm font-medium text-white font-mono">
+                  <span className="px-2 py-1 border border-[#333] rounded-xl text-sm font-medium text-white font-mono">
                     v{release.version}
                   </span>
                   <span className="text-sm text-[#959595] font-inter">
@@ -178,7 +191,7 @@ export default function ChangelogPage() {
                 <div className="space-y-2">
                   {release.changes.map((change, i) => (
                     <div key={i} className="flex items-start gap-3">
-                      <span className="inline-block px-1.5 py-0.5 rounded text-xs font-inter font-medium bg-[#303030] text-white">
+                      <span className="inline-block px-1.5 py-0.5 rounded text-xs font-inter font-medium border border-[#333] text-white">
                         {getChangeLabel(change.type)}
                       </span>
                       <span className="text-sm text-[#959595] font-inter">
