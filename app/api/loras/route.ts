@@ -224,19 +224,23 @@ export async function POST(request: NextRequest) {
         // First, create the model on Replicate (required before training)
         logger.info(`Creating model on Replicate: owner=${owner}, name=${modelName}`);
         
+        // Create model payload - try without hardware first (it's optional for destination models)
+        const createModelPayload: Record<string, string> = {
+          owner: owner,
+          name: modelName,
+          description: `LoRA model: ${lora.name}`,
+          visibility: 'private',
+        };
+        
+        logger.info(`Create model payload: ${JSON.stringify(createModelPayload)}`);
+        
         const createModelResponse = await fetch('https://api.replicate.com/v1/models', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            owner: owner,
-            name: modelName,
-            description: `LoRA model: ${lora.name}`,
-            visibility: 'private',
-            hardware: 'gpu-t4-small',
-          }),
+          body: JSON.stringify(createModelPayload),
         });
         
         const createModelText = await createModelResponse.text();
