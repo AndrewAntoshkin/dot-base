@@ -154,6 +154,14 @@ export async function POST(request: NextRequest) {
         hint: createError?.hint,
       });
       const errorMessage = createError?.message || 'Ошибка создания LoRA';
+      
+      // Check for duplicate trigger_word error
+      if (createError?.code === '23505' || errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+        return NextResponse.json({ 
+          error: `LoRA с trigger word "${normalizedTriggerWord}" уже существует. Используйте другой trigger word.`,
+        }, { status: 400 });
+      }
+      
       // Return the actual error message for debugging
       return NextResponse.json({ 
         error: `Ошибка создания LoRA: ${errorMessage}`,
