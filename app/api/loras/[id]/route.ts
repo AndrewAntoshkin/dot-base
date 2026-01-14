@@ -128,7 +128,7 @@ export async function DELETE(
     // Soft delete
     const { error } = await serviceClient
       .from('user_loras')
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ deleted_at: new Date().toISOString() } as any)
       .eq('id', id);
 
     if (error) {
