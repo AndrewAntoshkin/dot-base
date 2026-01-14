@@ -152,11 +152,9 @@ export default function VideoFeaturePage() {
       </DocsSection>
 
       {/* CTA */}
-      <div className="p-6 bg-transparent rounded-2xl border border-[#2f2f2f] text-center">
-        <Link href="/video" className="inline-block px-6 py-3 text-white border border-[#444] rounded-xl hover:border-white text-sm transition-colors transition-colors">
-          Попробовать Video
-        </Link>
-      </div>
+      <Link href="/video" className="inline-flex items-center gap-2 px-4 py-2 text-[13px] text-white border border-[#444] rounded-xl hover:border-white transition-colors">
+        Попробовать →
+      </Link>
 
       <DocsFooter />
     </DocsShell>

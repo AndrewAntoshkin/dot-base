@@ -19,8 +19,6 @@ interface OutputPanelProps {
   onGenerationUpdate?: (id: string, updates: Partial<SessionGeneration>) => void;
   /** Cached generation from session (for instant preview while loading full data) */
   cachedGeneration?: SessionGeneration | null;
-  /** Callback для открытия режима слоёв */
-  onOpenLayers?: (imageUrl: string) => void;
 }
 
 interface Creator {
@@ -147,7 +145,6 @@ export function OutputPanel({
   onSelectGeneration,
   onGenerationUpdate,
   cachedGeneration,
-  onOpenLayers,
 }: OutputPanelProps) {
   const [generation, setGeneration] = useState<Generation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -716,7 +713,6 @@ export function OutputPanel({
             mediaUrl={currentMediaUrl}
             mediaType={isVideo ? 'video' : 'image'}
             compact
-            onOpenLayers={!isVideo ? onOpenLayers : undefined}
           />
         )}
 
@@ -851,7 +847,6 @@ export function OutputPanel({
           <QuickActions
             mediaUrl={currentMediaUrl}
             mediaType={isVideo ? 'video' : 'image'}
-            onOpenLayers={!isVideo ? onOpenLayers : undefined}
           />
         </div>
       )}

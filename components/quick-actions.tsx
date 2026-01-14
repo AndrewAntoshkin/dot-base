@@ -8,7 +8,6 @@ import {
   Eraser, 
   PaintBucket, 
   Maximize2,
-  Layers,
 } from 'lucide-react';
 
 interface QuickActionsProps {
@@ -18,8 +17,6 @@ interface QuickActionsProps {
   mediaType: 'image' | 'video';
   /** Компактный режим для мобильной версии */
   compact?: boolean;
-  /** Callback для открытия режима слоёв */
-  onOpenLayers?: (mediaUrl: string) => void;
 }
 
 interface QuickAction {
@@ -28,8 +25,6 @@ interface QuickAction {
   icon: React.ReactNode;
   /** Путь для навигации */
   getPath: (mediaUrl: string) => string;
-  /** Если true, используется callback вместо навигации */
-  isCallback?: boolean;
 }
 
 // Quick Actions для изображений (6 штук)
@@ -70,13 +65,6 @@ const IMAGE_ACTIONS: QuickAction[] = [
     icon: <Maximize2 className="w-3.5 h-3.5" />,
     getPath: (url) => `/expand?imageUrl=${encodeURIComponent(url)}`,
   },
-  {
-    id: 'layers',
-    label: 'Слои',
-    icon: <Layers className="w-3.5 h-3.5" />,
-    getPath: () => '', // Handled by callback
-    isCallback: true,
-  },
 ];
 
 // Quick Actions для видео (2 штуки)
@@ -95,18 +83,11 @@ const VIDEO_ACTIONS: QuickAction[] = [
   },
 ];
 
-export function QuickActions({ mediaUrl, mediaType, compact = false, onOpenLayers }: QuickActionsProps) {
+export function QuickActions({ mediaUrl, mediaType, compact = false }: QuickActionsProps) {
   const router = useRouter();
   const actions = mediaType === 'image' ? IMAGE_ACTIONS : VIDEO_ACTIONS;
 
   const handleActionClick = (action: QuickAction) => {
-    // Для кнопки "Слои" используем callback
-    if (action.isCallback && action.id === 'layers' && onOpenLayers) {
-      console.log('[QuickActions] Opening layers mode');
-      onOpenLayers(mediaUrl);
-      return;
-    }
-    
     const path = action.getPath(mediaUrl);
     console.log('[QuickActions] Navigating to:', path);
     router.push(path);
@@ -114,31 +95,16 @@ export function QuickActions({ mediaUrl, mediaType, compact = false, onOpenLayer
 
   return (
     <div className={`flex items-center gap-2 ${compact ? 'flex-wrap' : ''}`}>
-      {actions.map((action) => {
-        // Скрываем кнопку "Слои" если нет callback
-        if (action.isCallback && action.id === 'layers' && !onOpenLayers) {
-          return null;
-        }
-        
-        return (
-          <button
-            key={action.id}
-            onClick={() => handleActionClick(action)}
-            className={`
-              inline-flex items-center justify-center gap-1.5
-              px-3 py-2 h-8
-              border border-[#4D4D4D] rounded-[10px]
-              font-inter font-medium text-xs text-white
-              hover:bg-[#1f1f1f] hover:border-[#666]
-              transition-colors
-              whitespace-nowrap
-            `}
-          >
-            {action.icon}
-            <span>{action.label}</span>
-          </button>
-        );
-      })}
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          onClick={() => handleActionClick(action)}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white transition-colors whitespace-nowrap hover:bg-[#1f1f1f] hover:border-[#666]"
+        >
+          {action.icon}
+          <span>{action.label}</span>
+        </button>
+      ))}
     </div>
   );
 }

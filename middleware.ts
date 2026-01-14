@@ -111,9 +111,11 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLoginPage = pathname === '/login';
   const isAdminPath = needsAdminCheck(pathname);
+  const needsAuth = needsAuthCheck(pathname);
   
-  // Skip auth check for non-protected paths (except login redirect check and admin paths)
-  if (!needsAuthCheck(pathname) && !isLoginPage && !isAdminPath) {
+  // РАННИЙ ВЫХОД: Пропускаем незащищенные пути БЕЗ ЛЮБЫХ проверок
+  // Это критично для производительности и избежания блокировок при медленном интернете
+  if (!needsAuth && !isLoginPage && !isAdminPath) {
     return NextResponse.next({ request });
   }
 
@@ -165,13 +167,13 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - only when needed
   // Add timeout to prevent 504 errors when Supabase is slow
-  // Увеличен timeout для мобильного интернета (5 сек вместо 2)
+  // Увеличен timeout для медленного интернета (10 сек для большей надежности)
   let user = null;
   let authFailed = false;
   
   try {
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Auth timeout')), 5000) // 5 sec timeout for mobile
+      setTimeout(() => reject(new Error('Auth timeout')), 10000) // 10 sec timeout for slow connections
     );
     const authPromise = supabase.auth.getUser();
     const result = await Promise.race([authPromise, timeoutPromise]) as { data: { user: any } };
@@ -188,8 +190,16 @@ export async function middleware(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error('[Middleware] Auth check failed or timed out:', error);
+    // Не логируем таймауты как ошибки - это нормально для медленного интернета
+    if (error instanceof Error && error.message !== 'Auth timeout') {
+      console.error('[Middleware] Auth check failed:', error);
+    }
     authFailed = true;
+    
+    // FALLBACK: Для незащищенных путей всегда пропускаем, даже при ошибке аутентификации
+    if (!needsAuthCheck(pathname) && !isAdminPath) {
+      return NextResponse.next({ request });
+    }
     
     // FALLBACK: If we have auth cookies, assume user is logged in
     // API routes will do proper auth check
@@ -198,12 +208,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next({ request });
     }
     
-    // No cookies and auth failed - redirect to login for protected routes
+    // No cookies and auth failed - redirect to login for protected routes only
     if (needsAuthCheck(pathname) || isAdminPath) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       return NextResponse.redirect(url);
     }
+    
+    // Default: allow access for non-protected paths
     return NextResponse.next({ request });
   }
 

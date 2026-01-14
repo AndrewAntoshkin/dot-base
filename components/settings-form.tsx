@@ -1018,6 +1018,9 @@ export function SettingsForm({
         // Handle concurrent limit error with toast
         if (response.status === 429 && errorData.code === 'CONCURRENT_LIMIT_EXCEEDED') {
           showLimitToast(errorData.error);
+          // Ensure onSubmitEnd is called even on early return
+          setIsLoading(false);
+          if (onSubmitEnd) onSubmitEnd();
           return; // Don't show error in form, toast is enough
         }
         

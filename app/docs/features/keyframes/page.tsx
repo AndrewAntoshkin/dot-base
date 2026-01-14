@@ -127,11 +127,9 @@ export default function KeyframesFeaturePage() {
       </DocsSection>
 
       {/* CTA */}
-      <div className="p-6 rounded-xl border border-[#262626] text-center">
-        <Link href="/keyframes" className="inline-flex items-center gap-2 px-4 py-2 text-[13px] text-white border border-[#444] rounded-xl hover:border-white transition-colors">
-          Попробовать Keyframes →
-        </Link>
-      </div>
+      <Link href="/keyframes" className="inline-flex items-center gap-2 px-4 py-2 text-[13px] text-white border border-[#444] rounded-xl hover:border-white transition-colors">
+        Попробовать →
+      </Link>
 
       <DocsFooter />
     </DocsShell>

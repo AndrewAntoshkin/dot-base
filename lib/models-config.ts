@@ -54,9 +54,82 @@ export interface Model {
 }
 
 /**
- * СОЗДАТЬ ИЗОБРАЖЕНИЕ - 14 моделей
+ * СОЗДАТЬ ИЗОБРАЖЕНИЕ - 15 моделей
  */
 export const CREATE_MODELS: Model[] = [
+  // 0. FLUX Dev LoRA - Генерация с кастомными LoRA
+  {
+    id: 'flux-dev-lora',
+    name: 'flux-dev-lora',
+    displayName: 'Flux Dev LoRA',
+    replicateModel: 'black-forest-labs/flux-dev-lora',
+    action: 'create',
+    runs: '10M+ runs',
+    price: '$0.032 per image',
+    description: 'FLUX Dev с поддержкой LoRA. Используй свои кастомные стили!',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изображение с trigger word вашей LoRA...',
+        description: 'Используйте trigger word вашей LoRA в промпте (например: YA3D style character)',
+      },
+      {
+        name: 'hf_lora',
+        label: 'LoRA URL',
+        type: 'text',
+        required: true,
+        placeholder: 'fofr/flux-pixar или путь к HuggingFace LoRA',
+        description: 'URL вашей LoRA модели на Replicate или HuggingFace',
+      },
+      {
+        name: 'lora_scale',
+        label: 'Сила LoRA',
+        type: 'slider',
+        default: 1,
+        min: 0,
+        max: 2,
+        step: 0.1,
+        description: 'Насколько сильно влияет LoRA на результат',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Формат',
+        type: 'select',
+        default: '1:1',
+        options: [
+          { value: '1:1', label: '1:1 (квадрат)' },
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '4:3', label: '4:3 (ландшафт)' },
+          { value: '3:4', label: '3:4 (портрет)' },
+        ],
+        description: 'Соотношение сторон изображения',
+      },
+      {
+        name: 'num_inference_steps',
+        label: 'Шаги',
+        type: 'slider',
+        default: 28,
+        min: 1,
+        max: 50,
+        step: 1,
+        description: 'Количество шагов генерации',
+      },
+      {
+        name: 'guidance_scale',
+        label: 'Guidance Scale',
+        type: 'slider',
+        default: 3.5,
+        min: 1,
+        max: 10,
+        step: 0.5,
+        description: 'Насколько точно следовать промпту',
+      },
+    ],
+  },
   // 1. FLUX 2 Max - Максимальное качество и консистентность
   {
     id: 'flux-2-max',
@@ -4774,7 +4847,7 @@ export const VIDEO_EDIT_MODELS: Model[] = [
 ];
 
 /**
- * УЛУЧШИТЬ ВИДЕО - 1 модель
+ * УЛУЧШИТЬ ВИДЕО - 2 модели
  */
 export const VIDEO_UPSCALE_MODELS: Model[] = [
   // 1. Topaz Video Upscale
@@ -4811,6 +4884,36 @@ export const VIDEO_UPSCALE_MODELS: Model[] = [
         min: 15,
         max: 60,
         description: 'Интерполяция кадров',
+      },
+    ],
+  },
+
+  // 2. Crystal Video Upscaler
+  {
+    id: 'crystal-video-upscaler',
+    name: 'crystal-video-upscaler',
+    displayName: 'Crystal Video Upscaler',
+    replicateModel: 'philz1337x/crystal-video-upscaler',
+    action: 'video_upscale',
+    runs: '58 runs',
+    description: 'Clarity AI - высокоточный апскейл для портретов, лиц и продуктов',
+    settings: [
+      {
+        name: 'video',
+        label: 'Видео',
+        type: 'file',
+        required: true,
+        description: 'Загрузите видео для улучшения качества.',
+      },
+      {
+        name: 'scale_factor',
+        label: 'Коэффициент масштабирования',
+        type: 'slider',
+        default: 2,
+        min: 1,
+        max: 6,
+        step: 1,
+        description: 'Масштабирование (ограничивается если результат превысит 4K)',
       },
     ],
   },

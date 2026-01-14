@@ -20,6 +20,7 @@ export interface ModelLite {
 
 // Лёгкие данные для селектора моделей - только id, название и описание
 export const CREATE_MODELS_LITE: ModelLite[] = [
+  { id: 'flux-dev-lora', displayName: '⭐ Flux LoRA', description: 'Генерация с кастомными LoRA стилями!', action: 'create' },
   { id: 'flux-2-max', displayName: 'FLUX 2 Max', description: 'Максимальное качество, лучшее следование промпту, до 8 референсов', action: 'create' },
   { id: 'flux-2-pro', displayName: 'FLUX 2 Pro', description: 'Генерация и редактирование с поддержкой до 8 референсных изображений', action: 'create' },
   { id: 'seedream-4', displayName: 'SeeDream 4', description: 'ByteDance - генерация и редактирование до 4K разрешения', action: 'create' },
@@ -122,6 +123,7 @@ export const VIDEO_EDIT_MODELS_LITE: ModelLite[] = [
 
 export const VIDEO_UPSCALE_MODELS_LITE: ModelLite[] = [
   { id: 'topaz-video-upscale', displayName: 'Topaz Video Upscale', description: 'Topaz Labs - профессиональный апскейл до 4K', action: 'video_upscale' },
+  { id: 'crystal-video-upscaler', displayName: 'Crystal Video Upscaler', description: 'Clarity AI - апскейл для портретов, лиц и продуктов', action: 'video_upscale' },
 ];
 
 // Analyze models

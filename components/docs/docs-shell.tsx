@@ -532,7 +532,7 @@ export function DocsShell({
           ref={mainContentRef}
           className="flex-1 overflow-y-auto scrollbar-hide min-h-0"
         >
-          <div className="py-8 px-14 transition-all duration-300">
+          <div className="py-8 px-20 transition-all duration-300">
             {/* Sidebar toggle button - будет в одной строке с breadcrumbs */}
             <div className="flex items-center gap-3 mb-6">
               <button
