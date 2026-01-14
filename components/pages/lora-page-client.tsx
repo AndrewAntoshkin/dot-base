@@ -540,11 +540,15 @@ function LoraDetailPanel({
   lora,
   onUse,
   onClose,
+  onSync,
+  isSyncing = false,
   isPreset = false,
 }: {
   lora: LoraModel | null;
   onUse: (lora: LoraModel) => void;
   onClose: () => void;
+  onSync?: (lora: LoraModel) => void;
+  isSyncing?: boolean;
   isPreset?: boolean;
 }) {
   if (!lora) {
@@ -614,6 +618,33 @@ function LoraDetailPanel({
             <label className="block text-xs text-[#606060] mb-1">Training Images</label>
             <span className="text-sm text-white">{lora.training_images_count} изображений</span>
           </div>
+        )}
+        
+        {lora.error_message && (
+          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+            <span className="text-sm text-red-400">{lora.error_message}</span>
+          </div>
+        )}
+        
+        {/* Sync status button for training */}
+        {lora.status === 'training' && !isPreset && onSync && (
+          <button
+            onClick={() => onSync(lora)}
+            disabled={isSyncing}
+            className="w-full h-10 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400 font-inter font-medium text-sm hover:bg-blue-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isSyncing ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Проверка статуса...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Обновить статус
+              </>
+            )}
+          </button>
         )}
         
         {lora.error_message && (
@@ -792,6 +823,34 @@ function LoraContent() {
     }
   };
   
+  const [isSyncing, setIsSyncing] = useState(false);
+  
+  const handleSyncLora = async (lora: LoraModel) => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`/api/loras/${lora.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.lora) {
+          setUserLoras(prev => prev.map(l => 
+            l.id === lora.id ? data.lora : l
+          ));
+          if (selectedLora?.id === lora.id) {
+            setSelectedLora(data.lora);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing LoRA:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+  
   const displayLoras = activeTab === 'presets' ? PRESET_LORAS : userLoras;
   
   return (
@@ -905,6 +964,8 @@ function LoraContent() {
               lora={selectedLora}
               onUse={handleUseLora}
               onClose={() => setSelectedLora(null)}
+              onSync={handleSyncLora}
+              isSyncing={isSyncing}
               isPreset={selectedLora ? PRESET_LORAS.some(p => p.id === selectedLora.id) : false}
             />
           </div>
@@ -996,6 +1057,8 @@ function LoraContent() {
               lora={selectedLora}
               onUse={handleUseLora}
               onClose={() => setSelectedLora(null)}
+              onSync={handleSyncLora}
+              isSyncing={isSyncing}
               isPreset={selectedLora ? PRESET_LORAS.some(p => p.id === selectedLora.id) : false}
             />
           </div>

@@ -75,6 +75,132 @@ export async function GET(
   }
 }
 
+// PATCH /api/loras/[id] - Update LoRA (sync status from Replicate)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore
+            }
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 });
+    }
+
+    const serviceClient = createServiceRoleClient();
+    
+    // Get LoRA
+    const { data: lora } = await serviceClient
+      .from('user_loras')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .single();
+
+    if (!lora) {
+      return NextResponse.json({ error: 'LoRA не найдена' }, { status: 404 });
+    }
+
+    const loraData = lora as any;
+
+    // If we have a replicate_training_id, check its status
+    if (loraData.replicate_training_id && loraData.status === 'training') {
+      const replicateTokens = process.env.REPLICATE_API_TOKENS;
+      if (replicateTokens) {
+        const token = replicateTokens.split(',')[0].trim();
+        
+        const trainingResponse = await fetch(
+          `https://api.replicate.com/v1/trainings/${loraData.replicate_training_id}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (trainingResponse.ok) {
+          const trainingData = await trainingResponse.json();
+          logger.info('Replicate training status:', {
+            id: trainingData.id,
+            status: trainingData.status,
+            output: trainingData.output,
+          });
+
+          let newStatus = loraData.status;
+          const updateData: Record<string, any> = {};
+
+          if (trainingData.status === 'succeeded') {
+            newStatus = 'completed';
+            updateData.training_completed_at = new Date().toISOString();
+            
+            // Get the model version URL
+            if (trainingData.output?.version) {
+              updateData.lora_url = trainingData.output.version;
+              updateData.replicate_model_url = trainingData.output.version;
+            } else if (trainingData.output?.weights) {
+              updateData.lora_url = trainingData.output.weights;
+            }
+          } else if (trainingData.status === 'failed' || trainingData.status === 'canceled') {
+            newStatus = 'failed';
+            updateData.error_message = trainingData.error || 'Обучение не удалось';
+          }
+
+          if (newStatus !== loraData.status) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (serviceClient as any)
+              .from('user_loras')
+              .update({
+                status: newStatus,
+                ...updateData,
+              })
+              .eq('id', id);
+            
+            logger.info(`LoRA ${id} status synced: ${loraData.status} -> ${newStatus}`);
+          }
+
+          // Return updated data
+          const { data: updatedLora } = await serviceClient
+            .from('user_loras')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          return NextResponse.json({ lora: updatedLora, synced: true });
+        }
+      }
+    }
+
+    return NextResponse.json({ lora: loraData, synced: false });
+  } catch (error) {
+    logger.error('PATCH /api/loras/[id] error:', error);
+    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
+  }
+}
+
 // DELETE /api/loras/[id] - Soft delete LoRA
 export async function DELETE(
   request: NextRequest,
