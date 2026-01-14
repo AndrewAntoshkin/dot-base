@@ -59,10 +59,14 @@ export async function GET(
       return NextResponse.json({ error: 'LoRA не найдена' }, { status: 404 });
     }
 
+    // Type assertion for Supabase response
+    const loraData = lora as any;
+    const trainingImages = Array.isArray(loraData.training_images) ? loraData.training_images : [];
+
     return NextResponse.json({ 
       lora: {
-        ...lora,
-        training_images_count: lora.training_images?.length || 0,
+        ...loraData,
+        training_images_count: trainingImages.length,
       }
     });
   } catch (error) {
