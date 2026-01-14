@@ -122,7 +122,8 @@ export async function POST(request: NextRequest) {
     const serviceClient = createServiceRoleClient();
 
     // Create LoRA record
-    const { data: lora, error: createError } = await serviceClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: lora, error: createError } = await (serviceClient as any)
       .from('user_loras')
       .insert({
         user_id: user.id,
@@ -146,14 +147,16 @@ export async function POST(request: NextRequest) {
       image_url: url,
     }));
 
-    const { error: imagesError } = await serviceClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: imagesError } = await (serviceClient as any)
       .from('lora_training_images')
       .insert(trainingImages);
 
     if (imagesError) {
       logger.error('Error saving training images:', imagesError);
       // Cleanup: delete the LoRA
-      await serviceClient.from('user_loras').delete().eq('id', lora.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (serviceClient as any).from('user_loras').delete().eq('id', lora.id);
       return NextResponse.json({ error: 'Ошибка сохранения изображений' }, { status: 500 });
     }
 
@@ -163,7 +166,8 @@ export async function POST(request: NextRequest) {
     if (replicateTokens) {
       try {
         // Update status to training
-        await serviceClient
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (serviceClient as any)
           .from('user_loras')
           .update({ status: 'training', training_started_at: new Date().toISOString() })
           .eq('id', lora.id);
@@ -205,7 +209,8 @@ export async function POST(request: NextRequest) {
         if (trainingResponse.ok) {
           const trainingData = await trainingResponse.json();
           
-          await serviceClient
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (serviceClient as any)
             .from('user_loras')
             .update({ 
               replicate_training_id: trainingData.id,
@@ -221,7 +226,8 @@ export async function POST(request: NextRequest) {
           // If webhook URL is invalid (localhost), simulate completion for local dev
           if (errorText.includes('webhook') && errorText.includes('HTTPS')) {
             logger.info('Webhook requires HTTPS - simulating completion for local development');
-            await serviceClient
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (serviceClient as any)
               .from('user_loras')
               .update({ 
                 status: 'completed',
@@ -230,7 +236,8 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', lora.id);
           } else {
-            await serviceClient
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (serviceClient as any)
               .from('user_loras')
               .update({ 
                 status: 'failed',
@@ -241,7 +248,8 @@ export async function POST(request: NextRequest) {
         }
       } catch (trainingError) {
         logger.error('Training API error:', trainingError);
-        await serviceClient
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (serviceClient as any)
           .from('user_loras')
           .update({ 
             status: 'failed',
@@ -253,14 +261,16 @@ export async function POST(request: NextRequest) {
       // No Replicate tokens - simulate training for local development
       logger.info('No REPLICATE_API_TOKENS - simulating training');
       
-      await serviceClient
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (serviceClient as any)
         .from('user_loras')
         .update({ status: 'training', training_started_at: new Date().toISOString() })
         .eq('id', lora.id);
 
       // Simulate completion after 10 seconds (for testing)
       setTimeout(async () => {
-        await serviceClient
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (serviceClient as any)
           .from('user_loras')
           .update({ 
             status: 'completed',
