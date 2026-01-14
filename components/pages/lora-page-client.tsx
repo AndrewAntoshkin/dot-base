@@ -211,6 +211,57 @@ function CreateLoraForm({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
   
+  // Compress image before upload (resize to max 1024x1024, quality 85%)
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const img = document.createElement('img');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      img.onload = () => {
+        // Calculate new dimensions (max 1024x1024, maintain aspect ratio)
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 1024;
+        
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to blob with compression
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              console.log(`[LoRA Compress] ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (${Math.round((1 - compressedFile.size / file.size) * 100)}% saved)`);
+              resolve(compressedFile);
+            } else {
+              resolve(file); // Fallback to original
+            }
+          },
+          'image/jpeg',
+          0.85 // 85% quality
+        );
+      };
+      
+      img.onerror = () => resolve(file); // Fallback to original on error
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const addFiles = async (files: File[]) => {
     const newImages = files.slice(0, 20 - images.length).map(file => ({
       file,
@@ -226,11 +277,14 @@ function CreateLoraForm({
     const uploadPromises = newImages.map(async (img) => {
       const startTime = Date.now();
       try {
+        // Compress image before upload
+        const compressedFile = await compressImage(img.file);
+        
         const formData = new FormData();
-        formData.append('files', img.file);
+        formData.append('files', compressedFile);
         formData.append('bucket', 'lora-training-images');
         
-        console.log(`[LoRA Upload] Starting upload: ${img.file.name} (${(img.file.size / 1024 / 1024).toFixed(2)}MB)`);
+        console.log(`[LoRA Upload] Starting upload: ${img.file.name} (${(compressedFile.size / 1024 / 1024).toFixed(2)}MB)`);
         
         const response = await fetch('/api/upload', {
           method: 'POST',
