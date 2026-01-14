@@ -146,15 +146,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (createError || !lora) {
-      logger.error('Error creating LoRA:', createError);
+      logger.error('Error creating LoRA:', {
+        error: createError,
+        message: createError?.message,
+        code: createError?.code,
+        details: createError?.details,
+        hint: createError?.hint,
+      });
       const errorMessage = createError?.message || 'Ошибка создания LoRA';
-      // Check if it's a validation error from Supabase
-      if (errorMessage.includes('pattern') || errorMessage.includes('match') || errorMessage.includes('constraint')) {
-        return NextResponse.json({ 
-          error: 'Ошибка валидации данных. Проверьте формат полей (trigger word должен содержать только A-Z, 0-9, _)' 
-        }, { status: 400 });
-      }
-      return NextResponse.json({ error: errorMessage }, { status: 500 });
+      // Return the actual error message for debugging
+      return NextResponse.json({ 
+        error: `Ошибка создания LoRA: ${errorMessage}`,
+        details: createError?.details || createError?.hint || null,
+      }, { status: 500 });
     }
 
     // Save training images
