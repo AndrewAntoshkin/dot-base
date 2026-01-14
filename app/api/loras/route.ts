@@ -222,6 +222,8 @@ export async function POST(request: NextRequest) {
         const destination = `${owner}/${modelName}`;
         
         // First, create the model on Replicate (required before training)
+        logger.info(`Creating model on Replicate: owner=${owner}, name=${modelName}`);
+        
         const createModelResponse = await fetch('https://api.replicate.com/v1/models', {
           method: 'POST',
           headers: {
@@ -237,15 +239,47 @@ export async function POST(request: NextRequest) {
           }),
         });
         
+        const createModelText = await createModelResponse.text();
+        logger.info(`Create model response: status=${createModelResponse.status}, body=${createModelText}`);
+        
         if (!createModelResponse.ok) {
-          const createModelError = await createModelResponse.text();
-          // Model might already exist, that's OK
-          if (!createModelError.includes('already exists')) {
-            logger.warn('Could not create model on Replicate:', createModelError);
+          // Model might already exist, that's OK - continue
+          if (!createModelText.includes('already exists') && !createModelText.includes('A model with that name')) {
+            logger.error('Failed to create model on Replicate:', createModelText);
+            
+            // Check if it's an authorization error
+            if (createModelResponse.status === 401 || createModelResponse.status === 403) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (serviceClient as any)
+                .from('user_loras')
+                .update({ 
+                  status: 'failed',
+                  error_message: 'Ошибка авторизации Replicate API',
+                })
+                .eq('id', lora.id);
+              return NextResponse.json({ error: 'Ошибка авторизации Replicate' }, { status: 500 });
+            }
+            
+            // If we can't create model and it doesn't exist, fail
+            if (createModelText.includes('Not Found') || createModelResponse.status === 404) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (serviceClient as any)
+                .from('user_loras')
+                .update({ 
+                  status: 'failed',
+                  error_message: 'Не удалось создать модель на Replicate',
+                })
+                .eq('id', lora.id);
+              return NextResponse.json({ error: 'Не удалось создать модель на Replicate. Проверьте REPLICATE_USERNAME.' }, { status: 500 });
+            }
+          } else {
+            logger.info(`Model already exists: ${destination}`);
           }
         } else {
-          logger.info(`Created model on Replicate: ${destination}`);
+          logger.info(`Successfully created model on Replicate: ${destination}`);
         }
+        
+        logger.info(`Starting training for destination: ${destination}`);
         
         const trainingResponse = await fetch('https://api.replicate.com/v1/models/ostris/flux-dev-lora-trainer/versions/e440909d3512c31646ee2e0c7d6f6f4923224863a6a10c494606e79fb5844497/trainings', {
           method: 'POST',
@@ -304,6 +338,8 @@ export async function POST(request: NextRequest) {
               errorMessage = 'Webhook требует HTTPS (локальная разработка)';
             } else if (errorText.includes('pattern') || errorText.includes('match')) {
               errorMessage = 'Неверный формат данных для обучения';
+            } else if (errorText.includes('destination does not exist')) {
+              errorMessage = 'Модель назначения не существует на Replicate';
             }
           }
           
