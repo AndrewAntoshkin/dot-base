@@ -154,17 +154,34 @@ async function uploadBuffers(
       continue;
     }
 
-    const { data: urlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
+    // For lora-training-images, use signed URLs (valid for 24 hours)
+    // This ensures Replicate can access them even if bucket is not public
+    if (bucket === 'lora-training-images') {
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 60 * 60 * 24); // 24 hours
+      
+      if (signedError || !signedData?.signedUrl) {
+        logger.error(`Signed URL error for file ${i}:`, signedError);
+        errors.push(`Файл ${i + 1}: ошибка получения signed URL`);
+        continue;
+      }
+      
+      uploadedUrls.push(signedData.signedUrl);
+      logger.debug(`Upload: File ${i} uploaded with signed URL:`, signedData.signedUrl);
+    } else {
+      const { data: urlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
 
-    if (urlData?.publicUrl) {
-      try {
-        new URL(urlData.publicUrl);
-        uploadedUrls.push(urlData.publicUrl);
-        logger.debug(`Upload: File ${i} uploaded successfully:`, urlData.publicUrl);
-      } catch {
-        errors.push(`Файл ${i + 1}: ошибка получения URL`);
+      if (urlData?.publicUrl) {
+        try {
+          new URL(urlData.publicUrl);
+          uploadedUrls.push(urlData.publicUrl);
+          logger.debug(`Upload: File ${i} uploaded successfully:`, urlData.publicUrl);
+        } catch {
+          errors.push(`Файл ${i + 1}: ошибка получения URL`);
+        }
       }
     }
   }
