@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
     const serviceClient = createServiceRoleClient();
 
     // Find LoRA by replicate_training_id
-    const { data: lora, error: findError } = await serviceClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: lora, error: findError } = await (serviceClient as any)
       .from('user_loras')
       .select('id, status')
       .eq('replicate_training_id', id)
@@ -34,6 +35,9 @@ export async function POST(request: NextRequest) {
       logger.warn('LoRA not found for training id:', id);
       return NextResponse.json({ error: 'LoRA not found' }, { status: 404 });
     }
+
+    // Type assertion for lora
+    const loraData = lora as any;
 
     // Map Replicate status to our status
     let newStatus: string;
@@ -73,14 +77,14 @@ export async function POST(request: NextRequest) {
         status: newStatus,
         ...updateData,
       })
-      .eq('id', lora.id);
+      .eq('id', loraData.id);
 
     if (updateError) {
       logger.error('Error updating LoRA status:', updateError);
       return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
-    logger.info(`LoRA ${lora.id} status updated to ${newStatus}`);
+    logger.info(`LoRA ${loraData.id} status updated to ${newStatus}`);
 
     return NextResponse.json({ success: true, status: newStatus });
   } catch (error) {
