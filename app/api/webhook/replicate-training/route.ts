@@ -66,7 +66,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update LoRA status
-    const { error: updateError } = await serviceClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (serviceClient as any)
       .from('user_loras')
       .update({
         status: newStatus,
