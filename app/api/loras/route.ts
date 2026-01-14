@@ -147,7 +147,14 @@ export async function POST(request: NextRequest) {
 
     if (createError || !lora) {
       logger.error('Error creating LoRA:', createError);
-      return NextResponse.json({ error: 'Ошибка создания LoRA' }, { status: 500 });
+      const errorMessage = createError?.message || 'Ошибка создания LoRA';
+      // Check if it's a validation error from Supabase
+      if (errorMessage.includes('pattern') || errorMessage.includes('match') || errorMessage.includes('constraint')) {
+        return NextResponse.json({ 
+          error: 'Ошибка валидации данных. Проверьте формат полей (trigger word должен содержать только A-Z, 0-9, _)' 
+        }, { status: 400 });
+      }
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 
     // Save training images
@@ -191,6 +198,16 @@ export async function POST(request: NextRequest) {
         const webhookUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/webhook/replicate-training`;
         
         // Start training via Replicate
+        // Create a valid model name from LoRA name (alphanumeric, dashes, underscores only)
+        const modelName = lora.name
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '')
+          .substring(0, 50) || `lora-${lora.id.substring(0, 8)}`;
+        
+        const destination = `${process.env.REPLICATE_USERNAME || 'basecraft'}/${modelName}`;
+        
         const trainingResponse = await fetch('https://api.replicate.com/v1/models/ostris/flux-dev-lora-trainer/versions/e440909d3512c31646ee2e0c7d6f6f4923224863a6a10c494606e79fb5844497/trainings', {
           method: 'POST',
           headers: {
@@ -198,7 +215,7 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            destination: `${process.env.REPLICATE_USERNAME || 'basecraft'}/${lora.id}`,
+            destination: destination,
             input: {
               input_images: image_urls.join('\n'),
               trigger_word: lora.trigger_word,
@@ -227,10 +244,29 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', lora.id);
             
-          logger.info(`LoRA training started: ${lora.id}, replicate_id: ${trainingData.id}`);
+          logger.info(`LoRA training started: ${lora.id}, replicate_id: ${trainingData.id}, destination: ${destination}`);
         } else {
           const errorText = await trainingResponse.text();
           logger.error('Replicate training error:', errorText);
+          
+          let errorMessage = 'Ошибка запуска обучения';
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.detail) {
+              errorMessage = Array.isArray(errorJson.detail) 
+                ? errorJson.detail.map((d: any) => d.msg || d).join(', ')
+                : errorJson.detail;
+            } else if (errorJson.error) {
+              errorMessage = errorJson.error;
+            }
+          } catch {
+            // If not JSON, use text as is
+            if (errorText.includes('webhook') && errorText.includes('HTTPS')) {
+              errorMessage = 'Webhook требует HTTPS (локальная разработка)';
+            } else if (errorText.includes('pattern') || errorText.includes('match')) {
+              errorMessage = 'Неверный формат данных для обучения';
+            }
+          }
           
           // If webhook URL is invalid (localhost), simulate completion for local dev
           if (errorText.includes('webhook') && errorText.includes('HTTPS')) {
@@ -250,7 +286,7 @@ export async function POST(request: NextRequest) {
               .from('user_loras')
               .update({ 
                 status: 'failed',
-                error_message: 'Ошибка запуска обучения',
+                error_message: errorMessage,
               })
               .eq('id', lora.id);
           }
