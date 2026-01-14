@@ -3,9 +3,67 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import archiver from 'archiver';
+import { Readable } from 'stream';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120; // Increased for ZIP creation
+
+// Helper: Download image and return buffer
+async function downloadImage(url: string): Promise<{ buffer: Buffer; filename: string } | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      logger.error(`Failed to download image: ${url}, status: ${response.status}`);
+      return null;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Extract filename from URL or generate one
+    const urlPath = new URL(url).pathname;
+    const originalName = urlPath.split('/').pop() || `image-${Date.now()}.jpg`;
+    
+    return { buffer, filename: originalName };
+  } catch (error) {
+    logger.error(`Error downloading image: ${url}`, error);
+    return null;
+  }
+}
+
+// Helper: Create ZIP from image URLs
+async function createZipFromImages(
+  imageUrls: string[], 
+  triggerWord: string
+): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    const chunks: Buffer[] = [];
+    
+    const archive = archiver('zip', {
+      zlib: { level: 5 } // Compression level
+    });
+    
+    archive.on('data', (chunk) => chunks.push(chunk));
+    archive.on('end', () => resolve(Buffer.concat(chunks)));
+    archive.on('error', (err) => reject(err));
+    
+    // Download and add each image to the archive
+    let index = 0;
+    for (const url of imageUrls) {
+      const imageData = await downloadImage(url);
+      if (imageData) {
+        // Name files with trigger word for auto-captioning
+        // e.g., "a_photo_of_BOTTY3_001.jpg"
+        const ext = imageData.filename.split('.').pop() || 'jpg';
+        const zipFilename = `a_photo_of_${triggerWord}_${String(index + 1).padStart(3, '0')}.${ext}`;
+        archive.append(imageData.buffer, { name: zipFilename });
+        index++;
+      }
+    }
+    
+    await archive.finalize();
+  });
+}
 
 // GET /api/loras - Get user's LoRA models
 export async function GET(request: NextRequest) {
@@ -288,7 +346,39 @@ export async function POST(request: NextRequest) {
         
         logger.info(`Starting training for destination: ${destination}`);
         
-        const trainingResponse = await fetch('https://api.replicate.com/v1/models/ostris/flux-dev-lora-trainer/versions/e440909d3512c31646ee2e0c7d6f6f4923224863a6a10c494606e79fb5844497/trainings', {
+        // Create ZIP file from images
+        logger.info(`Creating ZIP from ${image_urls.length} images...`);
+        const zipBuffer = await createZipFromImages(image_urls, lora.trigger_word);
+        logger.info(`ZIP created, size: ${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+        
+        // Upload ZIP to Supabase Storage
+        const zipFilename = `${user.id}/lora-${lora.id}-training.zip`;
+        const { error: zipUploadError } = await serviceClient.storage
+          .from('lora-training-images')
+          .upload(zipFilename, zipBuffer, {
+            contentType: 'application/zip',
+            upsert: true,
+          });
+        
+        if (zipUploadError) {
+          logger.error('Failed to upload ZIP:', zipUploadError);
+          throw new Error(`Failed to upload training ZIP: ${zipUploadError.message}`);
+        }
+        
+        // Get signed URL for ZIP (valid 24 hours)
+        const { data: zipSignedData, error: zipSignedError } = await serviceClient.storage
+          .from('lora-training-images')
+          .createSignedUrl(zipFilename, 60 * 60 * 24);
+        
+        if (zipSignedError || !zipSignedData?.signedUrl) {
+          logger.error('Failed to get signed URL for ZIP:', zipSignedError);
+          throw new Error('Failed to get signed URL for training ZIP');
+        }
+        
+        logger.info(`ZIP uploaded and signed URL created: ${zipSignedData.signedUrl.substring(0, 100)}...`);
+        
+        // Use fast-flux-trainer for faster training
+        const trainingResponse = await fetch('https://api.replicate.com/v1/models/replicate/fast-flux-trainer/versions/8b10794665aed907bb98a1a5324cd1d3a8bea0e9b31e65210967fb9c9e2e08ed/trainings', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -297,15 +387,9 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({
             destination: destination,
             input: {
-              input_images: image_urls.join('\n'),
+              input_images: zipSignedData.signedUrl,
               trigger_word: lora.trigger_word,
-              steps: 1000,
-              lora_rank: 16,
-              optimizer: 'adamw8bit',
-              batch_size: 1,
-              resolution: '512,768,1024',
-              autocaption: true,
-              autocaption_prefix: `a photo of ${lora.trigger_word},`,
+              lora_type: type === 'character' ? 'subject' : 'style',
             },
             webhook: webhookUrl,
             webhook_events_filter: ['start', 'completed'],
