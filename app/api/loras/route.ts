@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to include training_images_count
-    const lorasWithCount = loras?.map(lora => ({
+    const lorasWithCount = loras?.map((lora: any) => ({
       ...lora,
       training_images_count: lora.training_images?.[0]?.count || 0,
       training_images: undefined,
