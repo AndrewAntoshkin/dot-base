@@ -224,12 +224,15 @@ export async function POST(request: NextRequest) {
         // First, create the model on Replicate (required before training)
         logger.info(`Creating model on Replicate: owner=${owner}, name=${modelName}`);
         
-        // Create model payload - try without hardware first (it's optional for destination models)
+        // Create model payload
+        // Hardware is required - use 'cpu' for destination models (cheapest option)
+        // Actual training runs on H100, inference will use fast booting
         const createModelPayload: Record<string, string> = {
           owner: owner,
           name: modelName,
           description: `LoRA model: ${lora.name}`,
           visibility: 'private',
+          hardware: 'cpu',
         };
         
         logger.info(`Create model payload: ${JSON.stringify(createModelPayload)}`);
