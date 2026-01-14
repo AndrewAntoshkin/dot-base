@@ -222,13 +222,15 @@ function CreateLoraForm({
     setImages(prev => [...prev, ...newImages]);
     setUploadError(null);
     
-    // Upload each file
-    for (let i = 0; i < newImages.length; i++) {
-      const img = newImages[i];
+    // Upload all files in parallel for better performance
+    const uploadPromises = newImages.map(async (img) => {
+      const startTime = Date.now();
       try {
         const formData = new FormData();
         formData.append('files', img.file);
         formData.append('bucket', 'lora-training-images');
+        
+        console.log(`[LoRA Upload] Starting upload: ${img.file.name} (${(img.file.size / 1024 / 1024).toFixed(2)}MB)`);
         
         const response = await fetch('/api/upload', {
           method: 'POST',
@@ -236,12 +238,16 @@ function CreateLoraForm({
           credentials: 'include',
         });
         
+        const duration = Date.now() - startTime;
+        console.log(`[LoRA Upload] Response received in ${duration}ms: ${img.file.name}`, response.status);
+        
         if (response.ok) {
           const data = await response.json();
           if (data.urls?.[0]) {
             setImages(prev => prev.map(p => 
               p.url === img.url ? { ...p, uploading: false, uploaded: data.urls[0] } : p
             ));
+            return { success: true, url: img.url, uploadedUrl: data.urls[0] };
           } else {
             throw new Error('No URL returned');
           }
@@ -250,11 +256,18 @@ function CreateLoraForm({
           throw new Error(error.error || 'Upload failed');
         }
       } catch (error: any) {
-        setUploadError(error.message);
         setImages(prev => prev.map(p => 
           p.url === img.url ? { ...p, uploading: false } : p
         ));
+        return { success: false, url: img.url, error: error.message };
       }
+    });
+    
+    // Wait for all uploads to complete
+    const results = await Promise.all(uploadPromises);
+    const failed = results.filter(r => !r.success);
+    if (failed.length > 0) {
+      setUploadError(`Не удалось загрузить ${failed.length} из ${newImages.length} изображений`);
     }
   };
   
@@ -319,10 +332,18 @@ function CreateLoraForm({
         <input
           type="text"
           value={triggerWord}
-          onChange={(e) => setTriggerWord(e.target.value.toUpperCase().replace(/\s/g, ''))}
+          onChange={(e) => {
+            // Only allow alphanumeric, underscores, and spaces (spaces will be converted to _)
+            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9_\s]/g, '').replace(/\s+/g, '_');
+            setTriggerWord(value);
+          }}
           placeholder="MY3DSTYLE"
+          maxLength={50}
           className="w-full h-11 px-4 rounded-xl bg-[#1A1A1A] border border-[#2f2f2f] text-white placeholder-[#606060] focus:outline-none focus:border-white/50 transition-colors font-mono"
         />
+        <p className="text-xs text-[#606060] mt-1">
+          Только буквы, цифры и подчеркивания (A-Z, 0-9, _), до 50 символов
+        </p>
       </div>
       
       {/* Type */}
@@ -676,7 +697,9 @@ function LoraContent() {
         setMobileActiveTab('output');
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Ошибка создания LoRA');
+        const errorMessage = errorData.error || 'Ошибка создания LoRA';
+        setError(errorMessage);
+        console.error('LoRA creation error:', errorData);
       }
     } catch (error) {
       setError('Ошибка подключения к серверу');

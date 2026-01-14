@@ -111,6 +111,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Trigger word обязательно' }, { status: 400 });
     }
 
+    // Validate trigger_word format (alphanumeric and underscores only, 1-50 chars)
+    const triggerWordRegex = /^[A-Z0-9_]{1,50}$/;
+    const normalizedTriggerWord = trigger_word.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!triggerWordRegex.test(normalizedTriggerWord)) {
+      return NextResponse.json({ 
+        error: 'Trigger word должен содержать только буквы, цифры и подчеркивания (A-Z, 0-9, _), максимум 50 символов' 
+      }, { status: 400 });
+    }
+
     if (!image_urls || !Array.isArray(image_urls) || image_urls.length < 5) {
       return NextResponse.json({ error: 'Минимум 5 изображений для обучения' }, { status: 400 });
     }
@@ -129,7 +138,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         name: name.trim(),
         description: description?.trim() || null,
-        trigger_word: trigger_word.trim().toUpperCase(),
+        trigger_word: normalizedTriggerWord,
         type: type || 'style',
         status: 'uploading',
       })
