@@ -218,7 +218,34 @@ export async function POST(request: NextRequest) {
           .replace(/^-|-$/g, '')
           .substring(0, 50) || `lora-${lora.id.substring(0, 8)}`;
         
-        const destination = `${process.env.REPLICATE_USERNAME || 'basecraft'}/${modelName}`;
+        const owner = process.env.REPLICATE_USERNAME || 'basecraft';
+        const destination = `${owner}/${modelName}`;
+        
+        // First, create the model on Replicate (required before training)
+        const createModelResponse = await fetch('https://api.replicate.com/v1/models', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            owner: owner,
+            name: modelName,
+            description: `LoRA model: ${lora.name}`,
+            visibility: 'private',
+            hardware: 'gpu-t4-small',
+          }),
+        });
+        
+        if (!createModelResponse.ok) {
+          const createModelError = await createModelResponse.text();
+          // Model might already exist, that's OK
+          if (!createModelError.includes('already exists')) {
+            logger.warn('Could not create model on Replicate:', createModelError);
+          }
+        } else {
+          logger.info(`Created model on Replicate: ${destination}`);
+        }
         
         const trainingResponse = await fetch('https://api.replicate.com/v1/models/ostris/flux-dev-lora-trainer/versions/e440909d3512c31646ee2e0c7d6f6f4923224863a6a10c494606e79fb5844497/trainings', {
           method: 'POST',
