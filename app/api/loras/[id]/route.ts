@@ -126,9 +126,10 @@ export async function DELETE(
     }
 
     // Soft delete
-    const { error } = await serviceClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (serviceClient as any)
       .from('user_loras')
-      .update({ deleted_at: new Date().toISOString() } as any)
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
