@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS user_loras (
   deleted_at TIMESTAMPTZ
 );
 
+-- Drop and recreate type check constraint to ensure correct values
+ALTER TABLE user_loras DROP CONSTRAINT IF EXISTS user_loras_type_check;
+ALTER TABLE user_loras ADD CONSTRAINT user_loras_type_check 
+  CHECK (type IN ('style', 'character', 'product', 'custom'));
+
 -- Add missing columns if they don't exist (for existing tables)
 DO $$ 
 BEGIN
