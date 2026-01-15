@@ -10,11 +10,12 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Increased for ZIP creation
 
 // Helper: Download image and return buffer
-async function downloadImage(url: string): Promise<{ buffer: Buffer; filename: string } | null> {
+async function downloadImage(url: string): Promise<{ buffer: Buffer; filename: string; size: number } | null> {
   try {
+    logger.info(`Downloading image from: ${url.substring(0, 100)}...`);
     const response = await fetch(url);
     if (!response.ok) {
-      logger.error(`Failed to download image: ${url}, status: ${response.status}`);
+      logger.error(`Failed to download image: ${url.substring(0, 100)}..., status: ${response.status}`);
       return null;
     }
     const arrayBuffer = await response.arrayBuffer();
@@ -24,9 +25,11 @@ async function downloadImage(url: string): Promise<{ buffer: Buffer; filename: s
     const urlPath = new URL(url).pathname;
     const originalName = urlPath.split('/').pop() || `image-${Date.now()}.jpg`;
     
-    return { buffer, filename: originalName };
+    logger.info(`Downloaded image: ${originalName}, size: ${(buffer.length / 1024).toFixed(1)}KB`);
+    
+    return { buffer, filename: originalName, size: buffer.length };
   } catch (error) {
-    logger.error(`Error downloading image: ${url}`, error);
+    logger.error(`Error downloading image: ${url.substring(0, 100)}...`, error);
     return null;
   }
 }
@@ -36,16 +39,27 @@ async function createZipFromImages(
   imageUrls: string[], 
   triggerWord: string
 ): Promise<Buffer> {
+  logger.info(`Creating ZIP from ${imageUrls.length} image URLs, trigger_word: ${triggerWord}`);
+  
   return new Promise(async (resolve, reject) => {
     const chunks: Buffer[] = [];
+    const addedFiles: string[] = [];
+    let totalSize = 0;
     
     const archive = archiver('zip', {
       zlib: { level: 5 } // Compression level
     });
     
     archive.on('data', (chunk) => chunks.push(chunk));
-    archive.on('end', () => resolve(Buffer.concat(chunks)));
-    archive.on('error', (err) => reject(err));
+    archive.on('end', () => {
+      logger.info(`ZIP created with ${addedFiles.length} files: ${addedFiles.join(', ')}`);
+      logger.info(`Total uncompressed size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+      resolve(Buffer.concat(chunks));
+    });
+    archive.on('error', (err) => {
+      logger.error('ZIP creation error:', err);
+      reject(err);
+    });
     
     // Download and add each image to the archive
     let index = 0;
@@ -57,8 +71,17 @@ async function createZipFromImages(
         const ext = imageData.filename.split('.').pop() || 'jpg';
         const zipFilename = `a_photo_of_${triggerWord}_${String(index + 1).padStart(3, '0')}.${ext}`;
         archive.append(imageData.buffer, { name: zipFilename });
+        addedFiles.push(zipFilename);
+        totalSize += imageData.size;
         index++;
+      } else {
+        logger.warn(`Failed to download image ${index + 1}: ${url.substring(0, 80)}...`);
       }
+    }
+    
+    if (addedFiles.length === 0) {
+      reject(new Error('No images were successfully downloaded'));
+      return;
     }
     
     await archive.finalize();
