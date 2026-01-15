@@ -4,7 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
 import archiver from 'archiver';
-import { Readable } from 'stream';
+import { getTrainerById, getRecommendedTrainer } from '@/lib/lora-trainers-config';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Increased for ZIP creation
@@ -34,12 +34,18 @@ async function downloadImage(url: string): Promise<{ buffer: Buffer; filename: s
   }
 }
 
-// Helper: Create ZIP from image URLs
+// Helper: Create ZIP from image URLs with optional captions
+interface ImageWithCaption {
+  image_url: string;
+  caption: string;
+}
+
 async function createZipFromImages(
   imageUrls: string[], 
-  triggerWord: string
+  triggerWord: string,
+  captions?: ImageWithCaption[]
 ): Promise<Buffer> {
-  logger.info(`Creating ZIP from ${imageUrls.length} image URLs, trigger_word: ${triggerWord}`);
+  logger.info(`Creating ZIP from ${imageUrls.length} image URLs, trigger_word: ${triggerWord}, captions: ${captions?.length || 0}`);
   
   return new Promise(async (resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -52,7 +58,7 @@ async function createZipFromImages(
     
     archive.on('data', (chunk) => chunks.push(chunk));
     archive.on('end', () => {
-      logger.info(`ZIP created with ${addedFiles.length} files: ${addedFiles.join(', ')}`);
+      logger.info(`ZIP created with ${addedFiles.length} files: ${addedFiles.slice(0, 5).join(', ')}...`);
       logger.info(`Total uncompressed size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
       resolve(Buffer.concat(chunks));
     });
@@ -60,6 +66,16 @@ async function createZipFromImages(
       logger.error('ZIP creation error:', err);
       reject(err);
     });
+    
+    // Create a map of captions by image URL
+    const captionMap = new Map<string, string>();
+    if (captions) {
+      for (const c of captions) {
+        if (c.caption && c.caption.trim()) {
+          captionMap.set(c.image_url, c.caption.trim());
+        }
+      }
+    }
     
     // Download and add each image to the archive
     let index = 0;
@@ -69,10 +85,22 @@ async function createZipFromImages(
         // Name files with trigger word for auto-captioning
         // e.g., "a_photo_of_BOTTY3_001.jpg"
         const ext = imageData.filename.split('.').pop() || 'jpg';
-        const zipFilename = `a_photo_of_${triggerWord}_${String(index + 1).padStart(3, '0')}.${ext}`;
-        archive.append(imageData.buffer, { name: zipFilename });
-        addedFiles.push(zipFilename);
+        const baseName = `a_photo_of_${triggerWord}_${String(index + 1).padStart(3, '0')}`;
+        const imageFilename = `${baseName}.${ext}`;
+        
+        archive.append(imageData.buffer, { name: imageFilename });
+        addedFiles.push(imageFilename);
         totalSize += imageData.size;
+        
+        // Add caption file if available (same name but .txt extension)
+        const caption = captionMap.get(url);
+        if (caption) {
+          const captionFilename = `${baseName}.txt`;
+          archive.append(caption, { name: captionFilename });
+          addedFiles.push(captionFilename);
+          logger.info(`Added caption for ${imageFilename}: ${caption.substring(0, 50)}...`);
+        }
+        
         index++;
       } else {
         logger.warn(`Failed to download image ${index + 1}: ${url.substring(0, 80)}...`);
@@ -181,7 +209,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, trigger_word, type, image_urls } = body;
+    const { name, description, trigger_word, type, image_urls, captions, trainer_id } = body;
 
     // Validation
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -205,8 +233,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Минимум 5 изображений для обучения' }, { status: 400 });
     }
 
-    if (image_urls.length > 20) {
-      return NextResponse.json({ error: 'Максимум 20 изображений' }, { status: 400 });
+    if (image_urls.length > 100) {
+      return NextResponse.json({ error: 'Максимум 100 изображений' }, { status: 400 });
     }
 
     const serviceClient = createServiceRoleClient();
@@ -369,9 +397,9 @@ export async function POST(request: NextRequest) {
         
         logger.info(`Starting training for destination: ${destination}`);
         
-        // Create ZIP file from images
-        logger.info(`Creating ZIP from ${image_urls.length} images...`);
-        const zipBuffer = await createZipFromImages(image_urls, lora.trigger_word);
+        // Create ZIP file from images with captions
+        logger.info(`Creating ZIP from ${image_urls.length} images with ${captions?.length || 0} captions...`);
+        const zipBuffer = await createZipFromImages(image_urls, lora.trigger_word, captions);
         logger.info(`ZIP created, size: ${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB`);
         
         // Upload ZIP to Supabase Storage
@@ -400,8 +428,12 @@ export async function POST(request: NextRequest) {
         
         logger.info(`ZIP uploaded and signed URL created: ${zipSignedData.signedUrl.substring(0, 100)}...`);
         
-        // Use fast-flux-trainer for faster training
-        const trainingResponse = await fetch('https://api.replicate.com/v1/models/replicate/fast-flux-trainer/versions/8b10794665aed907bb98a1a5324cd1d3a8bea0e9b31e65210967fb9c9e2e08ed/trainings', {
+        // Get trainer model (from request or use default)
+        const trainer = getTrainerById(trainer_id) || getRecommendedTrainer();
+        logger.info(`Using trainer: ${trainer.displayName} (${trainer.replicateModel})`);
+        
+        // Start training with selected trainer
+        const trainingResponse = await fetch(`https://api.replicate.com/v1/models/${trainer.replicateModel}/versions/${trainer.version}/trainings`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
