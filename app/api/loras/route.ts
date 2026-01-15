@@ -412,7 +412,9 @@ export async function POST(request: NextRequest) {
             input: {
               input_images: zipSignedData.signedUrl,
               trigger_word: lora.trigger_word,
-              lora_type: type === 'character' ? 'subject' : 'style',
+              // style = artistic style, subject = specific object/person/thing
+              // If user selected 'style' type, use 'style', otherwise use 'subject'
+              lora_type: type === 'style' ? 'style' : 'subject',
             },
             webhook: webhookUrl,
             webhook_events_filter: ['start', 'completed'],

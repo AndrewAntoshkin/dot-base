@@ -402,22 +402,34 @@ function CreateLoraForm({
       
       {/* Type */}
       <div>
-        <label className="block text-sm font-medium text-white mb-2">Тип</label>
+        <label className="block text-sm font-medium text-white mb-2">Тип LoRA</label>
         <div className="flex gap-2 flex-wrap">
-          {['style', 'character', 'product', 'custom'].map((t) => (
+          {[
+            { id: 'product', label: 'Объект', desc: 'Бутылка, машина, предмет' },
+            { id: 'character', label: 'Персонаж', desc: 'Лицо, человек, персонаж' },
+            { id: 'style', label: 'Стиль', desc: 'Художественный стиль' },
+            { id: 'custom', label: 'Другое', desc: 'Свой вариант' },
+          ].map((t) => (
             <button
-              key={t}
-              onClick={() => setType(t)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${
-                type === t 
+              key={t.id}
+              onClick={() => setType(t.id)}
+              title={t.desc}
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                type === t.id 
                   ? 'bg-white text-black' 
                   : 'bg-[#1A1A1A] text-[#959595] hover:text-white border border-[#2f2f2f]'
               }`}
             >
-              {t}
+              {t.label}
             </button>
           ))}
         </div>
+        <p className="text-xs text-[#606060] mt-1.5">
+          {type === 'style' ? '⚠️ Стиль — для обучения художественному стилю, НЕ для объектов' : 
+           type === 'product' ? '✓ Объект — для обучения конкретным предметам (бутылки, машины)' :
+           type === 'character' ? '✓ Персонаж — для обучения лицам и персонажам' :
+           '✓ Свой вариант — для нестандартных случаев'}
+        </p>
       </div>
       
       {/* Image Upload */}
