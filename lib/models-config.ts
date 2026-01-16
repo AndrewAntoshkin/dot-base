@@ -78,11 +78,12 @@ export const CREATE_MODELS: Model[] = [
       },
       {
         name: 'hf_lora',
-        label: 'LoRA URL',
+        label: 'LoRA модель',
         type: 'text',
         required: true,
-        placeholder: 'fofr/flux-pixar или путь к HuggingFace LoRA',
-        description: 'URL вашей LoRA модели на Replicate или HuggingFace',
+        hidden: true,
+        placeholder: 'ID вашей LoRA модели',
+        description: 'Идентификатор вашей обученной LoRA модели',
       },
       {
         name: 'lora_scale',

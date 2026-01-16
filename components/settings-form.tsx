@@ -1246,6 +1246,11 @@ export function SettingsForm({
     <div className="flex flex-col gap-3">
       {/* Settings wrapped in cards */}
       {model.settings.map((setting) => {
+        // Скрываем hidden поля
+        if (setting.hidden) {
+          return null;
+        }
+        
         const meta = getSettingMeta(setting);
         const isAspectRatio = setting.name === 'aspect_ratio';
         

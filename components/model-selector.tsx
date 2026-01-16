@@ -80,8 +80,8 @@ export function ModelSelector({ action, value, onChange, onLoraSelect }: ModelSe
     // Добавляем пользовательские LoRA как "модели"
     const loraModels: ModelLite[] = userLoras.map(lora => ({
       id: `lora:${lora.id}`,
-      displayName: `🎨 ${lora.name}`,
-      description: lora.description || `LoRA: ${lora.trigger_word || 'без trigger word'}`,
+      displayName: lora.name,
+      description: lora.description || `Trigger: ${lora.trigger_word || 'без trigger word'}`,
       action: 'create',
     }));
 
@@ -110,11 +110,11 @@ export function ModelSelector({ action, value, onChange, onLoraSelect }: ModelSe
       } : model.id.startsWith('lora:') ? {
         text: 'LORA',
         icon: <LoraIcon />,
-        className: 'bg-[#7C3AED]/30',
+        className: 'bg-[#3A3A3A]',
       } : model.id === 'flux-dev-lora' ? {
         text: 'LoRA',
         icon: <LoraIcon />,
-        className: 'bg-[#7C3AED]/30',
+        className: 'bg-[#3A3A3A]',
       } : undefined,
     }));
   }, [allModels]);
