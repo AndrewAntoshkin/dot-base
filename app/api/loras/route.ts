@@ -278,10 +278,21 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Save training images
+    // Save training images with captions
+    // Create a map of captions by image URL for quick lookup
+    const captionMap = new Map<string, string>();
+    if (captions && Array.isArray(captions)) {
+      for (const c of captions) {
+        if (c.image_url && c.caption) {
+          captionMap.set(c.image_url, c.caption);
+        }
+      }
+    }
+    
     const trainingImages = image_urls.map((url: string) => ({
       lora_id: lora.id,
       image_url: url,
+      caption: captionMap.get(url) || null,
     }));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -316,7 +327,14 @@ export async function POST(request: NextRequest) {
         // In production, you would create a ZIP file and upload it
         // For now, we'll use the ostris/flux-dev-lora-trainer which can accept URLs
         
-        const webhookUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/webhook/replicate-training`;
+        // Build webhook URL - only include if it's a valid HTTPS URL
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
+        let webhookUrl: string | undefined;
+        
+        if (baseUrl && (baseUrl.startsWith('https://') || baseUrl.startsWith('http://localhost'))) {
+          // Only set webhook for HTTPS URLs or localhost (for local dev, will be handled by error handling)
+          webhookUrl = `${baseUrl}/api/webhook/replicate-training`;
+        }
         
         // Start training via Replicate
         // Create a valid model name from LoRA name (alphanumeric, dashes, underscores only)
@@ -448,8 +466,7 @@ export async function POST(request: NextRequest) {
               // If user selected 'style' type, use 'style', otherwise use 'subject'
               lora_type: type === 'style' ? 'style' : 'subject',
             },
-            webhook: webhookUrl,
-            webhook_events_filter: ['start', 'completed'],
+            ...(webhookUrl ? { webhook: webhookUrl, webhook_events_filter: ['start', 'completed'] } : {}),
           }),
         });
 

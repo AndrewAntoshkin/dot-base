@@ -47,40 +47,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI service not available' }, { status: 503 });
     }
 
-    // Use LLaVa-13b for detailed image description
-    // Prompt specifically designed for LoRA training captions
-    const captionPrompt = trigger_word 
-      ? `Describe this image in detail for AI training. Start with "${trigger_word}". Include: subject details, colors, textures, lighting, background, camera angle, style. Be specific and concise. Output only the caption, nothing else.`
-      : `Describe this image in detail for AI training. Include: subject details, colors, textures, lighting, background, camera angle, style. Be specific and concise. Output only the caption, nothing else.`;
-
+    // Use BLIP for image captioning (reliable, works on Replicate)
     console.log('[Caption API] Generating caption for image:', image_url.substring(0, 100));
+    console.log('[Caption API] Using model: salesforce/blip');
 
-    const output = await replicateClient.run(
-      'yorickvp/llava-13b:80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb',
-      {
-        input: {
-          image: image_url,
-          prompt: captionPrompt,
-          max_tokens: 256,
-          temperature: 0.2,
-        },
+    // Use BLIP with version (ReplicateClient uses version instead of model when version is provided)
+    const { prediction } = await replicateClient.run({
+      model: 'salesforce/blip', // Required by interface, but version takes precedence
+      version: '2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746',
+      input: {
+        image: image_url,
+      },
+    });
+
+    console.log('[Caption API] Prediction created:', prediction.id, 'status:', prediction.status);
+
+    // Wait for prediction to complete
+    let output = null;
+    if (prediction.status === 'succeeded') {
+      output = prediction.output;
+      console.log('[Caption API] Prediction succeeded, output type:', typeof output);
+    } else if (prediction.status === 'processing' || prediction.status === 'starting') {
+      // Poll for completion (wait up to 60 seconds)
+      console.log('[Caption API] Polling for completion...');
+      const replicateClient2 = getReplicateClient();
+      if (replicateClient2) {
+        let attempts = 0;
+        let currentPrediction = prediction;
+        while (attempts < 30 && (currentPrediction.status === 'processing' || currentPrediction.status === 'starting')) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          currentPrediction = await replicateClient2.getPrediction(prediction.id);
+          console.log('[Caption API] Poll attempt', attempts + 1, 'status:', currentPrediction.status);
+          attempts++;
+        }
+        if (currentPrediction.status === 'succeeded') {
+          output = currentPrediction.output;
+        } else if (currentPrediction.status === 'failed') {
+          throw new Error(currentPrediction.error || 'Prediction failed');
+        }
       }
-    );
+    } else if (prediction.status === 'failed') {
+      console.error('[Caption API] Prediction failed:', prediction.error);
+      throw new Error(prediction.error || 'Prediction failed');
+    }
 
-    // LLaVa returns array of strings, join them
+    if (!output) {
+      throw new Error('No output from prediction');
+    }
+
+    // Extract caption from output
     let caption = '';
     if (Array.isArray(output)) {
       caption = output.join('');
     } else if (typeof output === 'string') {
       caption = output;
+    } else if (output && typeof output === 'object') {
+      // Some models return object with text field
+      caption = output.text || output.caption || JSON.stringify(output);
     }
 
     // Clean up caption
     caption = caption.trim();
 
-    // Ensure trigger word is at the start if provided
-    if (trigger_word && !caption.toLowerCase().startsWith(trigger_word.toLowerCase())) {
+    // Ensure trigger word is at the start if provided and not already there
+    if (trigger_word && caption && !caption.toLowerCase().startsWith(trigger_word.toLowerCase())) {
       caption = `${trigger_word}, ${caption}`;
+    } else if (trigger_word && !caption) {
+      // If no caption generated, use trigger word as fallback
+      caption = trigger_word;
     }
 
     console.log('[Caption API] Generated caption:', caption.substring(0, 100));
@@ -152,27 +186,50 @@ export async function PUT(request: NextRequest) {
       const batchResults = await Promise.all(
         batch.map(async (image_url: string) => {
           try {
-            const captionPrompt = trigger_word 
-              ? `Describe this image in detail for AI training. Start with "${trigger_word}". Include: subject details, colors, textures, lighting, background, camera angle, style. Be specific and concise. Output only the caption, nothing else.`
-              : `Describe this image in detail for AI training. Include: subject details, colors, textures, lighting, background, camera angle, style. Be specific and concise. Output only the caption, nothing else.`;
+            // Use BLIP with version (ReplicateClient uses version instead of model when version is provided)
+            const { prediction } = await replicateClient.run({
+              model: 'salesforce/blip', // Required by interface, but version takes precedence
+              version: '2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746',
+              input: {
+                image: image_url,
+              },
+            });
 
-            const output = await replicateClient.run(
-              'yorickvp/llava-13b:80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb',
-              {
-                input: {
-                  image: image_url,
-                  prompt: captionPrompt,
-                  max_tokens: 256,
-                  temperature: 0.2,
-                },
+            // Wait for prediction to complete
+            let output = null;
+            if (prediction.status === 'succeeded') {
+              output = prediction.output;
+            } else if (prediction.status === 'processing' || prediction.status === 'starting') {
+              // Poll for completion (wait up to 60 seconds)
+              let attempts = 0;
+              let currentPrediction = prediction;
+              while (attempts < 30 && (currentPrediction.status === 'processing' || currentPrediction.status === 'starting')) {
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+                currentPrediction = await replicateClient.getPrediction(prediction.id);
+                attempts++;
               }
-            );
+              if (currentPrediction.status === 'succeeded') {
+                output = currentPrediction.output;
+              } else if (currentPrediction.status === 'failed') {
+                throw new Error(currentPrediction.error || 'Prediction failed');
+              }
+            } else if (prediction.status === 'failed') {
+              throw new Error(prediction.error || 'Prediction failed');
+            }
 
+            if (!output) {
+              throw new Error('No output from prediction');
+            }
+
+            // Extract caption from output
             let caption = '';
             if (Array.isArray(output)) {
               caption = output.join('');
             } else if (typeof output === 'string') {
               caption = output;
+            } else if (output && typeof output === 'object') {
+              // Some models return object with text field
+              caption = output.text || output.caption || JSON.stringify(output);
             }
 
             caption = caption.trim();
