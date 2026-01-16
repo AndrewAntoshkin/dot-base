@@ -4,7 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
 import archiver from 'archiver';
-import { getTrainerById, getRecommendedTrainer } from '@/lib/lora-trainers-config';
+import { getTrainerById, getRecommendedTrainer, getLoraTypeById } from '@/lib/lora-trainers-config';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Increased for ZIP creation
@@ -148,12 +148,12 @@ export async function GET(request: NextRequest) {
 
     const serviceClient = createServiceRoleClient();
     
-    // Get user's LoRAs with training images count
+    // Get user's LoRAs with training images (first 5 for preview)
     const { data: loras, error } = await serviceClient
       .from('user_loras')
       .select(`
         *,
-        training_images:lora_training_images(count)
+        training_images:lora_training_images(id, image_url, caption)
       `)
       .eq('user_id', user.id)
       .is('deleted_at', null)
@@ -164,14 +164,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Ошибка загрузки LoRA моделей' }, { status: 500 });
     }
 
-    // Transform to include training_images_count
-    const lorasWithCount = loras?.map((lora: any) => ({
+    // Transform to include training_images_count and limit images for preview
+    const lorasWithImages = loras?.map((lora: any) => ({
       ...lora,
-      training_images_count: lora.training_images?.[0]?.count || 0,
-      training_images: undefined,
+      training_images_count: lora.training_images?.length || 0,
+      training_images: lora.training_images?.slice(0, 5) || [],
     }));
 
-    return NextResponse.json({ loras: lorasWithCount || [] });
+    return NextResponse.json({ loras: lorasWithImages || [] });
   } catch (error) {
     logger.error('GET /api/loras error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
@@ -462,9 +462,8 @@ export async function POST(request: NextRequest) {
             input: {
               input_images: zipSignedData.signedUrl,
               trigger_word: lora.trigger_word,
-              // style = artistic style, subject = specific object/person/thing
-              // If user selected 'style' type, use 'style', otherwise use 'subject'
-              lora_type: type === 'style' ? 'style' : 'subject',
+              // Use replicateType from config (style or subject)
+              lora_type: getLoraTypeById(type)?.replicateType || 'subject',
             },
             ...(webhookUrl ? { webhook: webhookUrl, webhook_events_filter: ['start', 'completed'] } : {}),
           }),

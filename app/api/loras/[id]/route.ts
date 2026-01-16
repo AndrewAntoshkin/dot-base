@@ -201,13 +201,14 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/loras/[id] - Soft delete LoRA
-export async function DELETE(
+// PUT /api/loras/[id] - Update LoRA fields (name, description)
+export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const body = await request.json();
     
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -244,18 +245,138 @@ export async function DELETE(
       .select('id, user_id')
       .eq('id', id)
       .eq('user_id', user.id)
-      .is('deleted_at', null)
       .single();
 
     if (!lora) {
       return NextResponse.json({ error: 'LoRA не найдена' }, { status: 404 });
     }
 
-    // Soft delete
+    // Build update object from allowed fields
+    const updateData: Record<string, string> = {};
+    if (body.name && typeof body.name === 'string') {
+      updateData.name = body.name.trim();
+    }
+    if (body.description !== undefined && typeof body.description === 'string') {
+      updateData.description = body.description.trim();
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'Нет данных для обновления' }, { status: 400 });
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (serviceClient as any)
+    const { data: updatedLora, error } = await (serviceClient as any)
       .from('user_loras')
-      .update({ deleted_at: new Date().toISOString() })
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Error updating LoRA:', error);
+      return NextResponse.json({ error: 'Ошибка обновления' }, { status: 500 });
+    }
+
+    logger.info(`LoRA ${id} updated:`, updateData);
+    return NextResponse.json({ lora: updatedLora });
+  } catch (error) {
+    logger.error('PUT /api/loras/[id] error:', error);
+    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
+  }
+}
+
+// DELETE /api/loras/[id] - Hard delete LoRA (полное удаление)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore
+            }
+          },
+        },
+      }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 });
+    }
+
+    const serviceClient = createServiceRoleClient();
+    
+    // Verify ownership and get LoRA data
+    const { data: lora } = await serviceClient
+      .from('user_loras')
+      .select('id, user_id, trigger_word')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!lora) {
+      return NextResponse.json({ error: 'LoRA не найдена' }, { status: 404 });
+    }
+
+    // 1. Delete training images from storage
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: images } = await (serviceClient as any)
+        .from('lora_training_images')
+        .select('image_url')
+        .eq('lora_id', id);
+      
+      if (images && images.length > 0) {
+        // Extract storage paths from URLs and delete from storage
+        for (const img of images) {
+          const url = (img as { image_url: string }).image_url;
+          if (url && url.includes('/storage/v1/object/public/')) {
+            const pathMatch = url.match(/\/storage\/v1\/object\/public\/([^?]+)/);
+            if (pathMatch) {
+              const fullPath = pathMatch[1];
+              const [bucket, ...pathParts] = fullPath.split('/');
+              const filePath = pathParts.join('/');
+              await serviceClient.storage.from(bucket).remove([filePath]);
+              logger.info(`Deleted storage file: ${bucket}/${filePath}`);
+            }
+          }
+        }
+      }
+    } catch (storageError) {
+      logger.warn('Error deleting storage files:', storageError);
+      // Continue with database deletion
+    }
+
+    // 2. Delete training images from database
+    const { error: imagesError } = await serviceClient
+      .from('lora_training_images')
+      .delete()
+      .eq('lora_id', id);
+
+    if (imagesError) {
+      logger.error('Error deleting training images:', imagesError);
+    }
+
+    // 3. Hard delete LoRA from database
+    const { error } = await serviceClient
+      .from('user_loras')
+      .delete()
       .eq('id', id);
 
     if (error) {
@@ -263,6 +384,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Ошибка удаления' }, { status: 500 });
     }
 
+    logger.info(`LoRA ${id} completely deleted (hard delete)`);
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error('DELETE /api/loras/[id] error:', error);

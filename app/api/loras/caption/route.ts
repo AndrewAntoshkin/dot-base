@@ -47,16 +47,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI service not available' }, { status: 503 });
     }
 
-    // Use BLIP for image captioning (reliable, works on Replicate)
-    console.log('[Caption API] Generating caption for image:', image_url.substring(0, 100));
-    console.log('[Caption API] Using model: salesforce/blip');
+    // Use Moondream2 for detailed image captioning (recommended by Replicate)
+    console.log('[Caption API] Generating detailed caption for image:', image_url.substring(0, 100));
+    console.log('[Caption API] Using model: lucataco/moondream2');
 
-    // Use BLIP with version (ReplicateClient uses version instead of model when version is provided)
+    // Moondream2 with detailed prompt for LoRA training captions
+    const detailedPrompt = "Describe this image in detail for AI training. Include: the main subject and its appearance, colors, textures, materials, lighting conditions, background elements, composition, camera angle, and artistic style. Be specific and comprehensive in one paragraph.";
+    
     const { prediction } = await replicateClient.run({
-      model: 'salesforce/blip', // Required by interface, but version takes precedence
-      version: '2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746',
+      model: 'lucataco/moondream2',
+      version: 'd00c238928a560d2bd30b4e8a64d125fb42f9d23a0e143aeb5137404b6d5dc1b',
       input: {
         image: image_url,
+        prompt: detailedPrompt,
       },
     });
 
@@ -106,8 +109,23 @@ export async function POST(request: NextRequest) {
       caption = output.text || output.caption || JSON.stringify(output);
     }
 
-    // Clean up caption
+    // Clean up caption - remove BLIP prefixes like "Caption: " or "Answer: "
     caption = caption.trim();
+    if (caption.toLowerCase().startsWith('caption:')) {
+      caption = caption.substring(8).trim();
+    } else if (caption.toLowerCase().startsWith('answer:')) {
+      caption = caption.substring(7).trim();
+    }
+    
+    console.log('[Caption API] Raw output:', output);
+    console.log('[Caption API] Cleaned caption:', caption);
+
+    // If caption is too short or useless (like "no", "none", "yes", "blurry"), ignore it
+    const uselessResponses = ['no', 'none', 'yes', 'blurry', 'unclear', 'unknown'];
+    if (uselessResponses.includes(caption.toLowerCase())) {
+      caption = ''; // Will use trigger_word as fallback
+      console.log('[Caption API] Caption was useless, using trigger_word fallback');
+    }
 
     // Ensure trigger word is at the start if provided and not already there
     if (trigger_word && caption && !caption.toLowerCase().startsWith(trigger_word.toLowerCase())) {
@@ -117,7 +135,7 @@ export async function POST(request: NextRequest) {
       caption = trigger_word;
     }
 
-    console.log('[Caption API] Generated caption:', caption.substring(0, 100));
+    console.log('[Caption API] Final caption:', caption.substring(0, 100));
 
     return NextResponse.json({ 
       caption,
@@ -186,12 +204,15 @@ export async function PUT(request: NextRequest) {
       const batchResults = await Promise.all(
         batch.map(async (image_url: string) => {
           try {
-            // Use BLIP with version (ReplicateClient uses version instead of model when version is provided)
+            // Use Moondream2 for detailed captions (recommended by Replicate)
+            const detailedPrompt = "Describe this image in detail for AI training. Include: the main subject and its appearance, colors, textures, materials, lighting conditions, background elements, composition, camera angle, and artistic style. Be specific and comprehensive in one paragraph.";
+            
             const { prediction } = await replicateClient.run({
-              model: 'salesforce/blip', // Required by interface, but version takes precedence
-              version: '2e1dddc8621f72155f24cf2e0adbde548458d3cab9f00c0139eea840d0ac4746',
+              model: 'lucataco/moondream2',
+              version: 'd00c238928a560d2bd30b4e8a64d125fb42f9d23a0e143aeb5137404b6d5dc1b',
               input: {
                 image: image_url,
+                prompt: detailedPrompt,
               },
             });
 
@@ -232,9 +253,19 @@ export async function PUT(request: NextRequest) {
               caption = output.text || output.caption || JSON.stringify(output);
             }
 
+            // Clean up caption - remove BLIP prefixes like "Caption: " or "Answer: "
             caption = caption.trim();
-
-            if (trigger_word && !caption.toLowerCase().startsWith(trigger_word.toLowerCase())) {
+            if (caption.toLowerCase().startsWith('caption:')) {
+              caption = caption.substring(8).trim();
+            } else if (caption.toLowerCase().startsWith('answer:')) {
+              caption = caption.substring(7).trim();
+            }
+            
+            // If caption is too short or useless, ignore it
+            const uselessResponses = ['no', 'none', 'yes', 'blurry', 'unclear', 'unknown'];
+            if (uselessResponses.includes(caption.toLowerCase())) {
+              caption = trigger_word || ''; // Use trigger_word as fallback
+            } else if (trigger_word && !caption.toLowerCase().startsWith(trigger_word.toLowerCase())) {
               caption = `${trigger_word}, ${caption}`;
             }
 

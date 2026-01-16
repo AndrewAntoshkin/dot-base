@@ -40,7 +40,7 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
               className={`
                 flex-1 h-[56px] px-6 py-2 rounded-[16px] 
                 font-inter text-[13px] leading-[18px] text-center text-white
-                transition-all bg-neutral-900
+                transition-all bg-[#171717]
                 ${value === action 
                   ? 'border border-white' 
                   : 'border border-transparent hover:border-[#404040]'
@@ -62,7 +62,7 @@ export function ActionSelector({ value, onChange, mode = 'image' }: ActionSelect
                 className={`
                   flex-1 h-[56px] px-6 py-2 rounded-[16px] 
                   font-inter text-[13px] leading-[18px] text-center text-white
-                  transition-all bg-neutral-900
+                  transition-all bg-[#171717]
                   ${value === action 
                     ? 'border border-white' 
                     : 'border border-transparent hover:border-[#404040]'

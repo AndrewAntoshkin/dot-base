@@ -9,9 +9,8 @@ import { MobileSelect, SelectOption } from '@/components/ui/mobile-select';
 import { useUser } from '@/contexts/user-context';
 import { LORA_TRAINERS, LORA_TYPES, getTrainerById, getLoraTypeById } from '@/lib/lora-trainers-config';
 import { 
-  Upload, Plus, Play, Trash2, Loader2, ExternalLink, Sparkles, Clock, 
-  CheckCircle, XCircle, Info, RefreshCw, ChevronDown, X, Eye, Lock,
-  Wand2, Settings2, Image as ImageIcon, FileText, Zap, Command, Hash, Copy
+  Upload, Plus, Trash2, Loader2, ExternalLink, Sparkles, Clock, 
+  CheckCircle, XCircle, RefreshCw, ChevronDown, X, Eye, Lock, Copy, Wand2
 } from 'lucide-react';
 
 // Types
@@ -40,12 +39,14 @@ interface LoraModel {
 }
 
 interface TrainingImageFile {
-  file: File;
+  file: File | null; // null for existing images
   url: string;
   uploading: boolean;
-  uploaded: string | null;
+  uploaded: string | null; // Storage URL after upload
   caption: string;
   captionLoading: boolean;
+  isExisting?: boolean; // true for images from previous training
+  existingId?: string; // ID from lora_training_images table
 }
 
 // Status badge component
@@ -84,69 +85,147 @@ function LoraCard({
   isPreset?: boolean;
   isSelected?: boolean;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const loraType = getLoraTypeById(lora.type);
+  
+  // Get training images for preview (API returns max 5)
+  const previewImages = lora.training_images?.slice(0, 4) || [];
+  const totalImages = lora.training_images_count || lora.training_images?.length || 0;
+  const remainingCount = totalImages - 4;
+  
+  // Format date
+  const createdDate = lora.created_at 
+    ? new Date(lora.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '';
   
   return (
     <div 
-      className={`bg-neutral-900 rounded-[16px] border overflow-hidden transition-all cursor-pointer ${
-        isSelected ? 'border-white' : 'border-transparent hover:border-[#404040]'
+      className={`relative border rounded-[16px] p-4 flex flex-col gap-4 h-[206px] transition-all cursor-pointer ${
+        isSelected ? 'border-white' : 'border-[#252525] hover:border-[#404040]'
       }`}
       onClick={() => onView?.(lora)}
     >
       {/* Header */}
-      <div className="p-4 pb-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-inter font-semibold text-[13px] leading-[18px] text-white truncate">
-              {lora.name}
-            </h3>
-            <span className="text-[10px] text-[#606060] uppercase tracking-[0.15px]">{loraType?.label || lora.type}</span>
+      <div className="flex items-start justify-between">
+        {/* Left side - name and meta */}
+        <div className="flex flex-col gap-3 flex-1">
+          <h3 className="font-inter font-semibold text-[16px] leading-[24px] text-white uppercase tracking-[-0.01em]">
+            {lora.name}
+          </h3>
+          
+          {/* Meta info */}
+          <div className="flex flex-col gap-2">
+            {lora.trigger_word && (
+              <div className="flex gap-3">
+                <span className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.015em]">trigger word</span>
+                <span className="font-inter font-medium text-[10px] leading-[14px] text-white uppercase tracking-[0.015em]">{lora.trigger_word}</span>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <span className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.015em]">Тип</span>
+              <span className="font-inter font-medium text-[10px] leading-[14px] text-white uppercase tracking-[0.015em]">{loraType?.label || lora.type}</span>
+            </div>
+            {createdDate && (
+              <div className="flex gap-3">
+                <span className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.015em]">Создано</span>
+                <span className="font-inter font-medium text-[10px] leading-[14px] text-white uppercase tracking-[0.015em]">{createdDate}</span>
+              </div>
+            )}
           </div>
-          <StatusBadge status={lora.status} />
         </div>
         
-        {lora.description && (
-          <p className="text-xs text-[#959595] line-clamp-2 mb-2">
-            {lora.description}
-          </p>
-        )}
-        
-        {lora.trigger_word && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-[#606060] uppercase">Trigger:</span>
-            <code className="px-1.5 py-0.5 rounded bg-[#252525] text-[10px] text-white font-mono">
-              {lora.trigger_word}
-            </code>
+        {/* Menu button */}
+        {!isPreset && (
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(!menuOpen);
+              }}
+              className="p-1.5 rounded-lg bg-[#212121] text-white hover:bg-[#2a2a2a] transition-colors"
+            >
+              <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="10.5" cy="4.5" r="1.5" fill="currentColor"/>
+                <circle cx="10.5" cy="10.5" r="1.5" fill="currentColor"/>
+                <circle cx="10.5" cy="16.5" r="1.5" fill="currentColor"/>
+              </svg>
+            </button>
+            
+            {/* Dropdown menu */}
+            {menuOpen && (
+              <div 
+                className="absolute top-full right-0 mt-2 w-64 bg-[#1A1A1A] rounded-[16px] p-5 flex flex-col gap-2 z-50"
+                style={{ boxShadow: '0px 12px 24px 0px rgba(0, 0, 0, 0.8)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => {
+                    onView?.(lora);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-3 rounded-[12px] border border-[#2F2F2F] text-left font-inter font-normal text-[14px] leading-[18px] text-white hover:bg-[#252525] transition-colors"
+                >
+                  Редактировать
+                </button>
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      onDelete(lora);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-3 rounded-[12px] border border-[#2F2F2F] text-left font-inter font-normal text-[14px] leading-[18px] text-white hover:bg-[#252525] transition-colors"
+                  >
+                    Удалить
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
       
-      {/* Actions */}
-      <div className="p-3 pt-0 flex gap-2">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onUse(lora);
-          }}
-          disabled={lora.status !== 'completed'}
-          className="flex-1 h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-        >
-          <Play className="w-3.5 h-3.5" />
-          Использовать
-        </button>
-        
-        {!isPreset && onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(lora);
-            }}
-            className="h-10 w-10 rounded-xl border border-[#2f2f2f] flex items-center justify-center text-[#959595] hover:text-white hover:border-[#404040] transition-colors"
+      {/* Preview images - last image on top */}
+      <div className="flex items-center">
+        {previewImages.map((img, idx) => (
+          <div
+            key={img.id}
+            className="w-16 h-16 rounded-[16px] border-2 border-[#101010] overflow-hidden flex-shrink-0"
+            style={{ marginLeft: idx > 0 ? '-24px' : '0', zIndex: idx + 1 }}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+            <img
+              src={img.image_url}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+        {remainingCount > 0 && (
+          <div
+            className="w-16 h-16 rounded-[16px] border-2 border-[#101010] bg-[#212121] flex items-center justify-center flex-shrink-0"
+            style={{ marginLeft: '-24px', zIndex: previewImages.length + 1 }}
+          >
+            <span className="font-inter font-medium text-[16px] leading-[24px] text-white tracking-[-0.01em]">
+              +{remainingCount}
+            </span>
+          </div>
+        )}
+        {previewImages.length === 0 && (
+          <div className="w-16 h-16 rounded-[16px] border-2 border-[#101010] bg-[#212121] flex items-center justify-center">
+            <span className="text-[#959595] text-xs">Нет фото</span>
+          </div>
         )}
       </div>
+      
+      {/* Click outside to close menu */}
+      {menuOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -230,6 +309,13 @@ function LoraContent() {
   const [myLoras, setMyLoras] = useState<LoraModel[]>([]);
   const [lorasLoading, setLorasLoading] = useState(true);
   const [selectedLora, setSelectedLora] = useState<LoraModel | null>(null);
+  
+  // Inline editing state
+  const [isSavingName, setIsSavingName] = useState(false);
+  const nameRef = useRef<HTMLHeadingElement>(null);
+  
+  // Retrain mode - show settings panel with LoRA data
+  const [isRetrainMode, setIsRetrainMode] = useState(false);
 
   // Load user's LoRAs
   useEffect(() => {
@@ -302,7 +388,10 @@ function LoraContent() {
   const removeImage = (index: number) => {
     setImages(prev => {
       const updated = [...prev];
-      URL.revokeObjectURL(updated[index].url);
+      // Only revoke URL for new images (blob URLs), not existing ones (storage URLs)
+      if (!updated[index].isExisting && updated[index].url.startsWith('blob:')) {
+        URL.revokeObjectURL(updated[index].url);
+      }
       updated.splice(index, 1);
       return updated;
     });
@@ -317,7 +406,11 @@ function LoraContent() {
     
     // First upload all images that aren't uploaded yet
     const uploadPromises = images.map(async (img, idx) => {
+      // Already uploaded (existing or previously uploaded)
       if (img.uploaded) return img.uploaded;
+      
+      // No file to upload (shouldn't happen)
+      if (!img.file) return null;
       
       setImages(prev => {
         const updated = [...prev];
@@ -416,39 +509,48 @@ function LoraContent() {
     setError(null);
     
     try {
-      // Upload all images first
+      // Upload all images first (skip existing ones that are already uploaded)
       const uploadedImages: string[] = [];
-      
+
       for (let i = 0; i < images.length; i++) {
-        if (images[i].uploaded) {
-          uploadedImages.push(images[i].uploaded!);
+        const img = images[i];
+        
+        // If already uploaded (existing or previously uploaded new image)
+        if (img.uploaded) {
+          uploadedImages.push(img.uploaded);
           continue;
         }
-        
+
+        // Skip if no file (shouldn't happen, but safety check)
+        if (!img.file) {
+          console.warn(`Image ${i} has no file and no uploaded URL, skipping`);
+          continue;
+        }
+
         setImages(prev => {
           const updated = [...prev];
           updated[i] = { ...updated[i], uploading: true };
           return updated;
         });
-        
-        const compressed = await compressImage(images[i].file);
+
+        const compressed = await compressImage(img.file);
         const formData = new FormData();
         formData.append('files', compressed);
         formData.append('bucket', 'lora-training-images');
-        
+
         const res = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
-        
+
         if (!res.ok) throw new Error('Ошибка загрузки изображения');
         const data = await res.json();
-        
+
         const imageUrl = data.urls && data.urls.length > 0 ? data.urls[0] : null;
         if (!imageUrl) throw new Error('No URL returned from upload');
-        
+
         uploadedImages.push(imageUrl);
-        
+
         setImages(prev => {
           const updated = [...prev];
           updated[i] = { ...updated[i], uploading: false, uploaded: imageUrl };
@@ -562,17 +664,122 @@ function LoraContent() {
 
   // Delete LoRA
   const handleDeleteLora = async (lora: LoraModel) => {
-    if (!confirm('Удалить эту LoRA модель?')) return;
+    if (!confirm(`Удалить LoRA модель "${lora.name}"? Это действие нельзя отменить.`)) return;
     
     try {
-      await fetch(`/api/loras/${lora.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/loras/${lora.id}`, { method: 'DELETE' });
+      
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Ошибка при удалении');
+      }
+      
+      // Success - reload list and clear selection if needed
       loadMyLoras();
       if (selectedLora?.id === lora.id) {
         setSelectedLora(null);
       }
+      
+      console.log(`LoRA "${lora.name}" успешно удалена`);
     } catch (err) {
       console.error('Failed to delete LoRA:', err);
+      alert(err instanceof Error ? err.message : 'Не удалось удалить LoRA модель');
     }
+  };
+
+  // Save name on blur (contentEditable)
+  const handleNameBlur = async () => {
+    if (!selectedLora || !nameRef.current) return;
+    
+    const newName = nameRef.current.textContent?.trim() || '';
+    if (!newName || newName === selectedLora.name) {
+      // Restore original if empty or unchanged
+      if (nameRef.current) {
+        nameRef.current.textContent = selectedLora.name;
+      }
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      const res = await fetch(`/api/loras/${selectedLora.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Ошибка при сохранении');
+      }
+
+      // Update local state
+      const updatedLora = { ...selectedLora, name: newName };
+      setSelectedLora(updatedLora);
+      setMyLoras(prev => prev.map(l => l.id === selectedLora.id ? updatedLora : l));
+    } catch (err) {
+      console.error('Failed to save name:', err);
+      // Restore original on error
+      if (nameRef.current) {
+        nameRef.current.textContent = selectedLora.name;
+      }
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  // Handle key press in name (contentEditable)
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      nameRef.current?.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (nameRef.current && selectedLora) {
+        nameRef.current.textContent = selectedLora.name;
+        nameRef.current.blur();
+      }
+    }
+  };
+
+  // Start retrain mode - populate form with LoRA data including existing images
+  const startRetrainMode = () => {
+    if (!selectedLora) return;
+    
+    // Populate form with LoRA data
+    setName(selectedLora.name);
+    setDescription(selectedLora.description || '');
+    setTriggerWord(selectedLora.trigger_word);
+    setType(selectedLora.type);
+    setTrainerId(selectedLora.trainer_id || 'fast-flux-trainer');
+    setError(null);
+    
+    // Load existing training images
+    if (selectedLora.training_images && selectedLora.training_images.length > 0) {
+      const existingImages: TrainingImageFile[] = selectedLora.training_images.map((img) => ({
+        file: null, // No file for existing images
+        url: img.image_url, // Use storage URL for preview
+        uploading: false,
+        uploaded: img.image_url, // Already uploaded
+        caption: img.caption || '',
+        captionLoading: false,
+        isExisting: true,
+        existingId: img.id,
+      }));
+      setImages(existingImages);
+    } else {
+      setImages([]);
+    }
+    
+    // Switch to create tab and enable retrain mode
+    setActiveTab('create');
+    setIsRetrainMode(true);
+  };
+
+  // Cancel retrain mode
+  const cancelRetrainMode = () => {
+    setIsRetrainMode(false);
+    setActiveTab('my');
   };
 
   // Sync status
@@ -594,6 +801,7 @@ function LoraContent() {
   const trainerOptions: SelectOption[] = LORA_TRAINERS.map(t => ({
     value: t.id,
     label: t.displayName,
+    description: t.shortDescription,
     badge: t.recommended ? { text: 'Рекомендуем', className: 'bg-[#252525] text-white' } : undefined,
   }));
 
@@ -626,8 +834,7 @@ function LoraContent() {
             <div className="flex flex-col gap-3">
               {/* Tab Selector - styled like ActionSelector */}
               <div className="animate-fade-in-up animate-delay-100 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
-              <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                <Command className="w-3 h-3" />
+              <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                 Режим
               </label>
               <div className="flex gap-2">
@@ -638,7 +845,7 @@ function LoraContent() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                    className={`flex-1 h-[56px] px-4 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-neutral-900 ${
+                    className={`flex-1 h-[56px] px-6 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-[#171717] ${
                       activeTab === tab.id
                         ? 'border border-white'
                         : 'border border-transparent hover:border-[#404040]'
@@ -661,104 +868,123 @@ function LoraContent() {
                   )}
                   
                   {/* Name */}
-                  <div className="animate-fade-in-up animate-delay-200 border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <FileText className="w-3 h-3" />
+                  <div className="animate-fade-in-up animate-delay-200 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Название *
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Моя бутылка"
-                    className="w-full h-12 px-3 rounded-[8px] bg-neutral-900 text-white text-[14px] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white"
+                    placeholder="Космический кот"
+                    className="w-full h-12 px-3 rounded-[8px] bg-[#171717] text-white font-inter font-normal text-sm leading-[1.43] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white"
                   />
                 </div>
                 
                   {/* Description */}
-                  <div className="animate-fade-in-up animate-delay-300 border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Info className="w-3 h-3" />
+                  <div className="animate-fade-in-up animate-delay-300 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Описание
                   </label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Описание вашей LoRA модели..."
+                    placeholder="Пушистый кот в скафандре на фоне звёзд"
                     rows={2}
-                    className="w-full px-3 py-2 rounded-[8px] bg-neutral-900 text-white text-[14px] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white resize-none"
+                    className="w-full px-3 py-2 rounded-[8px] bg-[#171717] text-white font-inter font-normal text-sm leading-[1.43] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white resize-none"
                   />
                 </div>
                 
                   {/* Trigger Word */}
-                  <div className="animate-fade-in-up animate-delay-400 border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Hash className="w-3 h-3" />
+                  <div className="animate-fade-in-up animate-delay-400 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Trigger Word *
                   </label>
                   <input
                     type="text"
                     value={triggerWord}
                     onChange={(e) => setTriggerWord(e.target.value.toUpperCase().replace(/[^A-Z0-9_\s]/g, ''))}
-                    placeholder="MYBOTTLE"
-                    className="w-full h-12 px-3 rounded-[8px] bg-neutral-900 text-white text-[14px] font-mono placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white uppercase"
+                    placeholder="SPACECAT"
+                    className="w-full h-12 px-3 rounded-[8px] bg-[#171717] text-white font-inter font-normal text-sm leading-[1.43] font-mono placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white uppercase"
                   />
-                  <p className="text-[10px] text-[#606060]">
+                  <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
                     Уникальное слово для активации стиля (A-Z, 0-9, _)
                   </p>
                 </div>
                 
                   {/* Type Selector */}
-                  <div className="animate-fade-in-up animate-delay-500 border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Settings2 className="w-3 h-3" />
+                  <div className="animate-fade-in-up animate-delay-500 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Тип LoRA
                   </label>
-                  <div className="flex gap-2 flex-wrap">
-                    {LORA_TYPES.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setType(t.id)}
-                        title={t.description}
-                        className={`px-3 py-2 rounded-[12px] font-inter text-[13px] transition-colors ${
-                          type === t.id
-                            ? 'bg-white text-black'
-                            : 'bg-neutral-900 text-white hover:border-[#404040] border border-transparent'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-2">
+                    {/* Row 1 */}
+                    <div className="flex gap-2">
+                      {LORA_TYPES.slice(0, 2).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setType(t.id)}
+                          title={t.description}
+                          className={`flex-1 h-[56px] px-6 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-[#171717] ${
+                            type === t.id
+                              ? 'border border-white'
+                              : 'border border-transparent hover:border-[#404040]'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Row 2 */}
+                    {LORA_TYPES.length > 2 && (
+                      <div className="flex gap-2">
+                        {LORA_TYPES.slice(2, 4).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setType(t.id)}
+                            title={t.description}
+                            className={`flex-1 h-[56px] px-6 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-[#171717] ${
+                              type === t.id
+                                ? 'border border-white'
+                                : 'border border-transparent hover:border-[#404040]'
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[10px] text-[#606060]">
+                  <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
                     {loraType?.description}
                     {type === 'style' && ' Для художественных стилей, НЕ для объектов'}
                   </p>
                 </div>
                 
                   {/* Trainer Selector */}
-                  <div className="animate-fade-in-up animate-delay-600 border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Zap className="w-3 h-3" />
-                    Модель обучения
+                  <div className="animate-fade-in-up animate-delay-600 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                    Модель
                   </label>
                   <MobileSelect
                     value={trainerId}
                     onValueChange={setTrainerId}
                     options={trainerOptions}
-                    title="Модель обучения"
+                    title="Модель"
                   />
                   {trainer && (
-                    <div className="space-y-1 mt-2">
-                      <p className="text-[11px] text-[#959595]">{trainer.description}</p>
+                    <div className="flex flex-col gap-2 py-2">
+                      <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
+                        {trainer.description}
+                      </p>
                       <div className="flex flex-wrap gap-1">
                         {trainer.features.map((f, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded bg-[#252525] text-[10px] text-white">
+                          <span key={i} className="px-2 py-1.5 rounded-lg bg-[#171717] font-inter font-medium text-[10px] text-white uppercase tracking-[0.15px]">
                             {f}
                           </span>
                         ))}
                       </div>
-                      <p className="text-[10px] text-[#606060]">
+                      <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
                         ~{trainer.trainingTime} • {trainer.minImages}-{trainer.maxImages} изображений
                       </p>
                     </div>
@@ -766,10 +992,9 @@ function LoraContent() {
                 </div>
                 
                   {/* Image Upload */}
-                  <div className="animate-fade-in-up animate-delay-700 border border-[#252525] rounded-[16px] p-4 space-y-3">
+                  <div className="animate-fade-in-up animate-delay-700 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                      <ImageIcon className="w-3 h-3" />
+                    <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                       Изображения * ({images.length}/{trainer?.maxImages || 50})
                     </label>
                     {images.length >= 5 && (
@@ -826,7 +1051,7 @@ function LoraContent() {
                   {images.length > 0 && (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
                       {images.map((img, idx) => (
-                        <div key={idx} className="flex gap-2 p-2 bg-[#1A1A1A] rounded-[8px]">
+                        <div key={idx} className={"flex gap-2 p-2 rounded-[8px] bg-[#1A1A1A]"}>
                           <div className="relative w-16 h-16 flex-shrink-0">
                             <img
                               src={img.url}
@@ -855,7 +1080,7 @@ function LoraContent() {
                                   return updated;
                                 });
                               }}
-                              placeholder="Описание изображения..."
+                              placeholder="Добавьте детали для обучения..."
                               rows={2}
                               className="w-full px-2 py-1 text-[11px] bg-[#252525] rounded text-white placeholder:text-[#606060] focus:outline-none resize-none"
                             />
@@ -867,20 +1092,17 @@ function LoraContent() {
                 </div>
                 
                   {/* Info box */}
-                  <div className="animate-fade-in-up animate-delay-800 p-3 rounded-[12px] bg-[#1A1A1A] border border-[#252525]">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-[#959595] flex-shrink-0 mt-0.5" />
-                    <div className="text-[11px] text-[#959595] space-y-1">
-                      <p><strong className="text-white">Рекомендации:</strong></p>
-                      <ul className="list-disc list-inside space-y-0.5 text-[10px]">
-                        <li>25-30 изображений для лучшего результата</li>
-                        <li>Разные ракурсы, освещение, фоны</li>
-                        <li>Разрешение 1024x1024 оптимально</li>
-                        <li>Описания улучшают качество обучения</li>
-                      </ul>
-                    </div>
+                  <div className="animate-fade-in-up animate-delay-800 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                    <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                      Рекомендации
+                    </label>
+                    <ul className="list-disc list-inside space-y-1 font-inter text-[14px] leading-[20px] text-[#959595]">
+                      <li>25-30 изображений для лучшего результата</li>
+                      <li>Разные ракурсы, освещение, фоны</li>
+                      <li>Разрешение 1024x1024 оптимально</li>
+                      <li>Описания улучшают качество обучения</li>
+                    </ul>
                   </div>
-                </div>
                 
                 </>
               )}
@@ -939,30 +1161,41 @@ function LoraContent() {
 
           {/* Fixed buttons at bottom (outside scroll area) */}
           {activeTab === 'create' && (
-            <div className="shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
+            <div className="shrink-0 bg-[#171717] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setName('');
-                    setDescription('');
-                    setTriggerWord('');
-                    setType('product');
-                    setImages([]);
-                    setError(null);
-                  }}
-                  disabled={isSubmitting}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
-                >
-                  Сбросить
-                </button>
+                {isRetrainMode ? (
+                  <button
+                    type="button"
+                    onClick={cancelRetrainMode}
+                    disabled={isSubmitting}
+                    className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  >
+                    Отмена
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setName('');
+                      setDescription('');
+                      setTriggerWord('');
+                      setType('product');
+                      setImages([]);
+                      setError(null);
+                    }}
+                    disabled={isSubmitting}
+                    className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  >
+                    Сбросить
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting || images.length < 5 || !name.trim() || !triggerWord.trim()}
                   className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:bg-[#2f2f2f] disabled:text-[#666]"
                 >
-                  {isSubmitting ? 'Создание...' : 'Создать LoRA'}
+                  {isSubmitting ? 'Создание...' : isRetrainMode ? 'Переобучить' : 'Создать LoRA'}
                 </button>
               </div>
             </div>
@@ -983,20 +1216,33 @@ function LoraContent() {
           </div>
 
           <div className="animate-fade-in-up animate-delay-200 flex flex-col gap-6">
-            {selectedLora ? (
+            {selectedLora && activeTab === 'my' ? (
               <div className="flex flex-col gap-6">
-                {/* Header with name, status badge and button */}
-                <div className="flex items-start gap-2">
+                {/* Header with name and buttons */}
+                <div className="flex items-start gap-4">
                   <div className="flex-1 flex flex-col gap-2">
                     <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                       название
                     </label>
-                    <h2 className="font-inter font-semibold text-2xl text-white leading-[1.333]">
+                    <h2 
+                      ref={nameRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={handleNameBlur}
+                      onKeyDown={handleNameKeyDown}
+                      className={`font-inter font-semibold text-2xl text-white leading-[1.333] outline-none cursor-text border-b-2 border-transparent focus:border-white transition-colors ${isSavingName ? 'opacity-50' : ''}`}
+                      style={{ caretColor: 'white' }}
+                    >
                       {selectedLora.name}
                     </h2>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge status={selectedLora.status} />
+                    <button
+                      onClick={startRetrainMode}
+                      className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors"
+                    >
+                      Переобучить
+                    </button>
                     <button
                       onClick={() => handleUseLora(selectedLora)}
                       disabled={selectedLora.status !== 'completed'}
@@ -1082,7 +1328,7 @@ function LoraContent() {
                     <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                       Пример использования
                     </label>
-                    <div className="p-3 rounded-[16px] bg-[#101010] flex items-center justify-between gap-3">
+                    <div className="p-3 rounded-[16px] bg-[#171717] flex items-center justify-between gap-3">
                       <code className="font-inter text-sm text-white leading-[1.428] flex-1 break-words">
                         {selectedLora.trigger_word ? `${selectedLora.trigger_word}, ` : ''}a beautiful product shot of [your subject], professional lighting, studio photography
                       </code>
@@ -1102,36 +1348,47 @@ function LoraContent() {
                   </div>
                 )}
 
-                {/* Images */}
+                {/* Images - Grid 2 columns per Figma design */}
                 {selectedLora.training_images && selectedLora.training_images.length > 0 && (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3">
                     <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                       Изображения
                     </label>
                     <div className="flex flex-col gap-4">
-                      {selectedLora.training_images.map((img, idx) => (
-                        <div key={img.id || idx} className="rounded-[16px] p-4 bg-[#171717] flex items-start gap-4">
-                          <div className="w-20 h-20 rounded-[16px] overflow-hidden relative bg-[#1A1A1A] shrink-0">
-                            <Image
-                              src={img.image_url}
-                              alt={`Training image ${idx + 1}`}
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
+                      {/* Group images in pairs (2 per row) */}
+                      {Array.from({ length: Math.ceil(selectedLora.training_images.length / 2) }, (_, rowIdx) => {
+                        const startIdx = rowIdx * 2;
+                        const pair = selectedLora.training_images!.slice(startIdx, startIdx + 2);
+                        return (
+                          <div key={rowIdx} className="flex gap-4">
+                            {pair.map((img, idx) => (
+                              <div key={img.id || startIdx + idx} className="flex-1 rounded-[16px] p-4 bg-[#171717] flex gap-4">
+                                <div className="w-20 h-20 rounded-[16px] overflow-hidden relative shrink-0">
+                                  <Image
+                                    src={img.image_url}
+                                    alt={`Training image ${startIdx + idx + 1}`}
+                                    fill
+                                    className="object-cover"
+                                    unoptimized
+                                  />
+                                </div>
+                                {img.caption && (
+                                  <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                    <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                                      caption
+                                    </label>
+                                    <p className="font-inter font-medium text-xs text-white leading-[1.333] line-clamp-3">
+                                      {img.caption}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {/* Empty placeholder for odd number of images */}
+                            {pair.length === 1 && <div className="flex-1" />}
                           </div>
-                          {img.caption && (
-                            <div className="flex flex-col gap-2 flex-1 min-w-0">
-                              <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                                caption
-                              </label>
-                              <p className="font-inter font-medium text-xs text-white leading-[1.333]">
-                                {img.caption}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1160,22 +1417,22 @@ function LoraContent() {
                   <div className="flex-1 flex flex-col py-2">
                     <img src="/numbers/1.png" alt="1" width={36} height={64} className="mb-0" />
                     <div className="flex flex-col gap-2 py-6">
-                      <h3 className="font-inter font-semibold text-xl text-white">Выбор модели</h3>
-                      <p className="font-inter text-sm text-[#9c9c9c]">Выберите действие и модель</p>
+                      <h3 className="font-inter font-semibold text-xl text-white">Настройка</h3>
+                      <p className="font-inter text-sm text-[#9c9c9c]">Укажите название и триггер</p>
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col py-2">
                     <img src="/numbers/2.png" alt="2" width={55} height={64} className="mb-0" />
                     <div className="flex flex-col gap-2 py-6">
-                      <h3 className="font-inter font-semibold text-xl text-white">Промпт</h3>
-                      <p className="font-inter text-sm text-[#9c9c9c]">Опишите что хотите создать</p>
+                      <h3 className="font-inter font-semibold text-xl text-white">Изображения</h3>
+                      <p className="font-inter text-sm text-[#9c9c9c]">Загрузите 25-30 фото объекта</p>
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col py-2">
                     <img src="/numbers/3.png" alt="3" width={53} height={64} className="mb-0" />
                     <div className="flex flex-col gap-2 py-6">
-                      <h3 className="font-inter font-semibold text-xl text-white">Настройки</h3>
-                      <p className="font-inter text-sm text-[#9c9c9c]">Настройте параметры</p>
+                      <h3 className="font-inter font-semibold text-xl text-white">Обучение</h3>
+                      <p className="font-inter text-sm text-[#9c9c9c]">Запустите и дождитесь результата</p>
                     </div>
                   </div>
                 </div>
@@ -1195,8 +1452,7 @@ function LoraContent() {
             
             {/* Tab Selector */}
             <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
-              <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                <Command className="w-3 h-3" />
+              <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                 Режим
               </label>
               <div className="flex gap-2">
@@ -1207,7 +1463,7 @@ function LoraContent() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                    className={`flex-1 h-[56px] px-4 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-neutral-900 ${
+                    className={`flex-1 h-[56px] px-6 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-[#171717] ${
                       activeTab === tab.id
                         ? 'border border-white'
                         : 'border border-transparent hover:border-[#404040]'
@@ -1230,104 +1486,123 @@ function LoraContent() {
                 )}
                 
                 {/* Name */}
-                <div className="border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <FileText className="w-3 h-3" />
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Название *
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Моя бутылка"
-                    className="w-full h-12 px-3 rounded-[8px] bg-neutral-900 text-white text-[14px] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white"
+                    placeholder="Космический кот"
+                    className="w-full h-12 px-3 rounded-[8px] bg-[#171717] text-white font-inter font-normal text-sm leading-[1.43] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white"
                   />
                 </div>
                 
                 {/* Description */}
-                <div className="border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Info className="w-3 h-3" />
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Описание
                   </label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Описание вашей LoRA модели..."
+                    placeholder="Пушистый кот в скафандре на фоне звёзд"
                     rows={2}
-                    className="w-full px-3 py-2 rounded-[8px] bg-neutral-900 text-white text-[14px] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white resize-none"
+                    className="w-full px-3 py-2 rounded-[8px] bg-[#171717] text-white font-inter font-normal text-sm leading-[1.43] placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white resize-none"
                   />
                 </div>
                 
                 {/* Trigger Word */}
-                <div className="border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Hash className="w-3 h-3" />
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Trigger Word *
                   </label>
                   <input
                     type="text"
                     value={triggerWord}
                     onChange={(e) => setTriggerWord(e.target.value.toUpperCase().replace(/[^A-Z0-9_\s]/g, ''))}
-                    placeholder="MYBOTTLE"
-                    className="w-full h-12 px-3 rounded-[8px] bg-neutral-900 text-white text-[14px] font-mono placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white uppercase"
+                    placeholder="SPACECAT"
+                    className="w-full h-12 px-3 rounded-[8px] bg-[#171717] text-white font-inter font-normal text-sm leading-[1.43] font-mono placeholder:text-[#959595] focus:outline-none focus:ring-1 focus:ring-white uppercase"
                   />
-                  <p className="text-[10px] text-[#606060]">
+                  <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
                     Уникальное слово для активации стиля (A-Z, 0-9, _)
                   </p>
                 </div>
                 
                 {/* Type Selector */}
-                <div className="border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Settings2 className="w-3 h-3" />
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Тип LoRA
                   </label>
-                  <div className="flex gap-2 flex-wrap">
-                    {LORA_TYPES.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setType(t.id)}
-                        title={t.description}
-                        className={`px-3 py-2 rounded-[12px] font-inter text-[13px] transition-colors ${
-                          type === t.id
-                            ? 'bg-white text-black'
-                            : 'bg-neutral-900 text-white hover:border-[#404040] border border-transparent'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-2">
+                    {/* Row 1 */}
+                    <div className="flex gap-2">
+                      {LORA_TYPES.slice(0, 2).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setType(t.id)}
+                          title={t.description}
+                          className={`flex-1 h-[56px] px-6 py-2 rounded-[16px] font-inter text-[13px] leading-[18px] text-center text-white transition-all bg-[#171717] ${
+                            type === t.id
+                              ? 'border border-white'
+                              : 'border border-transparent hover:border-[#404040]'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Row 2 */}
+                    {LORA_TYPES.length > 2 && (
+                      <div className="flex gap-2">
+                        {LORA_TYPES.slice(2, 4).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setType(t.id)}
+                            title={t.description}
+                            className={`flex-1 h-14 px-6 rounded-[16px] font-inter font-normal text-[13px] leading-[1.38] text-center transition-colors ${
+                              type === t.id
+                                ? 'bg-[#171717] border border-white text-white'
+                                : 'bg-[#171717] text-white hover:bg-[#1a1a1a]'
+                          }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[10px] text-[#606060]">
+                  <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
                     {loraType?.description}
                     {type === 'style' && ' Для художественных стилей, НЕ для объектов'}
                   </p>
                 </div>
                 
                 {/* Trainer Selector */}
-                <div className="border border-[#252525] rounded-[16px] p-4 space-y-2">
-                  <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                    <Zap className="w-3 h-3" />
-                    Модель обучения
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                    Модель
                   </label>
                   <MobileSelect
                     value={trainerId}
                     onValueChange={setTrainerId}
                     options={trainerOptions}
-                    title="Модель обучения"
+                    title="Модель"
                   />
                   {trainer && (
-                    <div className="space-y-1 mt-2">
-                      <p className="text-[11px] text-[#959595]">{trainer.description}</p>
+                    <div className="flex flex-col gap-2 py-2">
+                      <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
+                        {trainer.description}
+                      </p>
                       <div className="flex flex-wrap gap-1">
                         {trainer.features.map((f, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded bg-[#252525] text-[10px] text-white">
+                          <span key={i} className="px-2 py-1.5 rounded-lg bg-[#171717] font-inter font-medium text-[10px] text-white uppercase tracking-[0.15px]">
                             {f}
                           </span>
                         ))}
                       </div>
-                      <p className="text-[10px] text-[#606060]">
+                      <p className="font-inter font-normal text-sm text-[#959595] leading-[1.43]">
                         ~{trainer.trainingTime} • {trainer.minImages}-{trainer.maxImages} изображений
                       </p>
                     </div>
@@ -1335,10 +1610,9 @@ function LoraContent() {
                 </div>
                 
                 {/* Image Upload */}
-                <div className="border border-[#252525] rounded-[16px] p-4 space-y-3">
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                      <ImageIcon className="w-3 h-3" />
+                    <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                       Изображения * ({images.length}/{trainer?.maxImages || 50})
                     </label>
                     {images.length >= 5 && (
@@ -1382,7 +1656,6 @@ function LoraContent() {
                       JPG, PNG • мин. {trainer?.minImages || 5} изображений
                     </p>
                     <input
-                      ref={fileInputRef}
                       type="file"
                       accept="image/*"
                       multiple
@@ -1391,11 +1664,11 @@ function LoraContent() {
                     />
                   </div>
                   
-                  {/* Images grid with captions */}
+                  {/* Images grid with captions - Mobile */}
                   {images.length > 0 && (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
                       {images.map((img, idx) => (
-                        <div key={idx} className="flex gap-2 p-2 bg-[#1A1A1A] rounded-[8px]">
+                        <div key={idx} className={"flex gap-2 p-2 rounded-[8px] bg-[#1A1A1A]"}>
                           <div className="relative w-16 h-16 flex-shrink-0">
                             <img
                               src={img.url}
@@ -1424,7 +1697,7 @@ function LoraContent() {
                                   return updated;
                                 });
                               }}
-                              placeholder="Описание изображения..."
+                              placeholder="Добавьте детали для обучения..."
                               rows={2}
                               className="w-full px-2 py-1 text-[11px] bg-[#252525] rounded text-white placeholder:text-[#606060] focus:outline-none resize-none"
                             />
@@ -1436,19 +1709,16 @@ function LoraContent() {
                 </div>
                 
                 {/* Info box */}
-                <div className="p-3 rounded-[12px] bg-[#1A1A1A] border border-[#252525]">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-[#959595] flex-shrink-0 mt-0.5" />
-                    <div className="text-[11px] text-[#959595] space-y-1">
-                      <p><strong className="text-white">Рекомендации:</strong></p>
-                      <ul className="list-disc list-inside space-y-0.5 text-[10px]">
-                        <li>25-30 изображений для лучшего результата</li>
-                        <li>Разные ракурсы, освещение, фоны</li>
-                        <li>Разрешение 1024x1024 оптимально</li>
-                        <li>Описания улучшают качество обучения</li>
-                      </ul>
-                    </div>
-                  </div>
+                <div className="border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
+                  <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
+                    Рекомендации
+                  </label>
+                  <ul className="list-disc list-inside space-y-1 font-inter text-[14px] leading-[20px] text-[#959595]">
+                    <li>25-30 изображений для лучшего результата</li>
+                    <li>Разные ракурсы, освещение, фоны</li>
+                    <li>Разрешение 1024x1024 оптимально</li>
+                    <li>Описания улучшают качество обучения</li>
+                  </ul>
                 </div>
               </div>
             )}
@@ -1492,30 +1762,41 @@ function LoraContent() {
           
           {/* Fixed buttons at bottom (mobile) */}
           {activeTab === 'create' && (
-            <div className="fixed bottom-0 left-0 right-0 bg-[#101010] p-4 border-t border-[#1f1f1f] z-10">
+            <div className="fixed bottom-0 left-0 right-0 bg-[#171717] p-4 border-t border-[#1f1f1f] z-10">
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setName('');
-                    setDescription('');
-                    setTriggerWord('');
-                    setType('product');
-                    setImages([]);
-                    setError(null);
-                  }}
-                  disabled={isSubmitting}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
-                >
-                  Сбросить
-                </button>
+                {isRetrainMode ? (
+                  <button
+                    type="button"
+                    onClick={cancelRetrainMode}
+                    disabled={isSubmitting}
+                    className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  >
+                    Отмена
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setName('');
+                      setDescription('');
+                      setTriggerWord('');
+                      setType('product');
+                      setImages([]);
+                      setError(null);
+                    }}
+                    disabled={isSubmitting}
+                    className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                  >
+                    Сбросить
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting || images.length < 5 || !name.trim() || !triggerWord.trim()}
                   className="flex-1 h-10 px-4 rounded-xl bg-white font-inter font-medium text-sm text-black tracking-[-0.084px] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:bg-[#2f2f2f] disabled:text-[#666]"
                 >
-                  {isSubmitting ? 'Создание...' : 'Создать LoRA'}
+                  {isSubmitting ? 'Создание...' : isRetrainMode ? 'Переобучить' : 'Создать LoRA'}
                 </button>
               </div>
             </div>
@@ -1528,22 +1809,34 @@ function LoraContent() {
         }`}>
           {selectedLora ? (
             <div className="p-4 flex flex-col gap-6">
-              {/* Header with name, status badge and button */}
-              <div className="flex items-start gap-2">
-                <div className="flex-1 flex flex-col gap-2">
+              {/* Header with name and buttons */}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
                   <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     название
                   </label>
-                  <h2 className="font-inter font-semibold text-2xl text-white leading-[1.333]">
+                  <h2 
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={handleNameBlur}
+                    onKeyDown={handleNameKeyDown}
+                    className={`font-inter font-semibold text-2xl text-white leading-[1.333] outline-none cursor-text border-b-2 border-transparent focus:border-white transition-colors ${isSavingName ? 'opacity-50' : ''}`}
+                    style={{ caretColor: 'white' }}
+                  >
                     {selectedLora.name}
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={selectedLora.status} />
+                  <button
+                    onClick={startRetrainMode}
+                    className="flex-1 h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors"
+                  >
+                    Переобучить
+                  </button>
                   <button
                     onClick={() => handleUseLora(selectedLora)}
                     disabled={selectedLora.status !== 'completed'}
-                    className="h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm leading-[1.428] tracking-[-0.006em] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm leading-[1.428] tracking-[-0.006em] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Попробовать
                   </button>
@@ -1625,7 +1918,7 @@ function LoraContent() {
                   <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Пример использования
                   </label>
-                  <div className="p-3 rounded-[16px] bg-[#101010] flex items-center justify-between gap-3">
+                  <div className="p-3 rounded-[16px] bg-[#171717] flex items-center justify-between gap-3">
                     <code className="font-inter text-sm text-white leading-[1.428] flex-1 break-words">
                       {selectedLora.trigger_word ? `${selectedLora.trigger_word}, ` : ''}a beautiful product shot of [your subject], professional lighting, studio photography
                     </code>
@@ -1645,16 +1938,16 @@ function LoraContent() {
                 </div>
               )}
 
-              {/* Images */}
+              {/* Images - Mobile: 2 columns grid */}
               {selectedLora.training_images && selectedLora.training_images.length > 0 && (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                     Изображения
                   </label>
-                  <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     {selectedLora.training_images.map((img, idx) => (
-                      <div key={img.id || idx} className="rounded-[16px] p-4 bg-[#171717] flex items-start gap-4">
-                        <div className="w-20 h-20 rounded-[16px] overflow-hidden relative bg-[#1A1A1A] shrink-0">
+                      <div key={img.id || idx} className="rounded-[16px] p-4 bg-[#171717] flex flex-col gap-4">
+                        <div className="w-full aspect-square rounded-[16px] overflow-hidden relative">
                           <Image
                             src={img.image_url}
                             alt={`Training image ${idx + 1}`}
@@ -1663,16 +1956,6 @@ function LoraContent() {
                             unoptimized
                           />
                         </div>
-                        {img.caption && (
-                          <div className="flex flex-col gap-2 flex-1 min-w-0">
-                            <label className="font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
-                              caption
-                            </label>
-                            <p className="font-inter font-medium text-xs text-white leading-[1.333]">
-                              {img.caption}
-                            </p>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>

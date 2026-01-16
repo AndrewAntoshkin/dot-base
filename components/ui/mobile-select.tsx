@@ -22,6 +22,7 @@ const CloseIcon = () => (
 export interface SelectOption {
   value: string;
   label: string;
+  description?: string; // Short description under label
   badge?: {
     text: string;
     icon?: React.ReactNode;
@@ -93,7 +94,7 @@ export function MobileSelect({
           type="button"
           onClick={() => setBottomSheetOpen(true)}
           className={cn(
-            'flex h-12 w-full items-center justify-between rounded-[8px] bg-neutral-900 px-3 py-2 font-inter font-normal text-[14px] leading-[20px] text-white',
+            'flex h-12 w-full items-center justify-between rounded-[8px] bg-[#171717] px-3 py-2 font-inter font-normal text-[14px] leading-[20px] text-white',
             triggerClassName
           )}
         >
@@ -139,7 +140,7 @@ export function MobileSelect({
                         type="button"
                         onClick={() => setTempValue(option.value)}
                         className={cn(
-                          'w-full h-12 rounded-[12px] px-4 py-2 flex items-center gap-3 transition-colors text-left',
+                          'w-full rounded-[12px] px-4 py-3 flex items-center gap-3 transition-colors text-left',
                           'bg-[#232323]',
                           isSelected && 'border border-[#d6d6d6]'
                         )}
@@ -151,15 +152,22 @@ export function MobileSelect({
                           </div>
                         )}
                         
-                        {/* Текст */}
-                        <span className="flex-1 font-inter font-normal text-[14px] leading-[18px] text-white">
-                          {option.label}
-                        </span>
+                        {/* Текст с описанием */}
+                        <div className="flex-1 flex flex-col gap-0.5">
+                          <span className="font-inter font-normal text-[14px] leading-[18px] text-white">
+                            {option.label}
+                          </span>
+                          {option.description && (
+                            <span className="font-inter text-[12px] leading-[16px] text-[#959595]">
+                              {option.description}
+                            </span>
+                          )}
+                        </div>
                         
                         {/* Badge */}
                         {option.badge && (
                           <span className={cn(
-                            'px-2 py-1 rounded-[6px] flex items-center gap-1 font-inter font-bold text-[14px] leading-[18px] text-white',
+                            'px-2 py-1 rounded-[6px] flex items-center gap-1 font-inter font-bold text-[14px] leading-[18px] text-white shrink-0',
                             option.badge.className || 'bg-[#573417]'
                           )}>
                             {option.badge.text}
@@ -201,7 +209,7 @@ export function MobileSelect({
     <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
       <SelectPrimitive.Trigger
         className={cn(
-          'flex h-12 w-full items-center justify-between rounded-[8px] bg-neutral-900 px-3 py-2 font-inter font-normal text-[14px] leading-[20px] text-white placeholder:text-[#959595] focus:outline-none focus:border focus:border-white transition-colors',
+          'flex h-12 w-full items-center justify-between rounded-[8px] bg-[#171717] px-3 py-2 font-inter font-normal text-[14px] leading-[20px] text-white placeholder:text-[#959595] focus:outline-none focus:border focus:border-white transition-colors',
           triggerClassName
         )}
       >
@@ -222,7 +230,7 @@ export function MobileSelect({
                 key={option.value}
                 value={option.value}
                 className={cn(
-                  'relative flex w-full cursor-pointer select-none items-center rounded-[12px] h-12 px-4 py-2 outline-none transition-colors',
+                  'relative flex w-full cursor-pointer select-none items-center rounded-[12px] px-4 py-3 outline-none transition-colors',
                   'bg-[#232323] hover:bg-[#2a2a2a]',
                   'data-[state=checked]:border data-[state=checked]:border-[#d6d6d6]',
                   'font-inter text-[14px] text-white'
@@ -235,14 +243,22 @@ export function MobileSelect({
                   </SelectPrimitive.ItemIndicator>
                 </span>
                 
-                <SelectPrimitive.ItemText className="flex-1">
-                  {option.label}
-                </SelectPrimitive.ItemText>
+                {/* Текст с описанием */}
+                <div className="flex-1 flex flex-col gap-0.5">
+                  <SelectPrimitive.ItemText>
+                    {option.label}
+                  </SelectPrimitive.ItemText>
+                  {option.description && (
+                    <span className="font-inter text-[12px] leading-[16px] text-[#959595]">
+                      {option.description}
+                    </span>
+                  )}
+                </div>
                 
                 {/* Badge */}
                 {option.badge && (
                   <span className={cn(
-                    'ml-2 px-2 py-1 rounded-[6px] flex items-center gap-1 font-inter font-bold text-[14px] leading-[18px] text-white',
+                    'ml-2 px-2 py-1 rounded-[6px] flex items-center gap-1 font-inter font-bold text-[14px] leading-[18px] text-white shrink-0',
                     option.badge.className || 'bg-[#573417]'
                   )}>
                     {option.badge.text}

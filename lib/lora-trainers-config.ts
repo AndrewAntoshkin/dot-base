@@ -4,6 +4,7 @@ export interface LoraTrainer {
   id: string;
   name: string;
   displayName: string;
+  shortDescription: string; // One-line benefit
   replicateModel: string;
   version: string;
   description: string;
@@ -19,7 +20,8 @@ export const LORA_TRAINERS: LoraTrainer[] = [
   {
     id: 'fast-flux-trainer',
     name: 'Fast Flux Trainer',
-    displayName: '⚡ Fast Flux Trainer',
+    displayName: 'Fast Flux Trainer',
+    shortDescription: 'Быстрое обучение за 3-5 минут, идеально для тестов',
     replicateModel: 'replicate/fast-flux-trainer',
     version: '8b10794665aed907bb98a1a5324cd1d3a8bea0e9b31e65210967fb9c9e2e08ed',
     description: 'Самая быстрая модель обучения. Идеально для быстрых тестов и простых LoRA.',
@@ -33,7 +35,8 @@ export const LORA_TRAINERS: LoraTrainer[] = [
   {
     id: 'ostris-flux-trainer',
     name: 'Ostris Flux Dev LoRA Trainer',
-    displayName: '🎯 Ostris Flux Trainer',
+    displayName: 'Ostris Flux Trainer',
+    shortDescription: 'Лучшее качество для сложных объектов и стилей',
     replicateModel: 'ostris/flux-dev-lora-trainer',
     version: 'd995297071a44dcb72244e6c19462111649ec86a9ff7e6b8a60e01e4f14c634c',
     description: 'Продвинутая модель с детальной настройкой. Лучше для сложных объектов и стилей.',
@@ -47,7 +50,8 @@ export const LORA_TRAINERS: LoraTrainer[] = [
   {
     id: 'lucataco-flux-trainer',
     name: 'Lucataco Flux Dev LoRA Trainer',
-    displayName: '🔬 Lucataco Trainer',
+    displayName: 'Lucataco Trainer',
+    shortDescription: 'Стабильные результаты с оптимизацией памяти',
     replicateModel: 'lucataco/flux-dev-lora-trainer',
     version: '1fc5c5dc8bfa10f3ab04e9e44b7a9a1659b7e4e9c30fe9c5d43a5b9e8ddf2a17',
     description: 'Альтернативная версия с оптимизацией для конкретных случаев.',
