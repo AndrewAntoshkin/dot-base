@@ -782,12 +782,21 @@ function LoraContent() {
     setActiveTab('my');
   };
 
-  // Sync status
+  // Sync status with Replicate
   const handleSyncStatus = async (lora: LoraModel) => {
     try {
       const res = await fetch(`/api/loras/${lora.id}`, { method: 'PATCH' });
       if (res.ok) {
-        loadMyLoras();
+        const data = await res.json();
+        // Update selectedLora if status changed
+        if (data.lora && data.synced) {
+          setSelectedLora(data.lora);
+          // Also update in the list
+          setMyLoras(prev => prev.map(l => l.id === lora.id ? data.lora : l));
+        } else {
+          // Just reload the list
+          loadMyLoras();
+        }
       }
     } catch (err) {
       console.error('Failed to sync status:', err);

@@ -182,14 +182,24 @@ export async function PATCH(
             logger.info(`LoRA ${id} status synced: ${loraData.status} -> ${newStatus}`);
           }
 
-          // Return updated data
+          // Return updated data with training images
           const { data: updatedLora } = await serviceClient
             .from('user_loras')
-            .select('*')
+            .select(`
+              *,
+              training_images:lora_training_images(id, image_url, caption)
+            `)
             .eq('id', id)
             .single();
 
-          return NextResponse.json({ lora: updatedLora, synced: true });
+          // Transform to include training_images_count
+          const updatedLoraData = updatedLora as any;
+          const loraWithCount = {
+            ...updatedLoraData,
+            training_images_count: updatedLoraData?.training_images?.length || 0,
+          };
+
+          return NextResponse.json({ lora: loraWithCount, synced: true });
         }
       }
     }
