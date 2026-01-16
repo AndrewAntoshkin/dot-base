@@ -74,10 +74,11 @@ export function ModelSelector({ action, value, onChange, onLoraSelect }: ModelSe
   // Создаем комбинированный список моделей + LoRA (только для админов)
   const allModels = useMemo((): ModelLite[] => {
     if (action !== 'create' || userLoras.length === 0 || !isAdmin) {
-      return models;
+      // Убираем flux-dev-lora из списка если нет пользовательских LoRA
+      return models.filter(m => m.id !== 'flux-dev-lora');
     }
 
-    // Добавляем пользовательские LoRA как "модели"
+    // Добавляем только пользовательские LoRA как "модели" (без базовой flux-dev-lora)
     const loraModels: ModelLite[] = userLoras.map(lora => ({
       id: `lora:${lora.id}`,
       displayName: lora.name,
@@ -85,17 +86,10 @@ export function ModelSelector({ action, value, onChange, onLoraSelect }: ModelSe
       action: 'create',
     }));
 
-    // Вставляем LoRA после flux-dev-lora
-    const fluxLoraIndex = models.findIndex(m => m.id === 'flux-dev-lora');
-    if (fluxLoraIndex >= 0) {
-      return [
-        ...models.slice(0, fluxLoraIndex + 1),
-        ...loraModels,
-        ...models.slice(fluxLoraIndex + 1),
-      ];
-    }
-
-    return [...loraModels, ...models];
+    // Убираем flux-dev-lora из списка и добавляем пользовательские LoRA в начало
+    const modelsWithoutFluxLora = models.filter(m => m.id !== 'flux-dev-lora');
+    
+    return [...loraModels, ...modelsWithoutFluxLora];
   }, [action, models, userLoras]);
 
   // Преобразуем модели в опции для MobileSelect
@@ -109,10 +103,6 @@ export function ModelSelector({ action, value, onChange, onLoraSelect }: ModelSe
         className: 'bg-[#573417]',
       } : model.id.startsWith('lora:') ? {
         text: 'LORA',
-        icon: <LoraIcon />,
-        className: 'bg-[#3A3A3A]',
-      } : model.id === 'flux-dev-lora' ? {
-        text: 'LoRA',
         icon: <LoraIcon />,
         className: 'bg-[#3A3A3A]',
       } : undefined,
