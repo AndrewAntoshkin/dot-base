@@ -132,7 +132,8 @@ function HomeContent() {
           const { lora } = await response.json();
           
           setSelectedLora(lora);
-          setSelectedModelId('flux-dev-lora');
+          // Сохраняем ID LoRA для отображения в селекторе
+          setSelectedModelId(newModelId);
           
           // Предзаполняем форму с данными LoRA
           const loraUrl = lora.replicate_model_url || lora.lora_url || '';

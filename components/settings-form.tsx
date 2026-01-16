@@ -730,7 +730,9 @@ export function SettingsForm({
   initialData,
   formRef,
 }: SettingsFormProps) {
-  const model = getModelById(modelId);
+  // Для LoRA моделей используем настройки flux-dev-lora
+  const actualModelId = modelId.startsWith('lora:') ? 'flux-dev-lora' : modelId;
+  const model = getModelById(actualModelId);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
