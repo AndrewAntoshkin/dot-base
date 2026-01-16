@@ -1237,19 +1237,37 @@ function LoraContent() {
                     </h2>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={startRetrainMode}
-                      className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors"
-                    >
-                      Переобучить
-                    </button>
-                    <button
-                      onClick={() => handleUseLora(selectedLora)}
-                      disabled={selectedLora.status !== 'completed'}
-                      className="h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm leading-[1.428] tracking-[-0.006em] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Попробовать
-                    </button>
+                    {selectedLora.status === 'training' || selectedLora.status === 'pending' || selectedLora.status === 'uploading' ? (
+                      <>
+                        <button
+                          onClick={() => handleSyncStatus(selectedLora)}
+                          className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors flex items-center gap-2"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Обновить
+                        </button>
+                        <div className="h-10 px-4 rounded-xl bg-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Обучается
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={startRetrainMode}
+                          className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors"
+                        >
+                          Переобучить
+                        </button>
+                        <button
+                          onClick={() => handleUseLora(selectedLora)}
+                          disabled={selectedLora.status !== 'completed'}
+                          className="h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm leading-[1.428] tracking-[-0.006em] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Попробовать
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1400,16 +1418,6 @@ function LoraContent() {
                   </div>
                 )}
 
-                {/* Sync status button for training/failed */}
-                {(selectedLora.status === 'training' || selectedLora.status === 'failed') && (
-                  <button
-                    onClick={() => handleSyncStatus(selectedLora)}
-                    className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors flex items-center justify-center gap-2"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Обновить статус
-                  </button>
-                )}
               </div>
             ) : (
               <div className="flex items-center justify-center min-h-[660px] px-20">
@@ -1827,19 +1835,37 @@ function LoraContent() {
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={startRetrainMode}
-                    className="flex-1 h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors"
-                  >
-                    Переобучить
-                  </button>
-                  <button
-                    onClick={() => handleUseLora(selectedLora)}
-                    disabled={selectedLora.status !== 'completed'}
-                    className="flex-1 h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm leading-[1.428] tracking-[-0.006em] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Попробовать
-                  </button>
+                  {selectedLora.status === 'training' || selectedLora.status === 'pending' || selectedLora.status === 'uploading' ? (
+                    <>
+                      <button
+                        onClick={() => handleSyncStatus(selectedLora)}
+                        className="flex-1 h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Обновить
+                      </button>
+                      <div className="flex-1 h-10 px-4 rounded-xl bg-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Обучается
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={startRetrainMode}
+                        className="flex-1 h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white leading-[1.428] tracking-[-0.006em] hover:bg-[#1f1f1f] transition-colors"
+                      >
+                        Переобучить
+                      </button>
+                      <button
+                        onClick={() => handleUseLora(selectedLora)}
+                        disabled={selectedLora.status !== 'completed'}
+                        className="flex-1 h-10 px-4 rounded-xl bg-white text-black font-inter font-medium text-sm leading-[1.428] tracking-[-0.006em] hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Попробовать
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1969,16 +1995,6 @@ function LoraContent() {
                 </div>
               )}
 
-              {/* Sync status button for training/failed */}
-              {(selectedLora.status === 'training' || selectedLora.status === 'failed') && (
-                <button
-                  onClick={() => handleSyncStatus(selectedLora)}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter font-medium text-sm text-white tracking-[-0.084px] hover:bg-[#1f1f1f] transition-colors flex items-center justify-center gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Обновить статус
-                </button>
-              )}
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center">
