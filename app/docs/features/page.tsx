@@ -69,6 +69,14 @@ const FEATURES = [
     models: ['Clarity Upscaler', 'Real-ESRGAN', 'Recraft Crisp'],
     href: '/',
   },
+  {
+    id: 'flow',
+    name: 'Flow',
+    description: 'Визуальный конструктор AI-пайплайнов',
+    fullDescription: 'Создавайте цепочки генераций: Текст → Изображение → Видео. Соединяйте блоки на канвасе и автоматизируйте процесс создания контента.',
+    models: ['Все модели Image', 'Все модели Video', 'Gemini'],
+    href: '/flow',
+  },
 ];
 
 const TABLE_OF_CONTENTS = [
@@ -160,6 +168,11 @@ export default function FeaturesPage() {
               <td className="py-3 pr-4 text-sm font-medium text-white font-inter">Upscale</td>
               <td className="py-3 pr-4 text-sm text-[#959595] font-inter">Изображение</td>
               <td className="py-3 text-sm text-[#959595] font-inter">Увеличенное изображение</td>
+            </tr>
+            <tr className="border-b border-[#4e4e4e]">
+              <td className="py-3 pr-4 text-sm font-medium text-white font-inter">Flow</td>
+              <td className="py-3 pr-4 text-sm text-[#959595] font-inter">Текст / Изображения</td>
+              <td className="py-3 text-sm text-[#959595] font-inter">Цепочка: Текст → Изображение → Видео</td>
             </tr>
           </tbody>
         </table>

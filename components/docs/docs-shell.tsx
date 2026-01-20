@@ -213,6 +213,7 @@ const SIDEBAR_SECTIONS: DocNavSection[] = [
       { id: 'func-upscale', title: 'Upscale', href: '/docs/features/upscale', icon: <ArrowUpRight className="w-4 h-4" /> },
       { id: 'func-remove-bg', title: 'Remove BG', href: '/docs/features/remove-bg', icon: <Scissors className="w-4 h-4" /> },
       { id: 'func-edit', title: 'Edit', href: '/docs/features/edit', icon: <Edit3 className="w-4 h-4" /> },
+      { id: 'func-flow', title: 'Flow', href: '/docs/features/flow', icon: <Layers className="w-4 h-4" />, badge: 'NEW' },
     ]
   },
   {

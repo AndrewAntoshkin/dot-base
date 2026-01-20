@@ -55,6 +55,15 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        'pulse-glow': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.6' },
+        },
+      },
+      animation: {
+        'pulse-glow': 'pulse-glow 1.5s ease-in-out infinite',
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

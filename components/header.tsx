@@ -89,6 +89,7 @@ const NAV_ITEMS = [
   { href: '/brainstorm', label: 'Brainstorm', description: 'Сравнение моделей на одном промпте. Сгенерируйте изображение сразу на нескольких моделях и сравните результаты на холсте.' },
   { href: '/inpaint', label: 'Inpaint', description: 'Редактирование части изображения. Выделите область и замените её на что-то новое по описанию.' },
   { href: '/expand', label: 'Outpaint', description: 'Расширение границ изображения. Добавьте контент за пределами исходной картинки.' },
+  { href: '/flow', label: 'Flow', description: 'Визуальный конструктор AI-пайплайнов. Создавайте цепочки из блоков: Текст → Изображение → Видео.' },
   { href: '/lora', label: 'LoRA', description: 'Обучение и использование кастомных LoRA моделей. Создайте свой уникальный стиль на основе ваших изображений.' },
 ];
 
@@ -243,7 +244,7 @@ export function Header() {
   }, [isMobileMenuOpen]);
 
   // Get current mode based on pathname
-  const currentMode = pathname === '/video' ? 'video' : pathname === '/keyframes' ? 'keyframes' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : pathname === '/expand' ? 'expand' : pathname === '/lora' ? 'lora' : 'image';
+  const currentMode = pathname === '/video' ? 'video' : pathname === '/keyframes' ? 'keyframes' : pathname === '/analyze' ? 'analyze' : pathname === '/brainstorm' ? 'brainstorm' : pathname === '/inpaint' ? 'inpaint' : pathname === '/expand' ? 'expand' : pathname === '/flow' ? 'flow' : pathname === '/lora' ? 'lora' : 'image';
   
   // isAdmin теперь приходит из UserContext (роль загружается из БД)
   
@@ -547,6 +548,17 @@ export function Header() {
               }`}
             >
               OUTPAINT
+            </Link>
+            
+            {/* FLOW */}
+            <Link
+              href="/flow"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`px-4 py-3 rounded-[16px] font-inter font-medium text-[20px] leading-[24px] text-white flex items-center gap-2 ${
+                currentMode === 'flow' ? 'bg-black' : ''
+              }`}
+            >
+              FLOW
             </Link>
             
             {/* LORA - only for admins */}
