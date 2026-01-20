@@ -16,7 +16,7 @@ import { FlowTextNode } from './flow-text-node';
 import { FlowImageNode } from './flow-image-node';
 import { FlowVideoNode } from './flow-video-node';
 import { FlowBlockModal } from './flow-block-modal';
-import { Plus, Minus, ChevronDown, Clock, Magnet } from 'lucide-react';
+import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -51,6 +51,7 @@ function FlowCanvasInner() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSectionDropdownOpen, setIsSectionDropdownOpen] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(true); // Snap to grid enabled by default
+  const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   
   const {
     nodes,
@@ -88,6 +89,61 @@ function FlowCanvasInner() {
     if (viewport.x !== 0 || viewport.y !== 0 || viewport.zoom !== 1) {
       setViewport(viewport);
     }
+  }, []);
+
+  // Polling для обновления статуса нодов с активными генерациями
+  useEffect(() => {
+    const activeNodes = nodes.filter(n => 
+      n.data.status === 'running' || n.data.status === 'processing'
+    );
+    
+    if (activeNodes.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      for (const node of activeNodes) {
+        // Если у нода есть generation_id, проверяем статус через API
+        if (node.data.generationId) {
+          try {
+            const response = await fetch(`/api/generations/${node.data.generationId}`);
+            if (response.ok) {
+              const gen = await response.json();
+              const { updateNodeData } = useFlowStore.getState();
+              
+              if (gen.status === 'completed' && gen.output_urls?.[0]) {
+                updateNodeData(node.id, {
+                  status: 'completed',
+                  outputUrl: gen.output_urls[0],
+                  outputType: node.data.blockType === 'video' ? 'video' : 'image',
+                });
+              } else if (gen.status === 'failed') {
+                updateNodeData(node.id, {
+                  status: 'failed',
+                  errorMessage: gen.error_message || 'Генерация не удалась',
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Error polling generation status:', error);
+          }
+        }
+      }
+    }, 5000); // Poll каждые 5 секунд
+
+    return () => clearInterval(pollInterval);
+  }, [nodes]);
+
+  // Проверка, нужно ли показывать приветственное сообщение
+  useEffect(() => {
+    const isWelcomeMessageHidden = localStorage.getItem('flow-welcome-message-hidden');
+    if (!isWelcomeMessageHidden) {
+      setShowWelcomeMessage(true);
+    }
+  }, []);
+
+  // Обработчик закрытия приветственного сообщения
+  const handleCloseWelcomeMessage = useCallback(() => {
+    setShowWelcomeMessage(false);
+    localStorage.setItem('flow-welcome-message-hidden', 'true');
   }, []);
 
   const handleZoomIn = useCallback(() => zoomIn(), [zoomIn]);
@@ -382,6 +438,37 @@ function FlowCanvasInner() {
             </span>
           </div>
         </Panel>
+
+        {/* Welcome message - bottom center, below flow controls */}
+        {showWelcomeMessage && (
+          <Panel position="bottom-center" className="!mb-20">
+            <div className="flex items-center gap-6 px-4 py-2 rounded-xl bg-[#212121] border border-transparent">
+              {/* Icon */}
+              <div className="flex-shrink-0">
+                <GitBranch className="w-5 h-5 text-white" />
+              </div>
+              
+              {/* Text content */}
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm text-white leading-[1.286em]">
+                  Тестируем новый функционал FLOW.
+                </p>
+                <p className="text-xs text-[#959595] leading-[1.5em]">
+                  По всем неточностям и доработкам пишите в группу в Telegram
+                </p>
+              </div>
+              
+              {/* Close button */}
+              <button
+                onClick={handleCloseWelcomeMessage}
+                className="flex-shrink-0 w-6 h-6 rounded-full hover:bg-[#2a2a2a] transition-colors flex items-center justify-center"
+                aria-label="Закрыть"
+              >
+                <X className="w-4 h-4 text-[#7E7E7E]" strokeWidth={1.8} />
+              </button>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
 
       {/* Block creation modal */}

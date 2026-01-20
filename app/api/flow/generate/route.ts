@@ -232,11 +232,11 @@ export async function POST(request: NextRequest) {
       
       const { prediction } = await replicateClient.run(runOptions);
 
-      // Обновляем генерацию с prediction ID
+      // Обновляем генерацию с prediction ID (используем правильное имя колонки)
       await supabase
         .from('generations')
         .update({
-          prediction_id: prediction.id,
+          replicate_prediction_id: prediction.id,
           status: 'processing',
         })
         .eq('id', generation.id);

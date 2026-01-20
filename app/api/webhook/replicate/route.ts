@@ -385,6 +385,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to save result' }, { status: 500 });
     }
 
+    // Update Flow nodes if this generation is linked to a flow node
+    try {
+      const { data: flowNodes } = await supabase
+        .from('flow_nodes')
+        .select('id, status')
+        .eq('generation_id', generation.id);
+      
+      if (flowNodes && flowNodes.length > 0) {
+        const nodeStatus = updateData.status === 'completed' ? 'completed' : 
+                          updateData.status === 'failed' ? 'failed' : 'processing';
+        
+        for (const node of flowNodes) {
+          await supabase
+            .from('flow_nodes')
+            .update({
+              status: nodeStatus,
+              error_message: updateData.status === 'failed' ? updateData.error_message : null,
+            })
+            .eq('id', node.id);
+        }
+        
+        logger.debug(`Updated ${flowNodes.length} flow node(s) for generation ${generation.id}`);
+      }
+    } catch (flowError: any) {
+      // Log but don't fail - flow node update is not critical
+      logger.warn('Failed to update flow nodes:', flowError.message);
+    }
+
     // Handle keyframe segment completion - start next segment or merge
     if (generation.is_keyframe_segment && updateData.status === 'completed') {
       logger.info('Keyframe segment completed, checking for next...', generation.id);

@@ -417,7 +417,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           outputType: node.data.blockType === 'video' ? 'video' : 'image',
         });
       } else if (result.success) {
-        // For production with webhook, keep running status
+        // For production with webhook, keep running status and store generationId for polling
+        updateNodeData(nodeId, {
+          status: 'running' as FlowNodeStatus,
+          generationId: result.generationId,
+        });
         console.log('Generation started, waiting for webhook:', result.generationId);
       }
       
