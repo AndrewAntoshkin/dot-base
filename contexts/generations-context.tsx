@@ -173,12 +173,26 @@ export function GenerationsProvider({ children, isAuthenticated = true }: Genera
       // На медленном соединении пропускаем sync чтобы не блокировать UI
       if (hasActiveRef.current && !isSlow) {
         try {
-          await fetchWithTimeout('/api/generations/sync-status', {
-            method: 'POST',
-            timeout: syncTimeout,
-            retries: 0,
-            credentials: 'include',
+          // Проверяем, есть ли генерации, которые долго в статусе processing
+          // (возможно, вебхук не обработался)
+          const now = Date.now();
+          const longRunningGenerations = generations.filter(g => {
+            if (g.status !== 'pending' && g.status !== 'processing') return false;
+            const createdAt = new Date(g.created_at).getTime();
+            const ageMinutes = (now - createdAt) / 60000;
+            // Синхронизируем чаще для генераций старше 2 минут
+            return ageMinutes > 2;
           });
+          
+          // Если есть долго работающие генерации - синхронизируем чаще
+          if (longRunningGenerations.length > 0) {
+            await fetchWithTimeout('/api/generations/sync-status', {
+              method: 'POST',
+              timeout: syncTimeout,
+              retries: 0,
+              credentials: 'include',
+            });
+          }
         } catch (syncError) {
           // Игнорируем ошибки sync - продолжаем получать список
           console.error('[Generations] Sync error:', syncError);

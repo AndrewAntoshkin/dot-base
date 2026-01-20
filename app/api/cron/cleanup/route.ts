@@ -56,13 +56,36 @@ export async function GET(request: NextRequest) {
         if (gen.replicate_prediction_id) {
           try {
             const prediction = await replicateClient.getPrediction(gen.replicate_prediction_id);
+            
+            // Если генерация завершилась - обновляем статус
             if (prediction.status === 'succeeded') {
+              // Для успешных генераций нужно сохранить медиа, но в cron это может быть долго
+              // Поэтому просто обновляем статус и URL - медиа сохранится при следующем sync
+              const output = prediction.output;
+              let outputUrls: string[] = [];
+              
+              if (typeof output === 'string' && (output.startsWith('http://') || output.startsWith('https://'))) {
+                outputUrls = [output];
+              } else if (Array.isArray(output)) {
+                outputUrls = output.filter((url: any) => 
+                  typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))
+                );
+              }
+              
               updateData = {
                 status: 'completed',
-                output_urls: Array.isArray(prediction.output) ? prediction.output : [prediction.output],
+                output_urls: outputUrls.length > 0 ? outputUrls : (Array.isArray(output) ? output : [output]),
+                completed_at: new Date().toISOString(),
+              };
+            } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
+              // Если генерация провалилась - обновляем статус
+              updateData = {
+                status: prediction.status === 'canceled' ? 'cancelled' : 'failed',
+                error_message: prediction.error || 'Генерация не удалась',
                 completed_at: new Date().toISOString(),
               };
             }
+            // Если статус всё ещё 'starting' или 'processing' - оставляем как есть
           } catch {}
         }
         

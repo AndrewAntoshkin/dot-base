@@ -42,25 +42,26 @@ export function LimitToastProvider({ children }: { children: ReactNode }) {
     g => g.status === 'pending' || g.status === 'processing'
   ).length;
   
-  // Track when we go from limit (5) to below limit
+  // Track when we go from limit to below limit (лимит временно убран, но оставляем логику для совместимости)
   useEffect(() => {
     if (previousActiveCount === null) {
       setPreviousActiveCount(activeCount);
       return;
     }
     
-    // If we were at limit (5) and now we're below
-    if (wasAtLimit && activeCount < 5) {
-      setWasAtLimit(false);
-      showReadyToast();
-    }
+    // If we were at limit and now we're below (проверка убрана, так как лимит временно отключен)
+    // if (wasAtLimit && activeCount < 5) {
+    //   setWasAtLimit(false);
+    //   showReadyToast();
+    // }
     
     setPreviousActiveCount(activeCount);
   }, [activeCount, previousActiveCount, wasAtLimit]);
   
   const showLimitToast = useCallback((message?: string) => {
     const id = `limit-${Date.now()}`;
-    const defaultMessage = 'Достигнут лимит (5 генераций). Дождитесь завершения текущих генераций.';
+    // Лимит временно убран, но оставляем обработку для совместимости со старыми версиями API
+    const defaultMessage = message || 'Достигнут лимит одновременных генераций. Дождитесь завершения текущих генераций.';
     
     setToasts(prev => {
       // Don't show duplicate limit toasts

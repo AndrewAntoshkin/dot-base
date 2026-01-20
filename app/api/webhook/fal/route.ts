@@ -169,14 +169,31 @@ export async function POST(request: NextRequest) {
         updateData.status = 'failed';
         updateData.error_message = 'Не удалось получить результат генерации';
       } else {
-        // Save media to storage
-        const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(mediaUrls, generation.id);
-        
+        // Асинхронное сохранение медиа - не блокируем вебхук
+        // Сначала обновляем статус с временными URL от Fal.ai
         updateData.status = 'completed';
-        updateData.output_urls = savedUrls.length > 0 ? savedUrls : mediaUrls;
-        updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+        updateData.output_urls = mediaUrls;
+        updateData.output_thumbs = null;
         
         logger.info('[Fal Webhook] Generation completed:', generation.id, 'URLs:', updateData.output_urls);
+        
+        // Сохраняем медиа в фоне (не ждём завершения)
+        saveGenerationMedia(mediaUrls, generation.id)
+          .then(({ urls: savedUrls, thumbs: savedThumbs }) => {
+            if (savedUrls.length > 0) {
+              // Обновляем с сохранёнными URL
+              return (supabase.from('generations') as any)
+                .update({
+                  output_urls: savedUrls,
+                  output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
+                })
+                .eq('id', generation.id);
+            }
+          })
+          .catch((error: any) => {
+            // Логируем ошибку, но не меняем статус - генерация уже completed
+            logger.error('[Fal Webhook] Background media save failed:', generation.id, error.message);
+          });
         
         // Deduct credits
         try {

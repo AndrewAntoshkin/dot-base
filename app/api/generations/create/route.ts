@@ -24,7 +24,8 @@ const createGenerationSchema = z.object({
   workspace_id: z.string().nullish(),
 });
 
-const MAX_CONCURRENT_GENERATIONS = 5;
+// Временно убран лимит на одновременные генерации
+// const MAX_CONCURRENT_GENERATIONS = 5;
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,24 +74,25 @@ export async function POST(request: NextRequest) {
       workspaceId = userWorkspaceIds[0];
     }
 
+    // Временно убрана проверка лимита на одновременные генерации
     // Check concurrent limit
-    const { count: activeCount } = await supabase
-      .from('generations')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .in('status', ['pending', 'processing']);
-    
-    if (activeCount !== null && activeCount >= MAX_CONCURRENT_GENERATIONS) {
-      return NextResponse.json(
-        { 
-          error: `Достигнут лимит одновременных генераций (${MAX_CONCURRENT_GENERATIONS}). Дождитесь завершения текущих генераций.`,
-          code: 'CONCURRENT_LIMIT_EXCEEDED',
-          activeCount,
-          limit: MAX_CONCURRENT_GENERATIONS,
-        },
-        { status: 429 }
-      );
-    }
+    // const { count: activeCount } = await supabase
+    //   .from('generations')
+    //   .select('id', { count: 'exact', head: true })
+    //   .eq('user_id', userId)
+    //   .in('status', ['pending', 'processing']);
+    // 
+    // if (activeCount !== null && activeCount >= MAX_CONCURRENT_GENERATIONS) {
+    //   return NextResponse.json(
+    //     { 
+    //       error: `Достигнут лимит одновременных генераций (${MAX_CONCURRENT_GENERATIONS}). Дождитесь завершения текущих генераций.`,
+    //       code: 'CONCURRENT_LIMIT_EXCEEDED',
+    //       activeCount,
+    //       limit: MAX_CONCURRENT_GENERATIONS,
+    //     },
+    //     { status: 429 }
+    //   );
+    // }
 
     // Get model config
     const model = getModelById(validatedData.model_id);

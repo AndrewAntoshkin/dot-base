@@ -290,18 +290,44 @@ export async function POST(request: NextRequest) {
           updateData.status = 'failed';
           updateData.error_message = 'Не удалось получить результат генерации';
         } else {
-          const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(replicateUrls, generation.id);
-          
-          // Для keyframe сегментов: если не удалось сохранить медиа - это критическая ошибка
-          // Временные URL Replicate истекут до merge и всё сломается
-          if (generation.is_keyframe_segment && savedUrls.length === 0) {
-            updateData.status = 'failed';
-            updateData.error_message = 'Не удалось сохранить видео сегмента. Попробуйте снова.';
-            logger.error('Keyframe segment media save failed:', generation.id);
+          // Для keyframe сегментов: сохраняем синхронно (критично для merge)
+          // Для остальных: сохраняем асинхронно чтобы не блокировать вебхук
+          if (generation.is_keyframe_segment) {
+            const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(replicateUrls, generation.id);
+            
+            if (savedUrls.length === 0) {
+              updateData.status = 'failed';
+              updateData.error_message = 'Не удалось сохранить видео сегмента. Попробуйте снова.';
+              logger.error('Keyframe segment media save failed:', generation.id);
+            } else {
+              updateData.status = 'completed';
+              updateData.output_urls = savedUrls;
+              updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+            }
           } else {
+            // Асинхронное сохранение медиа - не блокируем вебхук
+            // Сначала обновляем статус с временными URL от Replicate
             updateData.status = 'completed';
-            updateData.output_urls = savedUrls.length > 0 ? savedUrls : replicateUrls;
-            updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+            updateData.output_urls = replicateUrls;
+            updateData.output_thumbs = null;
+            
+            // Сохраняем медиа в фоне (не ждём завершения)
+            saveGenerationMedia(replicateUrls, generation.id)
+              .then(({ urls: savedUrls, thumbs: savedThumbs }) => {
+                if (savedUrls.length > 0) {
+                  // Обновляем с сохранёнными URL
+                  return (supabase.from('generations') as any)
+                    .update({
+                      output_urls: savedUrls,
+                      output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
+                    })
+                    .eq('id', generation.id);
+                }
+              })
+              .catch((error: any) => {
+                // Логируем ошибку, но не меняем статус - генерация уже completed
+                logger.error('Background media save failed:', generation.id, error.message);
+              });
           }
         }
       }

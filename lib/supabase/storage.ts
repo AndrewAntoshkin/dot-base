@@ -108,8 +108,9 @@ export async function saveMediaToStorage(
     const retryDelay = isLikelyVideo ? 3000 : 2000;
     const fetchTimeout = isLikelyVideo ? 60000 : 30000; // 60s для видео
     
-    // Начальная задержка для пропагации CDN (особенно важно для видео)
-    const initialDelay = isLikelyVideo ? 3000 : 1000;
+    // Уменьшена начальная задержка для ускорения обработки
+    // CDN обычно готов быстрее, а ретраи помогут если нет
+    const initialDelay = isLikelyVideo ? 1000 : 500;
     logger.debug(`Waiting ${initialDelay}ms for CDN propagation before fetching media ${index}...`);
     await new Promise(resolve => setTimeout(resolve, initialDelay));
 
