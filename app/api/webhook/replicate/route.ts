@@ -387,8 +387,7 @@ export async function POST(request: NextRequest) {
 
     // Update Flow nodes if this generation is linked to a flow node
     try {
-      const { data: flowNodes } = await supabase
-        .from('flow_nodes')
+      const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
         .select('id, status')
         .eq('generation_id', generation.id);
       
@@ -397,8 +396,7 @@ export async function POST(request: NextRequest) {
                           updateData.status === 'failed' ? 'failed' : 'processing';
         
         for (const node of flowNodes) {
-          await supabase
-            .from('flow_nodes')
+          await (supabase.from('flow_nodes') as any)
             .update({
               status: nodeStatus,
               error_message: updateData.status === 'failed' ? updateData.error_message : null,
