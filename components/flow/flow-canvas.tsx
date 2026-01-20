@@ -127,7 +127,7 @@ function FlowCanvasInner() {
           }
         }
       }
-    }, 5000); // Poll каждые 5 секунд
+    }, 3000); // Poll каждые 3 секунды для быстрого обновления
 
     return () => clearInterval(pollInterval);
   }, [nodes]);

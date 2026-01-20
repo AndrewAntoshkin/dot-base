@@ -128,15 +128,15 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={(e) => {
         // Don't hide if moving to plus icons or settings bar
-        const relatedTarget = e.relatedTarget as HTMLElement;
-        if (!relatedTarget) {
+        const relatedTarget = e.relatedTarget;
+        if (!relatedTarget || !(relatedTarget instanceof Node)) {
           setIsHovered(false);
           setOpenDropdown(null);
           return;
         }
         // Check if related target is within our expanded hover area
         const container = e.currentTarget;
-        if (!container.contains(relatedTarget)) {
+        if (container instanceof Node && !container.contains(relatedTarget)) {
           setIsHovered(false);
           setOpenDropdown(null);
         }

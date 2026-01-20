@@ -152,13 +152,13 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={(e) => {
-        const relatedTarget = e.relatedTarget as HTMLElement;
-        if (!relatedTarget) {
+        const relatedTarget = e.relatedTarget;
+        if (!relatedTarget || !(relatedTarget instanceof Node)) {
           setIsHovered(false);
           return;
         }
         const container = e.currentTarget;
-        if (!container.contains(relatedTarget)) {
+        if (container instanceof Node && !container.contains(relatedTarget)) {
           setIsHovered(false);
         }
       }}

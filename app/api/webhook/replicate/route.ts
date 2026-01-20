@@ -395,16 +395,35 @@ export async function POST(request: NextRequest) {
         const nodeStatus = updateData.status === 'completed' ? 'completed' : 
                           updateData.status === 'failed' ? 'failed' : 'processing';
         
+        // Prepare update data with output URL for completed generations
+        const nodeUpdateData: any = {
+          status: nodeStatus,
+          error_message: updateData.status === 'failed' ? updateData.error_message : null,
+        };
+        
+        // If completed, also update output_url for immediate display
+        if (updateData.status === 'completed' && updateData.output_urls?.[0]) {
+          nodeUpdateData.output_url = updateData.output_urls[0];
+          // Determine output type based on action
+          if (generation.action?.startsWith('video_')) {
+            nodeUpdateData.output_type = 'video';
+          } else if (generation.action?.startsWith('analyze_')) {
+            nodeUpdateData.output_type = 'text';
+          } else {
+            nodeUpdateData.output_type = 'image';
+          }
+        }
+        
         for (const node of flowNodes) {
           await (supabase.from('flow_nodes') as any)
-            .update({
-              status: nodeStatus,
-              error_message: updateData.status === 'failed' ? updateData.error_message : null,
-            })
+            .update(nodeUpdateData)
             .eq('id', node.id);
         }
         
-        logger.debug(`Updated ${flowNodes.length} flow node(s) for generation ${generation.id}`);
+        logger.debug(`Updated ${flowNodes.length} flow node(s) for generation ${generation.id}`, {
+          status: nodeStatus,
+          hasOutput: !!nodeUpdateData.output_url
+        });
       }
     } catch (flowError: any) {
       // Log but don't fail - flow node update is not critical

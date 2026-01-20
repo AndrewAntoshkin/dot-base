@@ -160,8 +160,13 @@ export async function POST(request: NextRequest) {
       }
     }
     // Single I2V mode: just one image
-    else if (inputImage && (model.action.includes('i2v') || model.action === 'edit')) {
+    // Check if model supports I2V (action includes 'i2v' or model ID includes 'i2v')
+    else if (inputImage && (model.action.includes('i2v') || model.action === 'edit' || modelId.includes('i2v'))) {
       input.image = inputImage;
+      console.log('[Flow Generate] I2V mode - using image:', inputImage);
+    } else if (inputImage) {
+      // Log warning if image is provided but model doesn't support I2V
+      console.warn('[Flow Generate] Image provided but model does not support I2V:', modelId, 'action:', model.action);
     }
 
     // Добавляем референсные изображения если есть
@@ -421,8 +426,23 @@ async function handleTextGeneration(
       outputType: 'text',
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Text generation error:', error);
-    return NextResponse.json({ error: 'Text generation failed' }, { status: 500 });
+    
+    // Более понятные сообщения об ошибках
+    let errorMessage = 'Ошибка генерации текста';
+    if (error?.message) {
+      if (error.message.includes('E001') || error.message.includes('Prediction failed')) {
+        errorMessage = 'Сервис временно недоступен. Попробуйте через несколько секунд';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Превышено время ожидания. Попробуйте ещё раз';
+      } else if (error.message.includes('rate limit') || error.message.includes('429')) {
+        errorMessage = 'Слишком много запросов. Подождите немного';
+      } else if (error.message.includes('invalid') || error.message.includes('validation')) {
+        errorMessage = 'Некорректные параметры запроса';
+      }
+    }
+    
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

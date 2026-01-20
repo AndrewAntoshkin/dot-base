@@ -341,6 +341,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // Set status to running
     updateNodeData(nodeId, { status: 'running' as FlowNodeStatus });
 
+    // For video node with keyframes (2+ images): determine mode first
+    const isKeyframeMode = node.data.blockType === 'video' && connectedImages.length >= 2;
+    
     // Determine model ID based on node type
     let modelId = node.data.modelId || node.data.settings?.model;
     
@@ -359,10 +362,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
 
+    // Auto-switch T2V model to I2V if image is connected (single image, not keyframe)
+    if (node.data.blockType === 'video' && inputImageUrl && !isKeyframeMode) {
+      const t2vToI2vMap: Record<string, string> = {
+        'seedance-1.5-pro-t2v': 'seedance-1.5-pro-i2v',
+        'kling-v2.5-turbo-pro-t2v': 'kling-v2.5-turbo-pro-i2v',
+        'kling-v2.1-master-t2v': 'kling-v2.1-master-i2v',
+        'hailuo-2.3-t2v': 'hailuo-2.3-fast-i2v',
+        'hailuo-02-t2v': 'hailuo-02-i2v',
+        'wan-2.5-t2v': 'wan-2.5-i2v-fast',
+        'kling-v2.0-t2v': 'kling-v2.0-i2v',
+        'veo-3.1-fast': 'veo-3.1-fast-i2v',
+      };
+      
+      if (t2vToI2vMap[modelId]) {
+        console.log(`[Flow] Auto-switching T2V model ${modelId} to I2V ${t2vToI2vMap[modelId]} (image connected)`);
+        modelId = t2vToI2vMap[modelId];
+      }
+    }
+
     // For video node with keyframes (2+ images): use first as start, second as end
     let startImageUrl: string | undefined;
     let endImageUrl: string | undefined;
-    const isKeyframeMode = node.data.blockType === 'video' && connectedImages.length >= 2;
     
     if (isKeyframeMode) {
       // Check if frames are swapped in UI (stored in settings)

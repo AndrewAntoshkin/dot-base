@@ -43,7 +43,7 @@ const getPollingIntervals = () => {
   
   if (isSlow) {
     return {
-      active: 15000,     // 15 сек для медленного соединения
+      active: 10000,     // 10 сек для медленного соединения
       idle: 120000,      // 2 мин
       background: 300000, // 5 мин
       error: 120000,     // 2 мин
@@ -51,7 +51,7 @@ const getPollingIntervals = () => {
   }
   
   return {
-    active: 5000,       // 5 сек - быстрое соединение
+    active: 5000,       // 5 сек - быстрый polling для активных генераций
     idle: 60000,        // 60 сек
     background: 120000, // 2 мин
     error: 60000,       // 60 сек

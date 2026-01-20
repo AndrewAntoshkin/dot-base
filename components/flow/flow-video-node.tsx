@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useState, useMemo } from 'react';
+import { memo, useCallback, useState, useMemo, useEffect } from 'react';
 import { Handle, Position, useEdges, useNodes } from '@xyflow/react';
 import type { NodeProps, Node } from '@xyflow/react';
 import { ReactFlowNodeData, FlowNodeStatus } from '@/lib/flow/types';
@@ -70,11 +70,17 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
     let prompt: string | undefined;
     const images: string[] = [];
     
+    console.log('[Flow Video Node] Checking connections for node:', id, 'edges:', inputEdges.length);
+    
     for (const edge of inputEdges) {
       const sourceNode = nodes.find(n => n.id === edge.source);
-      if (!sourceNode?.data) continue;
+      if (!sourceNode?.data) {
+        console.log('[Flow Video Node] Source node not found for edge:', edge.source);
+        continue;
+      }
       
       const nodeData = sourceNode.data as ReactFlowNodeData;
+      console.log('[Flow Video Node] Source node:', edge.source, 'type:', nodeData.blockType, 'outputUrl:', nodeData.outputUrl, 'output:', nodeData.output);
       
       // Get prompt from text node
       if (nodeData.blockType === 'text' && !prompt) {
@@ -86,10 +92,14 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
         const imageUrl = nodeData.outputUrl || nodeData.output as string;
         if (imageUrl) {
           images.push(imageUrl);
+          console.log('[Flow Video Node] ✓ Found connected image:', imageUrl);
+        } else {
+          console.log('[Flow Video Node] ✗ Image node found but no outputUrl. Status:', nodeData.status, 'Full data:', nodeData);
         }
       }
     }
     
+    console.log('[Flow Video Node] Final connectedImages:', images.length, images);
     return { inheritedPrompt: prompt, connectedImages: images };
   }, [edges, nodes, id]);
   
@@ -170,6 +180,14 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
   const isI2VMode = connectedImages.length === 1;
   const availableModels = isKeyframeMode ? KEYFRAME_MODELS : (isI2VMode ? I2V_MODELS : T2V_MODELS);
   
+  // Debug logging
+  useEffect(() => {
+    if (connectedImages.length > 0) {
+      console.log('[Flow Video Node] Connected images:', connectedImages.length, connectedImages);
+      console.log('[Flow Video Node] isI2VMode:', isI2VMode, 'inheritedImageUrl:', inheritedImageUrl);
+    }
+  }, [connectedImages.length, isI2VMode, inheritedImageUrl]);
+  
   // Find current model in available models, or use first one as default
   const currentModel = availableModels.find(m => m.id === (data.settings?.model || data.modelId)) || availableModels[0];
   const currentRatio = data.settings?.aspectRatio || '16:9';
@@ -199,14 +217,14 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
       onMouseLeave={(e) => {
         // Don't hide if moving to plus icons or settings bar
         const relatedTarget = e.relatedTarget as HTMLElement;
-        if (!relatedTarget) {
+        if (!relatedTarget || !(relatedTarget instanceof Node)) {
           setIsHovered(false);
           setOpenDropdown(null);
           return;
         }
         // Check if related target is within our expanded hover area
         const container = e.currentTarget;
-        if (!container.contains(relatedTarget)) {
+        if (container instanceof Node && !container.contains(relatedTarget)) {
           setIsHovered(false);
           setOpenDropdown(null);
         }
@@ -304,6 +322,19 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
               // Only set aspect ratio if model supports it, otherwise use auto (video determines its own size)
               aspectRatio: currentModel.supportsAspectRatio ? currentRatio.replace(':', '/') : 'auto'
             }}
+            onMouseEnter={(e) => {
+              const video = e.currentTarget.querySelector('video');
+              if (video) {
+                video.play();
+              }
+            }}
+            onMouseLeave={(e) => {
+              const video = e.currentTarget.querySelector('video');
+              if (video) {
+                video.pause();
+                video.currentTime = 0;
+              }
+            }}
           >
             <video
               id={`video-${id}`}
@@ -313,13 +344,6 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
               loop
               muted
               playsInline
-              onMouseEnter={(e) => {
-                e.currentTarget.play();
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.pause();
-                e.currentTarget.currentTime = 0;
-              }}
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-100 group-hover:opacity-0 transition-opacity duration-200">
               <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
@@ -392,14 +416,22 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
         )}
         
         {/* Single image mode: show one thumbnail */}
-        {isI2VMode && inheritedImageUrl && (
-          <div className="relative w-20 h-20 rounded-lg overflow-hidden mt-3 bg-[#101010] flex-shrink-0">
-            <Image
-              src={inheritedImageUrl}
-              alt="Source image"
-              fill
-              className="object-cover"
-            />
+        {isI2VMode && (
+          <div className="mt-3">
+            {inheritedImageUrl ? (
+              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#101010] flex-shrink-0">
+                <Image
+                  src={inheritedImageUrl}
+                  alt="Source image"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#101010] flex-shrink-0 flex items-center justify-center border border-dashed border-[#333]">
+                <span className="text-[10px] text-[#666] text-center px-2">Ожидание картинки...</span>
+              </div>
+            )}
           </div>
         )}
 
