@@ -1,21 +1,25 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
+import Image from 'next/image';
 
 interface NodeAuthorBadgeProps {
   email?: string;
+  avatarUrl?: string;
   className?: string;
 }
 
 /**
  * Компонент отображения автора ноды
- * По дизайну Figma: аватар с инициалами + email
+ * По дизайну Figma: квадратный аватар 24x24 (borderRadius 8px) + email
  */
-function NodeAuthorBadgeComponent({ email, className = '' }: NodeAuthorBadgeProps) {
+function NodeAuthorBadgeComponent({ email, avatarUrl, className = '' }: NodeAuthorBadgeProps) {
+  const [imageError, setImageError] = useState(false);
+  
   // Не показываем если нет email
   if (!email) return null;
 
-  // Получаем инициалы из email
+  // Получаем инициалы из email для fallback
   const initials = useMemo(() => {
     if (!email) return '??';
     const parts = email.split('@')[0];
@@ -26,28 +30,42 @@ function NodeAuthorBadgeComponent({ email, className = '' }: NodeAuthorBadgeProp
     return parts[0]?.toUpperCase() || '??';
   }, [email]);
 
+  // Показываем картинку если есть avatarUrl и нет ошибки загрузки
+  const showImage = avatarUrl && !imageError;
+
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
-      {/* Аватар с инициалами */}
+      {/* Аватар - квадратный со скруглением */}
       <div 
-        className="flex items-center justify-center rounded-full"
+        className="flex items-center justify-center overflow-hidden"
         style={{
           width: 24,
           height: 24,
-          backgroundColor: '#7357FF',
-          border: '1.5px solid #101010',
+          borderRadius: 8,
+          backgroundColor: showImage ? 'transparent' : '#7357FF',
         }}
       >
-        <span 
-          className="text-white text-center select-none"
-          style={{
-            fontSize: 9,
-            fontWeight: 600,
-            lineHeight: '12px',
-          }}
-        >
-          {initials}
-        </span>
+        {showImage ? (
+          <Image
+            src={avatarUrl}
+            alt={email}
+            width={24}
+            height={24}
+            className="object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <span 
+            className="text-white text-center select-none"
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              lineHeight: '12px',
+            }}
+          >
+            {initials}
+          </span>
+        )}
       </div>
       
       {/* Email */}
