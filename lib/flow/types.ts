@@ -48,6 +48,10 @@ export interface FlowNodeData {
   
   // UI state
   isSettingsOpen?: boolean;
+  
+  // Автор ноды (для коллаборации)
+  createdBy?: string;       // user_id автора
+  createdByEmail?: string;  // email автора для отображения
 }
 
 export interface Flow {
@@ -78,6 +82,8 @@ export interface FlowNode {
   status: FlowNodeStatus;
   error_message?: string;
   generation_id?: string;
+  created_by?: string;       // user_id автора
+  created_by_email?: string; // email автора
   created_at: string;
   updated_at: string;
 }
@@ -115,6 +121,8 @@ export function dbNodeToReactFlow(node: FlowNode): import('@xyflow/react').Node<
       status: node.status as FlowNodeStatus,
       errorMessage: node.error_message,
       generationId: node.generation_id,
+      createdBy: node.created_by,
+      createdByEmail: node.created_by_email,
     },
     width: node.width ?? undefined,
     height: node.height ?? undefined,

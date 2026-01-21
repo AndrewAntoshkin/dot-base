@@ -8,6 +8,7 @@ import { useFlowStore } from '@/lib/flow/store';
 import { cn } from '@/lib/utils';
 import { Loader2, Plus, FileText, Play, ImagePlus, X, Video, Copy, Check } from 'lucide-react';
 import Image from 'next/image';
+import { NodeAuthorBadge } from './node-author-badge';
 
 type FlowTextNodeType = Node<ReactFlowNodeData, 'flow-text'>;
 
@@ -168,6 +169,13 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
         pointerEvents: 'auto'
       }}
     >
+      {/* Author badge - показываем сверху ноды */}
+      {data.createdByEmail && (
+        <div className="mb-1.5 flex justify-center">
+          <NodeAuthorBadge email={data.createdByEmail} />
+        </div>
+      )}
+
       {/* Main block */}
       <div
         className={cn(

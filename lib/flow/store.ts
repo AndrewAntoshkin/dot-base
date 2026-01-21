@@ -264,6 +264,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           outputType: node.output_type || node.data?.outputType,
           outputText: node.data?.outputText,
           settings: node.data?.settings || {},
+          // Автор ноды
+          createdBy: node.created_by,
+          createdByEmail: node.created_by_email,
           ...node.data,
         },
       }));

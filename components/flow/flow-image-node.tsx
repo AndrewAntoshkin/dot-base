@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Loader2, ChevronDown, Plus, ImagePlus, RefreshCw, Expand, Download, FileImage, Play, Link, X } from 'lucide-react';
 import Image from 'next/image';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
+import { NodeAuthorBadge } from './node-author-badge';
 
 type FlowImageNodeType = Node<ReactFlowNodeData, 'flow-image'>;
 
@@ -148,6 +149,13 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
         pointerEvents: 'auto'
       }}
     >
+      {/* Author badge - показываем сверху ноды */}
+      {data.createdByEmail && (
+        <div className="mb-1.5 flex justify-center">
+          <NodeAuthorBadge email={data.createdByEmail} />
+        </div>
+      )}
+
       {/* Main block */}
       <div
         className={cn(

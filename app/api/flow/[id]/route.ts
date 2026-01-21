@@ -106,15 +106,31 @@ export async function PUT(
 
     // Обновляем nodes (delete + insert)
     if (nodes !== undefined) {
+      // Сначала получаем существующие ноды, чтобы сохранить их авторов
+      const { data: existingNodes } = await supabase
+        .from('flow_nodes')
+        .select('id, created_by, created_by_email')
+        .eq('flow_id', id);
+      
+      const existingAuthors = new Map(
+        (existingNodes || []).map((n: any) => [n.id, { created_by: n.created_by, created_by_email: n.created_by_email }])
+      );
+      
       await supabase.from('flow_nodes').delete().eq('flow_id', id);
       
       if (nodes.length > 0) {
         const { error: nodesError } = await supabase
           .from('flow_nodes')
-          .insert(nodes.map((node: any) => ({
-            ...node,
-            flow_id: id,
-          })));
+          .insert(nodes.map((node: any) => {
+            // Если нода уже существовала - сохраняем её автора, иначе - текущий пользователь
+            const existingAuthor = existingAuthors.get(node.id);
+            return {
+              ...node,
+              flow_id: id,
+              created_by: existingAuthor?.created_by || user.id,
+              created_by_email: existingAuthor?.created_by_email || user.email,
+            };
+          }));
 
         if (nodesError) {
           console.error('Nodes insert error:', nodesError);

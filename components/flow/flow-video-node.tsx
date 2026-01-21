@@ -8,6 +8,7 @@ import { useFlowStore } from '@/lib/flow/store';
 import { cn } from '@/lib/utils';
 import { Loader2, ChevronDown, Plus, Play, RefreshCw, Expand, Download, Video as VideoIcon, Link, ArrowLeftRight } from 'lucide-react';
 import Image from 'next/image';
+import { NodeAuthorBadge } from './node-author-badge';
 
 type FlowVideoNodeType = Node<ReactFlowNodeData, 'flow-video'>;
 
@@ -236,6 +237,13 @@ function FlowVideoNodeComponent({ id, data, selected }: NodeProps<FlowVideoNodeT
         pointerEvents: 'auto'
       }}
     >
+      {/* Author badge - показываем сверху ноды */}
+      {data.createdByEmail && (
+        <div className="mb-1.5 flex justify-center">
+          <NodeAuthorBadge email={data.createdByEmail} />
+        </div>
+      )}
+
       {/* Main block */}
       <div
         className={cn(
