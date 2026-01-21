@@ -82,29 +82,34 @@ export function FlowPageClient() {
     }
   }, [setFlowId, loadFlow]);
 
-  // Создание нового flow
+  // Создание нового flow через API
   const createNewFlow = useCallback(async () => {
     if (!user) return;
 
-    const supabase = createClient();
-
     try {
-      const { data, error } = await supabase
-        .from('flows')
-        .insert({
-          user_id: user.id,
+      const response = await fetch('/api/flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: 'Без названия',
-        })
-        .select()
-        .single();
+          nodes: [],
+          edges: [],
+          viewport_x: 0,
+          viewport_y: 0,
+          viewport_zoom: 1,
+        }),
+      });
 
-      if (error) throw error;
-      if (!data) throw new Error('Failed to create flow');
+      const data = await response.json();
 
-      setFlowId(data.id);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create flow');
+      }
+
+      setFlowId(data.flow.id);
       
       // Обновляем URL
-      router.replace(`/flow?id=${data.id}`);
+      router.replace(`/flow?id=${data.flow.id}`);
 
     } catch (err) {
       console.error('Error creating flow:', err);
