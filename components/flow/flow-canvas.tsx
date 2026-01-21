@@ -233,6 +233,30 @@ function FlowCanvasInner() {
       }
     }
   }, [nodes.length, edges.length, clearFlow]);
+
+  // Handle delete flow
+  const handleDeleteFlow = useCallback(async (deleteFlowId: string, flowName: string) => {
+    if (!confirm(`Удалить Flow "${flowName}"? Это действие нельзя отменить.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/flow/${deleteFlowId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // Если удаляем текущий flow, создаём новый
+        if (deleteFlowId === flowId) {
+          clearFlow();
+        }
+        // Обновляем список
+        fetchUserFlows();
+      }
+    } catch (error) {
+      console.error('Error deleting flow:', error);
+    }
+  }, [flowId, clearFlow, fetchUserFlows]);
   
   // Handle creating a new block from the plus button
   const handleCreateBlock = useCallback(() => {
@@ -465,14 +489,14 @@ function FlowCanvasInner() {
               {isFlowSelectorOpen && !isEditingName && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsFlowSelectorOpen(false)} />
-                  <div className="absolute bottom-full mb-2 left-0 bg-[#171717] rounded-xl p-2 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] min-w-[240px] max-w-[300px] z-50">
+                  <div className="absolute bottom-full mb-2 left-0 bg-[#171717] rounded-xl p-2 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] min-w-[280px] max-w-[340px] z-50">
                     {/* New Flow button */}
                     <button 
                       onClick={handleCreateNewFlow}
                       disabled={isCreatingNew}
                       className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-[#212121] transition-colors border-b border-[#2F2F2F] mb-2"
                     >
-                      <FilePlus className="w-4 h-4 text-[#4ade80]" />
+                      <FilePlus className="w-4 h-4 text-white" />
                       <span className="text-sm text-white">Новый Flow</span>
                     </button>
 
@@ -489,16 +513,18 @@ function FlowCanvasInner() {
                         Нет сохранённых Flow
                       </p>
                     ) : (
-                      <div className="max-h-[200px] overflow-y-auto">
+                      <div className="max-h-[240px] overflow-y-auto">
                         {userFlows.map((flow) => (
-                          <button
+                          <div
                             key={flow.id}
-                            onClick={() => handleLoadFlow(flow.id)}
-                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#212121] transition-colors text-left ${
+                            className={`group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#212121] transition-colors ${
                               flow.id === flowId ? 'bg-[#212121]' : ''
                             }`}
                           >
-                            <div className="flex-1 min-w-0">
+                            <button
+                              onClick={() => handleLoadFlow(flow.id)}
+                              className="flex-1 min-w-0 text-left"
+                            >
                               <span className="text-sm text-white block truncate">
                                 {flow.name}
                               </span>
@@ -510,11 +536,21 @@ function FlowCanvasInner() {
                                   minute: '2-digit',
                                 })}
                               </span>
-                            </div>
+                            </button>
                             {flow.id === flowId && (
-                              <div className="w-2 h-2 rounded-full bg-[#4ade80]" />
+                              <div className="w-2 h-2 rounded-full bg-white flex-shrink-0" />
                             )}
-                          </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFlow(flow.id, flow.name);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded hover:bg-[#2F2F2F] transition-all flex-shrink-0"
+                              title="Удалить Flow"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-[#959595] hover:text-white" />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
