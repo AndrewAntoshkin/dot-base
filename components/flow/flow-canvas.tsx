@@ -16,6 +16,7 @@ import { FlowTextNode } from './flow-text-node';
 import { FlowImageNode } from './flow-image-node';
 import { FlowVideoNode } from './flow-video-node';
 import { FlowBlockModal } from './flow-block-modal';
+import { FlowSaveModal } from './flow-save-modal';
 import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X, Loader2, Trash2, FilePlus, Share2 } from 'lucide-react';
 import { FlowShareModal } from './flow-share-modal';
 import Link from 'next/link';
@@ -57,6 +58,7 @@ function FlowCanvasInner() {
   const [editingNameValue, setEditingNameValue] = useState('');
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   
   const {
     nodes,
@@ -181,11 +183,26 @@ function FlowCanvasInner() {
 
   // Handle saving current flow
   const handleSaveFlow = useCallback(async () => {
+    // Если нет flowId, показываем модалку для ввода названия
+    if (!flowId) {
+      setIsSaveModalOpen(true);
+      return;
+    }
     const success = await saveFlow();
     if (success) {
       console.log('Flow saved successfully');
     }
-  }, [saveFlow]);
+  }, [flowId, saveFlow]);
+
+  // Handle save from modal with name
+  const handleSaveWithName = useCallback(async (name: string) => {
+    setFlowName(name);
+    const success = await saveFlow();
+    if (success) {
+      setIsSaveModalOpen(false);
+      console.log('Flow saved successfully with name:', name);
+    }
+  }, [setFlowName, saveFlow]);
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(async (selectedFlowId: string) => {
@@ -620,6 +637,15 @@ function FlowCanvasInner() {
       <FlowShareModal 
         isOpen={isShareModalOpen} 
         onClose={() => setIsShareModalOpen(false)} 
+      />
+
+      {/* Save modal - показывается при первом сохранении */}
+      <FlowSaveModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        onSave={handleSaveWithName}
+        initialName={flowName}
+        isLoading={isSaving}
       />
     </div>
   );

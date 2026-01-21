@@ -95,9 +95,9 @@ export async function POST(request: NextRequest) {
         output_url: node.data?.outputUrl || node.output_url,
         output_type: node.data?.outputType || node.output_type,
         status: node.data?.status || node.status || 'idle',
-        // Автор ноды
-        created_by: user.id,
-        created_by_email: user.email,
+        // TODO: добавить created_by после применения миграции
+        // created_by: user.id,
+        // created_by_email: user.email,
       }));
 
       const { error: nodesError } = await supabase
