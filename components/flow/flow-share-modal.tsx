@@ -141,10 +141,7 @@ export function FlowShareModal({ isOpen, onClose }: FlowShareModalProps) {
       <div className="bg-[#171717] rounded-2xl w-full max-w-md mx-4 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[#2F2F2F]">
-          <div className="flex items-center gap-3">
-            <Users className="w-5 h-5 text-white" />
-            <h2 className="text-lg font-semibold text-white">Совместный доступ</h2>
-          </div>
+          <h2 className="text-lg font-semibold text-white">Совместный доступ</h2>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-[#212121] transition-colors"
