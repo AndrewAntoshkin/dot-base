@@ -71,6 +71,7 @@ interface FlowState {
   
   // Load flow
   loadFlow: (nodes: Node<ReactFlowNodeData>[], edges: Edge[], name: string) => void;
+  loadFlowFromServer: (flowId: string) => Promise<boolean>;
   
   // Generation
   runGeneration: (nodeId: string) => Promise<void>;
@@ -80,7 +81,14 @@ interface FlowState {
   
   // Flow management
   resetFlow: () => void;
-  saveFlow: () => Promise<void>;
+  clearFlow: () => void;
+  createNewFlow: (name?: string) => Promise<string | null>;
+  saveFlow: () => Promise<boolean>;
+  
+  // User flows list
+  userFlows: { id: string; name: string; updated_at: string }[];
+  isLoadingFlows: boolean;
+  fetchUserFlows: () => Promise<void>;
 }
 
 // Grid configuration - must match flow-canvas.tsx
@@ -90,18 +98,20 @@ const GRID_SIZE = 20;
 const snapToGrid = (value: number): number => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
 const initialState = {
-  flowId: null,
+  flowId: null as string | null,
   flowName: 'Без названия',
-  nodes: [],
-  edges: [],
+  nodes: [] as Node<ReactFlowNodeData>[],
+  edges: [] as Edge[],
   viewport: { x: 0, y: 0, zoom: 1 },
-  selectedNodeId: null,
+  selectedNodeId: null as string | null,
   isSettingsPanelOpen: false,
   isSaving: false,
   hasUnsavedChanges: false,
   isBlockModalOpen: false,
-  blockModalPosition: null,
-  screenPosition: null,
+  blockModalPosition: null as { x: number; y: number } | null,
+  screenPosition: null as { x: number; y: number } | null,
+  userFlows: [] as { id: string; name: string; updated_at: string }[],
+  isLoadingFlows: false,
 };
 
 export const useFlowStore = create<FlowState>((set, get) => ({
@@ -227,6 +237,67 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedNodeId: null,
       isSettingsPanelOpen: false,
     });
+  },
+
+  loadFlowFromServer: async (flowId) => {
+    try {
+      const response = await fetch(`/api/flow/${flowId}`);
+      if (!response.ok) {
+        console.error('Failed to load flow');
+        return false;
+      }
+
+      const data = await response.json();
+      const { flow, nodes: dbNodes, edges: dbEdges } = data;
+
+      // Convert DB nodes to React Flow nodes
+      const reactFlowNodes: Node<ReactFlowNodeData>[] = (dbNodes || []).map((node: any) => ({
+        id: node.id,
+        type: `flow-${node.block_type}`,
+        position: { x: node.position_x, y: node.position_y },
+        data: {
+          blockType: node.block_type,
+          modelId: node.model_id,
+          status: node.status || 'idle',
+          prompt: node.data?.prompt || '',
+          outputUrl: node.output_url || node.data?.outputUrl,
+          outputType: node.output_type || node.data?.outputType,
+          outputText: node.data?.outputText,
+          settings: node.data?.settings || {},
+          ...node.data,
+        },
+      }));
+
+      // Convert DB edges to React Flow edges
+      const reactFlowEdges: Edge[] = (dbEdges || []).map((edge: any) => ({
+        id: edge.id,
+        source: edge.source_node_id,
+        sourceHandle: edge.source_handle,
+        target: edge.target_node_id,
+        targetHandle: edge.target_handle,
+        type: edge.edge_type || 'default',
+      }));
+
+      set({
+        flowId,
+        flowName: flow.name,
+        nodes: reactFlowNodes,
+        edges: reactFlowEdges,
+        viewport: {
+          x: flow.viewport_x || 0,
+          y: flow.viewport_y || 0,
+          zoom: flow.viewport_zoom || 1,
+        },
+        hasUnsavedChanges: false,
+        selectedNodeId: null,
+        isSettingsPanelOpen: false,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error loading flow:', error);
+      return false;
+    }
   },
 
   runGeneration: async (nodeId) => {
@@ -465,26 +536,133 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     hasUnsavedChanges: true,
     selectedNodeId: null,
   })),
+
+  // Clear flow - reset to initial state (new empty flow)
+  clearFlow: () => set({
+    ...initialState,
+    flowId: null,
+    flowName: 'Без названия',
+    nodes: [],
+    edges: [],
+    viewport: { x: 0, y: 0, zoom: 1 },
+    hasUnsavedChanges: false,
+    selectedNodeId: null,
+    isSettingsPanelOpen: false,
+  }),
+
+  // Create new flow in database
+  createNewFlow: async (name = 'Без названия') => {
+    set({ isSaving: true });
+    
+    try {
+      const state = get();
+      
+      // Prepare nodes for API
+      const nodesForApi = state.nodes.map(node => ({
+        id: node.id,
+        block_type: node.data.blockType,
+        position_x: node.position.x,
+        position_y: node.position.y,
+        data: node.data,
+        model_id: node.data.modelId,
+        output_url: node.data.outputUrl,
+        output_type: node.data.outputType,
+        status: node.data.status,
+      }));
+
+      // Prepare edges for API
+      const edgesForApi = state.edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        sourceHandle: edge.sourceHandle,
+        target: edge.target,
+        targetHandle: edge.targetHandle,
+        type: edge.type,
+      }));
+
+      const response = await fetch('/api/flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          nodes: nodesForApi,
+          edges: edgesForApi,
+          viewport_x: state.viewport.x,
+          viewport_y: state.viewport.y,
+          viewport_zoom: state.viewport.zoom,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create flow');
+      }
+
+      const data = await response.json();
+      
+      set({
+        flowId: data.flow.id,
+        flowName: data.flow.name,
+        hasUnsavedChanges: false,
+      });
+
+      // Refresh user flows list
+      get().fetchUserFlows();
+
+      return data.flow.id;
+    } catch (error) {
+      console.error('Error creating flow:', error);
+      return null;
+    } finally {
+      set({ isSaving: false });
+    }
+  },
   
   // Save flow to server
   saveFlow: async () => {
     const state = get();
+    
+    // If no flowId, create new flow
     if (!state.flowId) {
-      console.log('No flow ID, skipping save');
-      return;
+      const newId = await get().createNewFlow(state.flowName);
+      return newId !== null;
     }
     
     set({ isSaving: true });
     
     try {
+      // Prepare nodes for API
+      const nodesForApi = state.nodes.map(node => ({
+        id: node.id,
+        block_type: node.data.blockType,
+        position_x: node.position.x,
+        position_y: node.position.y,
+        data: node.data,
+        model_id: node.data.modelId,
+        output_url: node.data.outputUrl,
+        output_type: node.data.outputType,
+        status: node.data.status,
+      }));
+
+      // Prepare edges for API
+      const edgesForApi = state.edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        sourceHandle: edge.sourceHandle,
+        target: edge.target,
+        targetHandle: edge.targetHandle,
+        type: edge.type,
+      }));
+
       const response = await fetch(`/api/flow/${state.flowId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: state.flowName,
-          nodes: state.nodes,
-          edges: state.edges,
-          viewport: state.viewport,
+          viewport_x: state.viewport.x,
+          viewport_y: state.viewport.y,
+          viewport_zoom: state.viewport.zoom,
+          nodes: nodesForApi,
+          edges: edgesForApi,
         }),
       });
       
@@ -493,10 +671,42 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
       
       set({ hasUnsavedChanges: false });
+
+      // Refresh user flows list
+      get().fetchUserFlows();
+
+      return true;
     } catch (error) {
       console.error('Error saving flow:', error);
+      return false;
     } finally {
       set({ isSaving: false });
+    }
+  },
+
+  // Fetch user's flows list
+  fetchUserFlows: async () => {
+    set({ isLoadingFlows: true });
+    
+    try {
+      const response = await fetch('/api/flow?limit=50');
+      if (!response.ok) {
+        throw new Error('Failed to fetch flows');
+      }
+
+      const data = await response.json();
+      
+      set({
+        userFlows: data.flows.map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          updated_at: f.updated_at,
+        })),
+      });
+    } catch (error) {
+      console.error('Error fetching user flows:', error);
+    } finally {
+      set({ isLoadingFlows: false });
     }
   },
 }));

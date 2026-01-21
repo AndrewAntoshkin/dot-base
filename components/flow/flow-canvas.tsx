@@ -16,7 +16,8 @@ import { FlowTextNode } from './flow-text-node';
 import { FlowImageNode } from './flow-image-node';
 import { FlowVideoNode } from './flow-video-node';
 import { FlowBlockModal } from './flow-block-modal';
-import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X } from 'lucide-react';
+import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X, Loader2, Trash2, FilePlus, Share2 } from 'lucide-react';
+import { FlowShareModal } from './flow-share-modal';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -52,21 +53,34 @@ function FlowCanvasInner() {
   const [isSectionDropdownOpen, setIsSectionDropdownOpen] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(true); // Snap to grid enabled by default
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState('');
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   
   const {
     nodes,
     edges,
     viewport,
     hasUnsavedChanges,
+    flowId,
     flowName,
+    isSaving,
+    userFlows,
+    isLoadingFlows,
     onNodesChange,
     onEdgesChange,
     onConnect,
     openBlockModal,
     selectNode,
     setViewport: setStoreViewport,
+    setFlowName,
     resetFlow,
+    clearFlow,
     saveFlow,
+    createNewFlow,
+    loadFlowFromServer,
+    fetchUserFlows,
   } = useFlowStore();
 
   // Обработка клика на пустое место
@@ -149,6 +163,59 @@ function FlowCanvasInner() {
   const handleZoomIn = useCallback(() => zoomIn(), [zoomIn]);
   const handleZoomOut = useCallback(() => zoomOut(), [zoomOut]);
   const handleFitView = useCallback(() => fitView({ padding: 0.2 }), [fitView]);
+
+  // Fetch user flows when dropdown opens
+  useEffect(() => {
+    if (isFlowSelectorOpen) {
+      fetchUserFlows();
+    }
+  }, [isFlowSelectorOpen, fetchUserFlows]);
+
+  // Handle creating new flow
+  const handleCreateNewFlow = useCallback(async () => {
+    setIsCreatingNew(true);
+    clearFlow();
+    setIsFlowSelectorOpen(false);
+    setIsCreatingNew(false);
+  }, [clearFlow]);
+
+  // Handle saving current flow
+  const handleSaveFlow = useCallback(async () => {
+    const success = await saveFlow();
+    if (success) {
+      console.log('Flow saved successfully');
+    }
+  }, [saveFlow]);
+
+  // Handle loading a flow
+  const handleLoadFlow = useCallback(async (selectedFlowId: string) => {
+    const success = await loadFlowFromServer(selectedFlowId);
+    if (success) {
+      setIsFlowSelectorOpen(false);
+    }
+  }, [loadFlowFromServer]);
+
+  // Handle name edit
+  const handleStartEditName = useCallback(() => {
+    setEditingNameValue(flowName);
+    setIsEditingName(true);
+  }, [flowName]);
+
+  const handleSaveName = useCallback(() => {
+    if (editingNameValue.trim()) {
+      setFlowName(editingNameValue.trim());
+    }
+    setIsEditingName(false);
+  }, [editingNameValue, setFlowName]);
+
+  // Handle clear/reset flow with confirmation
+  const handleClearFlow = useCallback(() => {
+    if (nodes.length > 0 || edges.length > 0) {
+      if (confirm('Очистить текущий Flow? Все несохранённые изменения будут потеряны.')) {
+        clearFlow();
+      }
+    }
+  }, [nodes.length, edges.length, clearFlow]);
   
   // Handle creating a new block from the plus button
   const handleCreateBlock = useCallback(() => {
@@ -297,20 +364,38 @@ function FlowCanvasInner() {
           </div>
         </Panel>
 
-        {/* Top-right: Reset and Save buttons */}
+        {/* Top-right: Reset, Share and Save buttons */}
         <Panel position="top-right" className="!m-4">
           <div className="flex items-center gap-1">
             <button
-              onClick={() => resetFlow?.()}
-              className="h-10 px-4 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors text-white text-sm font-medium"
+              onClick={handleClearFlow}
+              className="h-10 px-4 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors text-white text-sm font-medium flex items-center gap-2"
+              title="Очистить Flow"
             >
+              <Trash2 className="w-4 h-4" />
               Сбросить
             </button>
             <button
-              onClick={() => saveFlow?.()}
-              className="h-10 px-4 rounded-xl bg-white hover:bg-gray-100 transition-colors text-black text-sm font-medium"
+              onClick={() => setIsShareModalOpen(true)}
+              className="h-10 px-4 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors text-white text-sm font-medium flex items-center gap-2"
+              title="Поделиться Flow"
             >
-              Сохранить
+              <Share2 className="w-4 h-4" />
+              Поделиться
+            </button>
+            <button
+              onClick={handleSaveFlow}
+              disabled={isSaving}
+              className="h-10 px-4 rounded-xl bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors text-black text-sm font-medium flex items-center gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Сохранение...
+                </>
+              ) : (
+                'Сохранить'
+              )}
             </button>
           </div>
         </Panel>
@@ -331,35 +416,91 @@ function FlowCanvasInner() {
             
             {/* Flow name selector */}
             <div className="relative">
-              <button
-                onClick={() => setIsFlowSelectorOpen(!isFlowSelectorOpen)}
-                className="flex items-center gap-2 h-10 px-3 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors"
-              >
-                <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-white">
-                  {flowName || 'Без названия'}
-                </span>
-                <ChevronDown className="w-4 h-4 text-white" />
-              </button>
+              {isEditingName ? (
+                <input
+                  type="text"
+                  value={editingNameValue}
+                  onChange={(e) => setEditingNameValue(e.target.value)}
+                  onBlur={handleSaveName}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Escape') setIsEditingName(false);
+                  }}
+                  autoFocus
+                  className="h-10 px-3 rounded-xl bg-[#212121] text-white text-sm outline-none border border-white/20 min-w-[150px]"
+                  placeholder="Название Flow"
+                />
+              ) : (
+                <button
+                  onClick={() => setIsFlowSelectorOpen(!isFlowSelectorOpen)}
+                  onDoubleClick={handleStartEditName}
+                  className="flex items-center gap-2 h-10 px-3 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors"
+                  title="Двойной клик для редактирования"
+                >
+                  <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-white max-w-[150px] truncate">
+                    {flowName || 'Без названия'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-white flex-shrink-0" />
+                </button>
+              )}
               
               {/* Flow selector dropdown */}
-              {isFlowSelectorOpen && (
+              {isFlowSelectorOpen && !isEditingName && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsFlowSelectorOpen(false)} />
-                  <div className="absolute bottom-full mb-2 left-0 bg-[#171717] rounded-xl p-2 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] min-w-[200px] z-50">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#959595] px-3 py-2">
-                      Ваши Flow
-                    </p>
-                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#212121] transition-colors text-left">
-                      <span className="text-sm text-white">{flowName || 'Без названия'}</span>
-                    </button>
-                    <Link 
-                      href="/flow" 
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#212121] transition-colors"
-                      onClick={() => setIsFlowSelectorOpen(false)}
+                  <div className="absolute bottom-full mb-2 left-0 bg-[#171717] rounded-xl p-2 shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] min-w-[240px] max-w-[300px] z-50">
+                    {/* New Flow button */}
+                    <button 
+                      onClick={handleCreateNewFlow}
+                      disabled={isCreatingNew}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-[#212121] transition-colors border-b border-[#2F2F2F] mb-2"
                     >
-                      <Plus className="w-4 h-4 text-white" />
+                      <FilePlus className="w-4 h-4 text-[#4ade80]" />
                       <span className="text-sm text-white">Новый Flow</span>
-                    </Link>
+                    </button>
+
+                    <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#959595] px-3 py-2">
+                      Ваши Flow ({userFlows.length})
+                    </p>
+                    
+                    {isLoadingFlows ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                      </div>
+                    ) : userFlows.length === 0 ? (
+                      <p className="text-sm text-[#656565] px-3 py-2">
+                        Нет сохранённых Flow
+                      </p>
+                    ) : (
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {userFlows.map((flow) => (
+                          <button
+                            key={flow.id}
+                            onClick={() => handleLoadFlow(flow.id)}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#212121] transition-colors text-left ${
+                              flow.id === flowId ? 'bg-[#212121]' : ''
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-white block truncate">
+                                {flow.name}
+                              </span>
+                              <span className="text-[10px] text-[#656565]">
+                                {new Date(flow.updated_at).toLocaleDateString('ru-RU', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            {flow.id === flowId && (
+                              <div className="w-2 h-2 rounded-full bg-[#4ade80]" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -433,8 +574,9 @@ function FlowCanvasInner() {
         {/* Status indicator - bottom right */}
         <Panel position="bottom-right" className="!m-4">
           <div className="flex items-center gap-2 px-4 h-10 rounded-xl bg-[#212121]">
+            <div className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500'}`} />
             <span className="text-sm text-white">
-              {hasUnsavedChanges ? 'Несохранённые изменения' : 'Сохранено'}
+              {isSaving ? 'Сохранение...' : hasUnsavedChanges ? 'Несохранённо' : 'Сохранено'}
             </span>
           </div>
         </Panel>
@@ -473,6 +615,12 @@ function FlowCanvasInner() {
 
       {/* Block creation modal */}
       <FlowBlockModal />
+
+      {/* Share modal */}
+      <FlowShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+      />
     </div>
   );
 }
