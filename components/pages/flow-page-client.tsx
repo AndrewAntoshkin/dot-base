@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFlowStore } from '@/lib/flow/store';
 import { FlowCanvas } from '@/components/flow/flow-canvas';
+import { FlowCreateModal } from '@/components/flow/flow-create-modal';
 import { dbNodeToReactFlow, dbEdgeToReactFlow } from '@/lib/flow/types';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -16,6 +17,8 @@ export function FlowPageClient() {
   const [isUserLoading, setIsUserLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Получаем текущего пользователя
   useEffect(() => {
@@ -38,36 +41,17 @@ export function FlowPageClient() {
     reset,
   } = useFlowStore();
 
-  // Загрузка flow из БД
+  // Загрузка flow из API (обходит RLS через adminClient)
   const loadFlowFromDb = useCallback(async (id: string) => {
-    const supabase = createClient();
-
     try {
-      // Загружаем flow
-      const { data: flowData, error: flowError } = await supabase
-        .from('flows')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const response = await fetch(`/api/flow/${id}`);
+      const result = await response.json();
 
-      if (flowError) throw flowError;
-      if (!flowData) throw new Error('Flow not found');
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load flow');
+      }
 
-      // Загружаем nodes
-      const { data: nodesData, error: nodesError } = await supabase
-        .from('flow_nodes')
-        .select('*')
-        .eq('flow_id', id);
-
-      if (nodesError) throw nodesError;
-
-      // Загружаем edges
-      const { data: edgesData, error: edgesError } = await supabase
-        .from('flow_edges')
-        .select('*')
-        .eq('flow_id', id);
-
-      if (edgesError) throw edgesError;
+      const { flow: flowData, nodes: nodesData, edges: edgesData } = result;
 
       // Конвертируем в React Flow формат
       const reactFlowNodes = (nodesData || []).map(dbNodeToReactFlow);
@@ -82,16 +66,30 @@ export function FlowPageClient() {
     }
   }, [setFlowId, loadFlow]);
 
-  // Создание нового flow через API
-  const createNewFlow = useCallback(async () => {
+  // Показать модалку создания нового flow
+  const showCreateFlowModal = useCallback(() => {
+    if (!user) return;
+    setShowCreateModal(true);
+    setIsLoading(false);
+  }, [user]);
+
+  // Создание нового flow через API с данными из модалки
+  const handleCreateFlow = useCallback(async (data: {
+    name: string;
+    description: string;
+    members: { email: string; role: 'editor' | 'viewer' }[];
+  }) => {
     if (!user) return;
 
+    setIsCreating(true);
     try {
       const response = await fetch('/api/flow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'Без названия',
+          name: data.name,
+          description: data.description,
+          members: data.members,
           nodes: [],
           edges: [],
           viewport_x: 0,
@@ -100,83 +98,77 @@ export function FlowPageClient() {
         }),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create flow');
+        throw new Error(result.error || 'Failed to create flow');
       }
 
-      setFlowId(data.flow.id);
+      setFlowId(result.flow.id);
+      setShowCreateModal(false);
       
       // Обновляем URL
-      router.replace(`/flow?id=${data.flow.id}`);
+      router.replace(`/flow?id=${result.flow.id}`);
 
     } catch (err) {
       console.error('Error creating flow:', err);
       setError(err instanceof Error ? err.message : 'Failed to create flow');
+    } finally {
+      setIsCreating(false);
     }
   }, [user, setFlowId, router]);
 
-  // Сохранение flow
+  // Сохранение flow через API (обходит RLS через adminClient)
   const saveFlow = useCallback(async () => {
     const currentFlowId = useFlowStore.getState().flowId;
     if (!currentFlowId) return;
 
-    const supabase = createClient();
     const state = useFlowStore.getState();
 
     try {
-      // Обновляем flow metadata
-      await supabase
-        .from('flows')
-        .update({
+      // Подготавливаем nodes для API
+      const nodesForApi = state.nodes.map((node) => ({
+        id: node.id,
+        block_type: node.data.blockType,
+        position_x: node.position.x,
+        position_y: node.position.y,
+        width: node.width,
+        height: node.height,
+        data: node.data,
+        model_id: node.data.modelId,
+        output_url: node.data.outputUrl,
+        output_type: node.data.outputType,
+        status: node.data.status,
+        error_message: node.data.errorMessage,
+        generation_id: node.data.generationId,
+      }));
+
+      // Подготавливаем edges для API
+      const edgesForApi = state.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        sourceHandle: edge.sourceHandle,
+        target: edge.target,
+        targetHandle: edge.targetHandle,
+        type: edge.type || 'default',
+      }));
+
+      const response = await fetch(`/api/flow/${currentFlowId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: state.flowName,
           viewport_x: state.viewport.x,
           viewport_y: state.viewport.y,
           viewport_zoom: state.viewport.zoom,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', currentFlowId);
+          nodes: nodesForApi,
+          edges: edgesForApi,
+        }),
+      });
 
-      // Удаляем старые nodes и edges
-      await supabase.from('flow_nodes').delete().eq('flow_id', currentFlowId);
-      await supabase.from('flow_edges').delete().eq('flow_id', currentFlowId);
-
-      // Сохраняем nodes
-      if (state.nodes.length > 0) {
-        const nodesForDb = state.nodes.map((node) => ({
-          id: node.id,
-          flow_id: currentFlowId,
-          block_type: node.data.blockType,
-          position_x: node.position.x,
-          position_y: node.position.y,
-          width: node.width,
-          height: node.height,
-          data: node.data,
-          model_id: node.data.modelId,
-          output_url: node.data.outputUrl,
-          output_type: node.data.outputType,
-          status: node.data.status,
-          error_message: node.data.errorMessage,
-          generation_id: node.data.generationId,
-        }));
-
-        await supabase.from('flow_nodes').insert(nodesForDb);
-      }
-
-      // Сохраняем edges
-      if (state.edges.length > 0) {
-        const edgesForDb = state.edges.map((edge) => ({
-          id: edge.id,
-          flow_id: currentFlowId,
-          source_node_id: edge.source,
-          source_handle: edge.sourceHandle,
-          target_node_id: edge.target,
-          target_handle: edge.targetHandle,
-          edge_type: edge.type || 'default',
-        }));
-
-        await supabase.from('flow_edges').insert(edgesForDb);
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to save flow');
       }
 
     } catch (err) {
@@ -204,17 +196,20 @@ export function FlowPageClient() {
       setIsLoading(true);
       try {
         if (flowId) {
+          // Загружаем существующий flow
           await loadFlowFromDb(flowId);
+          setIsLoading(false);
         } else {
-          await createNewFlow();
+          // Показываем модалку для создания нового flow
+          showCreateFlowModal();
         }
-      } finally {
+      } catch {
         setIsLoading(false);
       }
     };
 
     init();
-  }, [flowId, user, isUserLoading, loadFlowFromDb, createNewFlow, router]);
+  }, [flowId, user, isUserLoading, loadFlowFromDb, showCreateFlowModal, router]);
 
   // Очистка при размонтировании
   useEffect(() => {
@@ -254,6 +249,20 @@ export function FlowPageClient() {
     <div className="h-screen w-screen overflow-hidden bg-[#050505] relative">
       {/* Canvas - contains all UI (toolbar, empty state, controls) */}
       <FlowCanvas />
+      
+      {/* Create Flow Modal */}
+      <FlowCreateModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          // Если модалка закрыта без создания, редирект на главную
+          if (!flowId) {
+            router.push('/');
+          }
+        }}
+        onSubmit={handleCreateFlow}
+        isLoading={isCreating}
+      />
     </div>
   );
 }

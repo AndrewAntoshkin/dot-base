@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, memo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/header';
 import { ChevronRight, Search } from 'lucide-react';
+import { WorkspaceFlowsKanban } from '@/components/workspace-flows-kanban';
+import type { FlowCard, FlowWorkspaceStatus } from '@/lib/flow/types';
 
 interface WorkspaceUser {
   id: string;
@@ -257,14 +259,45 @@ const CardSkeleton = memo(function CardSkeleton() {
 // Количество карточек в одной порции
 const BATCH_SIZE = 8;
 
+// Типы табов
+type TabType = 'participants' | 'flows';
+
+interface WorkspaceMember {
+  id: string;
+  email: string;
+  name?: string;
+}
+
 export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsersPageClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'flows' ? 'flows' : 'participants';
+  
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [users, setUsers] = useState<WorkspaceUser[]>([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  
+  // Flows state
+  const [flows, setFlows] = useState<Record<FlowWorkspaceStatus, FlowCard[]>>({
+    in_progress: [],
+    review: [],
+    done: [],
+    archived: [],
+  });
+  const [flowCounts, setFlowCounts] = useState<Record<FlowWorkspaceStatus, number>>({
+    in_progress: 0,
+    review: 0,
+    done: 0,
+    archived: 0,
+  });
+  const [isLoadingFlows, setIsLoadingFlows] = useState(false);
 
   // Callback для поиска - стабильная ссылка
   const handleSearch = useCallback((query: string) => {
@@ -322,6 +355,13 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
         const data = await response.json();
         setWorkspace(data.workspace);
         setUsers(data.users || []);
+        // Формируем список участников для флоу-модалки
+        const members = (data.users || []).map((u: WorkspaceUser) => ({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+        }));
+        setWorkspaceMembers(members);
       } else if (response.status === 401) {
         router.push('/login');
       }
@@ -332,9 +372,44 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
     }
   }, [workspaceId, router]);
 
+  const fetchFlows = useCallback(async () => {
+    setIsLoadingFlows(true);
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/flows`);
+      if (response.ok) {
+        const data = await response.json();
+        setFlows(data.flows);
+        setFlowCounts(data.counts);
+      }
+    } catch (error) {
+      console.error('Fetch flows error:', error);
+    } finally {
+      setIsLoadingFlows(false);
+    }
+  }, [workspaceId]);
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Подгружаем флоу при переключении на таб
+  useEffect(() => {
+    if (activeTab === 'flows') {
+      fetchFlows();
+    }
+  }, [activeTab, fetchFlows]);
+
+  const handleTabChange = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+    // Обновляем URL без перезагрузки страницы
+    const url = new URL(window.location.href);
+    if (tab === 'flows') {
+      url.searchParams.set('tab', 'flows');
+    } else {
+      url.searchParams.delete('tab');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
 
   const handleUserClick = useCallback((userId: string) => {
     // Переходим в историю с предустановленным фильтром по пользователю
@@ -389,64 +464,119 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
       <Header />
 
       <main className="flex-1 px-4 lg:px-[80px] py-6">
-        {/* Header row: Breadcrumb + Title | Search */}
-        <div className="flex items-start justify-between mb-6">
-          {/* Left: Breadcrumb + Title */}
-          <div className="flex flex-col gap-3">
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-[14px]">
-              <Link 
-                href="/workspaces" 
-                className="text-[#717171] hover:text-white transition-colors"
-              >
-                Пространства
-              </Link>
-              <ChevronRight className="w-4 h-4 text-[#4d4d4d]" />
-              <span className="text-white font-medium">{workspace?.name || 'Загрузка...'}</span>
-            </div>
-            
-            {/* Заголовок */}
-            <h1 className="font-inter font-semibold text-[20px] text-white tracking-[-0.4px] leading-[28px]">
-              Пользователи
-            </h1>
+        {/* Header row: Breadcrumb + Title */}
+        <div className="flex flex-col gap-3 mb-5">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-[14px]">
+            <Link 
+              href="/workspaces" 
+              className="text-[#717171] hover:text-white transition-colors"
+            >
+              Пространства
+            </Link>
+            <ChevronRight className="w-4 h-4 text-[#4d4d4d]" />
+            <span className="text-white font-medium">{workspace?.name || 'Загрузка...'}</span>
           </div>
-
-          {/* Right: Search field - isolated component */}
-          <SearchInput onSearch={handleSearch} />
+          
+          {/* Заголовок */}
+          <h1 className="font-inter font-semibold text-[20px] text-white tracking-[-0.4px] leading-[28px]">
+            {workspace?.name || 'Загрузка...'}
+          </h1>
         </div>
 
-        {filteredUsers.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <p className="font-inter text-[14px] text-[#6D6D6D]">
-              {searchQuery 
-                ? 'Пользователи не найдены' 
-                : 'В этом пространстве пока нет участников с генерациями'}
-            </p>
-          </div>
-        ) : (
-          /* Grid карточек пользователей - 4 колонки, gap 24px как в Figma */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {/* Загруженные карточки */}
-            {visibleUsers.map((user, index) => (
-              <UserCard
-                key={user.id}
-                user={user}
-                index={index}
-                onUserClick={handleUserClick}
-              />
-            ))}
-            
-            {/* Скелетоны для ещё не загруженных */}
-            {skeletonCount > 0 && (
-              <>
-                {Array.from({ length: skeletonCount }).map((_, i) => (
-                  <CardSkeleton key={`skeleton-${i}`} />
-                ))}
-                {/* Триггер для подгрузки следующей порции */}
-                <div ref={loadMoreRef} className="col-span-full h-1" />
-              </>
+        {/* Tabs: Участники / Флоу (с подчёркиванием как в Figma) */}
+        <div className="flex items-end gap-3 mb-6 border-b border-[#2e2e2e]">
+          <button
+            onClick={() => handleTabChange('participants')}
+            className={`flex items-center gap-2 px-0 pb-[10px] font-inter text-[14px] transition-colors relative ${
+              activeTab === 'participants'
+                ? 'font-medium text-white'
+                : 'font-normal text-[#959595] hover:text-white'
+            }`}
+          >
+            <span>Участники</span>
+            <span className="h-5 px-[6px] bg-[#2c2c2c] rounded-md flex items-center justify-center font-inter font-medium text-[10px] text-white">
+              {users.length}
+            </span>
+            {activeTab === 'participants' && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
             )}
-          </div>
+          </button>
+          <button
+            onClick={() => handleTabChange('flows')}
+            className={`flex items-center gap-2 px-0 pb-[10px] font-inter text-[14px] transition-colors relative ${
+              activeTab === 'flows'
+                ? 'font-medium text-white'
+                : 'font-normal text-[#959595] hover:text-white'
+            }`}
+          >
+            <span>Флоу</span>
+            <span className="h-5 px-[6px] bg-[#2c2c2c] rounded-md flex items-center justify-center font-inter font-medium text-[10px] text-white">
+              {Object.values(flowCounts).reduce((a, b) => a + b, 0)}
+            </span>
+            {activeTab === 'flows' && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
+            )}
+          </button>
+        </div>
+
+        {/* Контент в зависимости от активного таба */}
+        {activeTab === 'participants' ? (
+          <>
+            {/* Поиск для участников */}
+            <div className="flex items-center justify-between mb-4">
+              <SearchInput onSearch={handleSearch} />
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <p className="font-inter text-[14px] text-[#6D6D6D]">
+                  {searchQuery 
+                    ? 'Пользователи не найдены' 
+                    : 'В этом пространстве пока нет участников с генерациями'}
+                </p>
+              </div>
+            ) : (
+              /* Grid карточек пользователей - 4 колонки, gap 24px как в Figma */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {/* Загруженные карточки */}
+                {visibleUsers.map((user, index) => (
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    index={index}
+                    onUserClick={handleUserClick}
+                  />
+                ))}
+                
+                {/* Скелетоны для ещё не загруженных */}
+                {skeletonCount > 0 && (
+                  <>
+                    {Array.from({ length: skeletonCount }).map((_, i) => (
+                      <CardSkeleton key={`skeleton-${i}`} />
+                    ))}
+                    {/* Триггер для подгрузки следующей порции */}
+                    <div ref={loadMoreRef} className="col-span-full h-1" />
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          /* Kanban-доска для флоу */
+          isLoadingFlows ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="animate-spin w-8 h-8 border-2 border-white border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <WorkspaceFlowsKanban
+              workspaceId={workspaceId}
+              flows={flows}
+              counts={flowCounts}
+              workspaceMembers={workspaceMembers}
+              onRefresh={fetchFlows}
+            />
+          )
         )}
       </main>
     </div>

@@ -17,22 +17,22 @@ import { FlowImageNode } from './flow-image-node';
 import { FlowVideoNode } from './flow-video-node';
 import { FlowBlockModal } from './flow-block-modal';
 import { FlowSaveModal } from './flow-save-modal';
-import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X, Loader2, Trash2, FilePlus, Share2 } from 'lucide-react';
+import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X, Loader2, Trash2, FilePlus } from 'lucide-react';
 import { FlowShareModal } from './flow-share-modal';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { AssistantPanel } from '@/components/assistant-panel';
 
 // Navigation items for section dropdown
 const NAV_SECTIONS = [
-  { href: '/', label: 'Image' },
-  { href: '/video', label: 'Video' },
-  { href: '/keyframes', label: 'Keyframes' },
-  { href: '/analyze', label: 'Analyze' },
-  { href: '/brainstorm', label: 'Brainstorm' },
-  { href: '/inpaint', label: 'Inpaint' },
-  { href: '/expand', label: 'Outpaint' },
-  { href: '/lora', label: 'LoRA' },
+  { href: '/', label: 'IMAGE' },
+  { href: '/video', label: 'VIDEO' },
+  { href: '/keyframes', label: 'KEYFRAMES' },
+  { href: '/brainstorm', label: 'BRAINSTORM' },
+  { href: '/lora', label: 'LORA' },
+  { href: '/admin', label: 'DASHBOARD' },
+  { href: '/docs', label: 'ДОКУМЕНТАЦИЯ' },
 ];
 
 // Регистрация типов узлов
@@ -59,6 +59,7 @@ function FlowCanvasInner() {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   
   const {
     nodes,
@@ -387,47 +388,64 @@ function FlowCanvasInner() {
             
             {/* Section dropdown */}
             {isSectionDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 py-2 min-w-[160px] rounded-xl bg-[#171717] border border-[#2F2F2F] shadow-lg z-50">
-                {NAV_SECTIONS.map((section) => (
-                  <button
-                    key={section.href}
-                    onClick={() => {
-                      router.push(section.href);
-                      setIsSectionDropdownOpen(false);
-                    }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-white hover:bg-[#2a2a2a] transition-colors"
-                  >
-                    {section.label}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsSectionDropdownOpen(false)} />
+                <div className="absolute top-full left-0 mt-2 p-3 min-w-[280px] rounded-2xl bg-[#171717] shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] z-50">
+                  {/* Navigation items */}
+                  <div className="flex flex-col gap-2">
+                    {NAV_SECTIONS.map((section, idx) => (
+                      <button
+                        key={section.href}
+                        onClick={() => {
+                          router.push(section.href);
+                          setIsSectionDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-3 text-left text-sm font-medium text-white rounded-[10px] transition-colors ${
+                          idx === 0 ? 'bg-[#232323]' : 'hover:bg-[#232323]'
+                        }`}
+                      >
+                        {section.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </Panel>
 
-        {/* Top-right: Reset, Share and Save buttons */}
+        {/* Top-right: Assistant, Share, Reset and Save buttons */}
         <Panel position="top-right" className="!m-4">
           <div className="flex items-center gap-1">
+            {/* Assistant button */}
             <button
-              onClick={handleClearFlow}
-              className="h-10 px-4 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors text-white text-sm font-medium flex items-center gap-2"
-              title="Очистить Flow"
+              onClick={() => setIsAssistantOpen(true)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors overflow-hidden"
+              title="Ассистент"
             >
-              <Trash2 className="w-4 h-4" />
-              Сбросить
+              <Image src="/icon-assistant-flow.svg" alt="Ассистент" width={36} height={36} />
             </button>
+            {/* Share button - icon only */}
             <button
               onClick={() => setIsShareModalOpen(true)}
-              className="h-10 px-4 rounded-xl bg-[#212121] hover:bg-[#2a2a2a] transition-colors text-white text-sm font-medium flex items-center gap-2"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors overflow-hidden"
               title="Поделиться Flow"
             >
-              <Share2 className="w-4 h-4" />
-              Поделиться
+              <Image src="/icon-share-flow.svg" alt="Поделиться" width={36} height={36} />
             </button>
+            {/* Reset button */}
+            <button
+              onClick={handleClearFlow}
+              className="h-9 px-4 rounded-xl bg-[#212121] border border-[#303030] hover:bg-[#2a2a2a] transition-colors text-white text-sm font-medium"
+              title="Сбросить Flow"
+            >
+              Сбросить
+            </button>
+            {/* Save button */}
             <button
               onClick={handleSaveFlow}
               disabled={isSaving}
-              className="h-10 px-4 rounded-xl bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors text-black text-sm font-medium flex items-center gap-2"
+              className="h-9 px-4 rounded-xl bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors text-black text-sm font-medium flex items-center gap-2"
             >
               {isSaving ? (
                 <>
@@ -682,6 +700,15 @@ function FlowCanvasInner() {
         onSave={handleSaveWithName}
         initialName={flowName}
         isLoading={isSaving}
+      />
+
+      {/* Assistant Panel */}
+      <AssistantPanel 
+        isOpen={isAssistantOpen} 
+        onClose={() => setIsAssistantOpen(false)}
+        context={{
+          currentAction: 'Flow редактор'
+        }}
       />
     </div>
   );

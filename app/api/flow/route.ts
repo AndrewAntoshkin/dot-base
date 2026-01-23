@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       viewport_x = 0,
       viewport_y = 0,
       viewport_zoom = 1,
+      members = [], // Array of { email: string, role: 'editor' | 'viewer' }
     } = body;
 
     // Create flow
@@ -111,14 +112,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert edges if provided
+    // React Flow generates edge IDs as strings (not UUIDs), so let Supabase generate UUIDs
     if (edges.length > 0) {
       const edgesWithFlowId = edges.map((edge: any) => ({
-        id: edge.id,
+        // Don't include edge.id - it's not a valid UUID. Supabase will generate one
         flow_id: flow.id,
         source_node_id: edge.source,
-        source_handle: edge.sourceHandle,
+        source_handle: edge.sourceHandle || null,
         target_node_id: edge.target,
-        target_handle: edge.targetHandle,
+        target_handle: edge.targetHandle || null,
         edge_type: edge.type || 'default',
       }));
 
@@ -132,6 +134,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Create invites for members
+    const inviteResults: { email: string; success: boolean; error?: string }[] = [];
+    
+    if (members.length > 0) {
+      for (const member of members) {
+        if (!member.email || !['editor', 'viewer'].includes(member.role)) {
+          inviteResults.push({ email: member.email, success: false, error: 'Invalid data' });
+          continue;
+        }
+
+        const { error: inviteError } = await supabase
+          .from('flow_invites')
+          .insert({
+            flow_id: flow.id,
+            email: member.email,
+            role: member.role,
+            invited_by: user.id,
+          });
+
+        if (inviteError) {
+          console.error('Error creating invite for', member.email, inviteError);
+          inviteResults.push({ email: member.email, success: false, error: inviteError.message });
+        } else {
+          inviteResults.push({ email: member.email, success: true });
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       flow: {
@@ -141,6 +171,7 @@ export async function POST(request: NextRequest) {
         created_at: flow.created_at,
         updated_at: flow.updated_at,
       },
+      invites: inviteResults,
     });
 
   } catch (error) {

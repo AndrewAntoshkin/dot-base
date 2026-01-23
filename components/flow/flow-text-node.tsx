@@ -23,7 +23,6 @@ interface MediaItem {
 
 function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeType>) {
   const { selectNode, updateNodeData, runGeneration } = useFlowStore();
-  const [isHovered, setIsHovered] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,25 +148,8 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
 
   return (
     <div
-      className="relative"
+      className="relative group"
       onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={(e) => {
-        const relatedTarget = e.relatedTarget;
-        if (!relatedTarget || !(relatedTarget instanceof Node)) {
-          setIsHovered(false);
-          return;
-        }
-        const container = e.currentTarget;
-        if (container instanceof Node && !container.contains(relatedTarget)) {
-          setIsHovered(false);
-        }
-      }}
-      style={{ 
-        padding: '0 60px 80px 60px', 
-        margin: '0 -60px 0 -60px',
-        pointerEvents: 'auto'
-      }}
     >
       {/* Author badge - показываем сверху ноды */}
       {data.createdByEmail && (
@@ -187,41 +169,38 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
           data.status === 'running' && 'animate-pulse-glow'
         )}
       >
-        {/* Handles for connections */}
+        {/* Handles for connections - positioned at the visual edge */}
         <Handle
           type="target"
           position={Position.Left}
           id="input"
-          style={{ left: '0', transform: 'translate(-50%, -50%)' }}
-          className={cn(
-            "!w-6 !h-6 !rounded-full !bg-transparent !border-none !cursor-crosshair transition-opacity duration-200",
-            isHovered ? "!opacity-100" : "!opacity-0"
-          )}
+          style={{ left: 0, top: '50%' }}
+          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
+        {/* Visual indicator for target handle */}
         <div 
           className={cn(
-            "absolute top-1/2 left-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 pointer-events-none transition-opacity duration-200 z-30",
+            "absolute top-1/2 left-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
             "transform -translate-x-1/2 -translate-y-1/2",
-            isHovered ? "opacity-100" : "opacity-0"
+            "opacity-0 group-hover:opacity-100"
           )}
         >
           <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
         </div>
+        
         <Handle
           type="source"
           position={Position.Right}
           id="output"
-          style={{ right: '0', transform: 'translate(50%, -50%)' }}
-          className={cn(
-            "!w-6 !h-6 !rounded-full !bg-transparent !border-none !cursor-crosshair transition-opacity duration-200",
-            isHovered ? "!opacity-100" : "!opacity-0"
-          )}
+          style={{ right: 0, top: '50%' }}
+          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
+        {/* Visual indicator for source handle */}
         <div 
           className={cn(
-            "absolute top-1/2 right-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 pointer-events-none transition-opacity duration-200 z-30",
+            "absolute top-1/2 right-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
             "transform translate-x-1/2 -translate-y-1/2",
-            isHovered ? "opacity-100" : "opacity-0"
+            "opacity-0 group-hover:opacity-100"
           )}
         >
           <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />

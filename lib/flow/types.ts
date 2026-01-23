@@ -54,6 +54,9 @@ export interface FlowNodeData {
   createdByEmail?: string;  // email автора для отображения
 }
 
+// Статусы для Kanban-доски в пространстве
+export type FlowWorkspaceStatus = 'in_progress' | 'review' | 'done' | 'archived';
+
 export interface Flow {
   id: string;
   user_id: string;
@@ -63,8 +66,30 @@ export interface Flow {
   viewport_y: number;
   viewport_zoom: number;
   is_template: boolean;
+  workspace_id?: string;
+  status: FlowWorkspaceStatus;
   created_at: string;
   updated_at: string;
+}
+
+// Для карточки флоу в Kanban
+export interface FlowCardMember {
+  id: string;
+  email: string;
+  role: 'owner' | 'editor' | 'viewer';
+}
+
+export interface FlowCard {
+  id: string;
+  name: string;
+  description?: string;
+  status: FlowWorkspaceStatus;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  owner_email?: string;
+  members: FlowCardMember[];
+  node_count: number;
 }
 
 export interface FlowNode {

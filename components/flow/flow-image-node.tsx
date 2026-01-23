@@ -37,7 +37,6 @@ const QUALITY_OPTIONS = ['4K', '2K', '1K'];
 
 function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeType>) {
   const { selectNode, updateNodeData, runGeneration } = useFlowStore();
-  const [isHovered, setIsHovered] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -124,30 +123,9 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
 
   return (
     <div
-      className="relative"
+      className="relative group pb-16"
       onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={(e) => {
-        // Don't hide if moving to plus icons or settings bar
-        const relatedTarget = e.relatedTarget;
-        if (!relatedTarget || !(relatedTarget instanceof Node)) {
-          setIsHovered(false);
-          setOpenDropdown(null);
-          return;
-        }
-        // Check if related target is within our expanded hover area
-        const container = e.currentTarget;
-        if (container instanceof Node && !container.contains(relatedTarget)) {
-          setIsHovered(false);
-          setOpenDropdown(null);
-        }
-      }}
-      style={{ 
-        padding: '0 60px 80px 60px', 
-        margin: '0 -60px 0 -60px',
-        // Expanded hover area
-        pointerEvents: 'auto'
-      }}
+      onMouseLeave={() => setOpenDropdown(null)}
     >
       {/* Author badge - показываем сверху ноды */}
       {data.createdByEmail && (
@@ -167,41 +145,38 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
           data.status === 'running' && 'animate-pulse-glow'
         )}
       >
-        {/* Handles for connections - positioned on block border, visible on hover */}
+        {/* Handles for connections - positioned at the visual edge */}
         <Handle
           type="target"
           position={Position.Left}
           id="input"
-          style={{ left: '0', transform: 'translate(-50%, -50%)' }}
-          className={cn(
-            "!w-6 !h-6 !rounded-full !bg-transparent !border-none !cursor-crosshair transition-opacity duration-200",
-            isHovered ? "!opacity-100" : "!opacity-0"
-          )}
+          style={{ left: 0, top: '50%' }}
+          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
+        {/* Visual indicator for target handle */}
         <div 
           className={cn(
-            "absolute top-1/2 left-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 pointer-events-none transition-opacity duration-200 z-30",
+            "absolute top-1/2 left-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
             "transform -translate-x-1/2 -translate-y-1/2",
-            isHovered ? "opacity-100" : "opacity-0"
+            "opacity-0 group-hover:opacity-100"
           )}
         >
           <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
         </div>
+        
         <Handle
           type="source"
           position={Position.Right}
           id="output"
-          style={{ right: '0', transform: 'translate(50%, -50%)' }}
-          className={cn(
-            "!w-6 !h-6 !rounded-full !bg-transparent !border-none !cursor-crosshair transition-opacity duration-200",
-            isHovered ? "!opacity-100" : "!opacity-0"
-          )}
+          style={{ right: 0, top: '50%' }}
+          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
+        {/* Visual indicator for source handle */}
         <div 
           className={cn(
-            "absolute top-1/2 right-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 pointer-events-none transition-opacity duration-200 z-30",
+            "absolute top-1/2 right-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
             "transform translate-x-1/2 -translate-y-1/2",
-            isHovered ? "opacity-100" : "opacity-0"
+            "opacity-0 group-hover:opacity-100"
           )}
         >
           <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
@@ -304,9 +279,8 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
         <div 
           className={cn(
             "absolute top-[calc(100%+16px)] left-1/2 -translate-x-1/2 flex items-center gap-1 transition-opacity duration-200 z-40",
-            isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+            "opacity-0 group-hover:opacity-100 group-hover:pointer-events-auto pointer-events-none"
           )}
-          onMouseEnter={() => setIsHovered(true)}
         >
         {/* Model selector */}
         <div className="relative">

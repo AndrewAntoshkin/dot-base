@@ -4,12 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, WifiOff, Wifi, Check, ChevronDown } from 'lucide-react';
+import { Loader2, WifiOff, Wifi, Check, ChevronDown, Search, Trash2 } from 'lucide-react';
 import { GenerationsQueue } from './generations-queue';
 import { AssistantPanel } from './assistant-panel';
+import { FlowCreateModal } from './flow/flow-create-modal';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import { AnnouncementBanner } from './announcement-banner';
+import { useRouter } from 'next/navigation';
 
 // Network Status Indicator Component
 function NetworkStatusIndicator({ isOffline, networkError }: { isOffline: boolean; networkError: string | null }) {
@@ -211,6 +213,212 @@ function HeaderTooltip({
   );
 }
 
+// Flow navigation with dropdown
+interface UserFlow {
+  id: string;
+  name: string;
+  updated_at: string;
+}
+
+function FlowNavDropdown({ isActive }: { isActive: boolean }) {
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [userFlows, setUserFlows] = useState<UserFlow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user flows when dropdown opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchFlows();
+    }
+  }, [isOpen]);
+
+  const fetchFlows = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/flow');
+      if (response.ok) {
+        const data = await response.json();
+        setUserFlows(data.flows || []);
+      }
+    } catch (error) {
+      console.error('Error fetching flows:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter flows by search
+  const filteredFlows = userFlows.filter(flow =>
+    flow.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Handle create flow
+  const handleCreateFlow = async (data: {
+    name: string;
+    description: string;
+    members: { email: string; role: 'editor' | 'viewer' }[];
+  }) => {
+    setIsCreating(true);
+    try {
+      const response = await fetch('/api/flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          members: data.members,
+          nodes: [],
+          edges: [],
+          viewport_x: 0,
+          viewport_y: 0,
+          viewport_zoom: 1,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setIsCreateModalOpen(false);
+        setIsOpen(false);
+        router.push(`/flow?id=${result.flow.id}`);
+      }
+    } catch (error) {
+      console.error('Error creating flow:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Handle flow click
+  const handleFlowClick = (flowId: string) => {
+    setIsOpen(false);
+    router.push(`/flow?id=${flowId}`);
+  };
+
+  // Handle delete flow
+  const handleDeleteFlow = async (e: React.MouseEvent, flowId: string, flowName: string) => {
+    e.stopPropagation();
+    if (!confirm(`Удалить Flow "${flowName}"? Это действие нельзя отменить.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/flow/${flowId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // Обновляем список
+        setUserFlows(prev => prev.filter(f => f.id !== flowId));
+      }
+    } catch (error) {
+      console.error('Error deleting flow:', error);
+    }
+  };
+
+  return (
+    <>
+      <div className="relative" ref={dropdownRef}>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`h-9 px-3 py-2 rounded-xl flex items-center gap-1 font-inter font-medium text-xs uppercase tracking-[-0.12px] transition-all duration-150 border ${
+            isActive || isOpen
+              ? 'bg-[#1f1f1f] text-white border-white'
+              : 'bg-transparent text-white hover:text-white/80 hover:bg-[#1f1f1f]/50 border-transparent'
+          }`}
+        >
+          FLOW
+          <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Dropdown */}
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            <div 
+              className="absolute top-full left-0 mt-2 w-[280px] p-3 bg-[#171717] rounded-2xl z-50"
+              style={{ boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.9)' }}
+            >
+              {/* Create button */}
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsCreateModalOpen(true);
+                }}
+                className="w-full h-10 px-4 mb-2 flex items-center justify-center gap-2 rounded-xl border border-[#2F2F2F] text-white text-sm font-medium hover:bg-[#212121] transition-colors"
+              >
+                Создать флоу
+              </button>
+
+              {/* Title */}
+              <p className="px-3 py-2 text-[10px] font-medium uppercase tracking-[0.15em] text-[#959595]">
+                Ваши Flow ({userFlows.length})
+              </p>
+
+              {/* Search */}
+              <div className="relative mb-2">
+                <input
+                  type="text"
+                  placeholder="Поиск..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-9 px-3 pr-10 bg-transparent border border-[#2B2B2B] rounded-xl text-sm text-white placeholder:text-[#959595] outline-none focus:border-white/50 transition-colors"
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white" />
+              </div>
+
+              {/* Flows list */}
+              <div className="max-h-[240px] overflow-y-auto">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  </div>
+                ) : filteredFlows.length === 0 ? (
+                  <p className="text-sm text-[#656565] px-3 py-2">
+                    {searchQuery ? 'Ничего не найдено' : 'Нет сохранённых Flow'}
+                  </p>
+                ) : (
+                  filteredFlows.map((flow) => (
+                    <div
+                      key={flow.id}
+                      className="group flex items-center gap-2 px-3 py-3 rounded-[10px] transition-colors cursor-pointer hover:bg-[#232323]"
+                      onClick={() => handleFlowClick(flow.id)}
+                    >
+                      <span className="flex-1 text-sm font-medium text-white truncate">
+                        {flow.name || 'Без названия'}
+                      </span>
+                      <button
+                        onClick={(e) => handleDeleteFlow(e, flow.id, flow.name || 'Без названия')}
+                        className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded hover:bg-[#2F2F2F] transition-all flex-shrink-0"
+                        title="Удалить Flow"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-[#959595] hover:text-white" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Create Flow Modal */}
+      <FlowCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateFlow}
+        isLoading={isCreating}
+      />
+    </>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const [isQueueOpen, setIsQueueOpen] = useState(false);
@@ -285,13 +493,20 @@ export function Header() {
               {NAV_ITEMS
                 .filter(item => item.href !== '/lora' || isAdmin)
                 .map((item) => (
-                <NavLinkWithTooltip
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  description={item.description}
-                  isActive={pathname === item.href}
-                />
+                  item.href === '/flow' ? (
+                    <FlowNavDropdown 
+                      key={item.href}
+                      isActive={pathname === '/flow' || pathname.startsWith('/flow')}
+                    />
+                  ) : (
+                    <NavLinkWithTooltip
+                      key={item.href}
+                      href={item.href}
+                      label={item.label}
+                      description={item.description}
+                      isActive={pathname === item.href}
+                    />
+                  )
               ))}
             </nav>
           </div>

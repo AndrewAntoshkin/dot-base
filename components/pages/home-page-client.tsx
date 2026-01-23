@@ -511,12 +511,12 @@ function HomeContent() {
       </main>
 
       {/* Mobile Layout */}
-      <main className="flex lg:hidden flex-1 flex-col p-4 pb-0">
+      <main className="flex lg:hidden flex-1 flex-col min-h-0">
         {showStartScreen ? (
           <MobileStartScreen mode="image" onStartGeneration={() => setMobileShowForm(true)} />
         ) : (
           <>
-            <div className="mb-4">
+            <div className="mb-4 px-4 pt-4 shrink-0">
               <MobileTabSwitcher 
                 activeTab={mobileActiveTab}
                 onTabChange={setMobileActiveTab}
@@ -525,7 +525,7 @@ function HomeContent() {
             </div>
 
             {mobileActiveTab === 'input' ? (
-              <div className="flex-1 flex flex-col gap-3 pb-[120px]">
+              <div className="flex-1 flex flex-col gap-3 px-4 pb-[120px] overflow-y-auto scrollbar-hide">
                 <div className="animate-fade-in-up">
                   <ActionSelector
                     value={selectedAction}
@@ -562,7 +562,7 @@ function HomeContent() {
                 )}
               </div>
             ) : (
-              <div className="flex-1 flex flex-col pb-[120px]">
+              <div className="flex-1 flex flex-col px-4 pb-[120px] overflow-y-auto scrollbar-hide">
                 <div className="animate-fade-in-up">
                   <Suspense
                     fallback={
@@ -587,7 +587,7 @@ function HomeContent() {
         )}
 
         {mobileActiveTab === 'input' && selectedModelId && (
-          <div className="fixed bottom-0 left-0 right-0 bg-[#101010] p-4 border-t border-[#1f1f1f] z-10">
+          <div className="shrink-0 bg-[#101010] p-4 border-t border-[#1f1f1f]">
             <div className="flex gap-3">
               <button
                 type="button"
