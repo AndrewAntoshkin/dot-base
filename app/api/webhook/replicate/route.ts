@@ -313,15 +313,29 @@ export async function POST(request: NextRequest) {
             
             // Сохраняем медиа в фоне (не ждём завершения)
             saveGenerationMedia(replicateUrls, generation.id)
-              .then(({ urls: savedUrls, thumbs: savedThumbs }) => {
+              .then(async ({ urls: savedUrls, thumbs: savedThumbs }) => {
                 if (savedUrls.length > 0) {
-                  // Обновляем с сохранёнными URL
-                  return (supabase.from('generations') as any)
+                  // Обновляем generations с постоянными URL
+                  await (supabase.from('generations') as any)
                     .update({
                       output_urls: savedUrls,
                       output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
                     })
                     .eq('id', generation.id);
+                  
+                  // Также обновляем flow_nodes с постоянными URL
+                  const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
+                    .select('id')
+                    .eq('generation_id', generation.id);
+                  
+                  if (flowNodes && flowNodes.length > 0) {
+                    for (const node of flowNodes) {
+                      await (supabase.from('flow_nodes') as any)
+                        .update({ output_url: savedUrls[0] })
+                        .eq('id', node.id);
+                    }
+                    logger.debug(`Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
+                  }
                 }
               })
               .catch((error: any) => {

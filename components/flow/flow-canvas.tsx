@@ -23,6 +23,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { AssistantPanel } from '@/components/assistant-panel';
+import { Tooltip } from '@/components/ui/tooltip';
+import { useUser } from '@/contexts/user-context';
 
 // Navigation items for section dropdown
 const NAV_SECTIONS = [
@@ -48,6 +50,7 @@ const GRID_SIZE = 20; // Size of grid cells for snapping
 function FlowCanvasInner() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { email, avatarUrl, displayName } = useUser();
   const { fitView, zoomIn, zoomOut, getViewport, setViewport } = useReactFlow();
   const [isFlowSelectorOpen, setIsFlowSelectorOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -60,6 +63,15 @@ function FlowCanvasInner() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [isUIReady, setIsUIReady] = useState(false);
+  
+  // Trigger UI entrance animations after mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsUIReady(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
   
   const {
     nodes,
@@ -349,90 +361,192 @@ function FlowCanvasInner() {
         {/* Empty state - show when no nodes */}
         {nodes.length === 0 && (
           <Panel position="top-center" className="!mt-[30vh]">
-            <div className="flex flex-col items-center gap-4 max-w-[368px]">
-              {/* Empty state illustration */}
-              <Image 
-                src="/flow-empty-state.svg" 
-                alt="Empty flow" 
-                width={202} 
-                height={109}
-                className="opacity-80"
-              />
+            <div className={`flex flex-col items-center gap-4 transition-all duration-500 ease-out delay-300 ${isUIReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              {/* Block preview with connection icons */}
+              <div className="flex items-center gap-1.5">
+                {/* Left connection icon */}
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="6" cy="6" r="5" stroke="#717171" strokeWidth="1"/>
+                  <path d="M6 3.5V8.5M3.5 6H8.5" stroke="#717171" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+                
+                {/* Block preview card */}
+                <div className="w-[168px] p-1.5 bg-[#1C1C1C] rounded-lg shadow-[0px_4px_14px_0px_rgba(0,0,0,0.16)] backdrop-blur-[9px]">
+                  <div className="flex items-center justify-between px-0.5 mb-1.5">
+                    <div className="flex items-center gap-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#4D4D4D]" />
+                      <div className="w-8 h-1.5 rounded-sm bg-[#C7C7C7]" />
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#4D4D4D]" />
+                  </div>
+                  <div className="h-8 bg-[#101010] rounded" />
+                </div>
+                
+                {/* Right connection icon */}
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="6" cy="6" r="5" stroke="#717171" strokeWidth="1"/>
+                  <path d="M6 3.5V8.5M3.5 6H8.5" stroke="#717171" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+              </div>
               
               {/* Instructions */}
-              <p className="text-[#6D6D6D] text-sm text-center leading-5">
-                Нажмите на кнопку ниже для создания первого блока или кликните два раза в любом месте
+              <p className="text-[#6D6D6D] text-sm text-center leading-5 max-w-[440px] px-10">
+                Начните с выбора первого блока или кликните два раза в любом месте
               </p>
               
-              {/* Create button */}
-              <button
-                onClick={handleCreateBlock}
-                className="h-10 px-4 rounded-xl bg-white hover:bg-gray-100 transition-colors text-black text-sm font-medium"
-              >
-                Создать
-              </button>
+              {/* Block type buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!reactFlowWrapper.current) return;
+                    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+                    const currentViewport = getViewport();
+                    const canvasPosition = {
+                      x: (bounds.width / 2 - currentViewport.x) / currentViewport.zoom,
+                      y: (bounds.height / 2 - currentViewport.y) / currentViewport.zoom,
+                    };
+                    useFlowStore.getState().addNode('text', canvasPosition);
+                  }}
+                  className="flex items-center gap-2 h-11 px-4 rounded-xl bg-[#050505] border border-[#303030] hover:border-white/30 transition-colors"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.66667 4.66667V2.66667H13.3333V4.66667M6 13.3333H10M8 2.66667V13.3333" stroke="white" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="text-sm font-medium text-white">Текст</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (!reactFlowWrapper.current) return;
+                    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+                    const currentViewport = getViewport();
+                    const canvasPosition = {
+                      x: (bounds.width / 2 - currentViewport.x) / currentViewport.zoom,
+                      y: (bounds.height / 2 - currentViewport.y) / currentViewport.zoom,
+                    };
+                    useFlowStore.getState().addNode('image', canvasPosition);
+                  }}
+                  className="flex items-center gap-2 h-11 px-4 rounded-xl bg-[#050505] border border-[#303030] hover:border-white/30 transition-colors"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="12" height="12" rx="2" stroke="white" strokeWidth="1.33"/>
+                    <circle cx="5.5" cy="5.5" r="1.5" stroke="white" strokeWidth="1"/>
+                    <path d="M2 11L5.5 7.5L8 10L10.5 7L14 11" stroke="white" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="text-sm font-medium text-white">Изображение</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (!reactFlowWrapper.current) return;
+                    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+                    const currentViewport = getViewport();
+                    const canvasPosition = {
+                      x: (bounds.width / 2 - currentViewport.x) / currentViewport.zoom,
+                      y: (bounds.height / 2 - currentViewport.y) / currentViewport.zoom,
+                    };
+                    useFlowStore.getState().addNode('video', canvasPosition);
+                  }}
+                  className="flex items-center gap-2 h-11 px-4 rounded-xl bg-[#050505] border border-[#303030] hover:border-white/30 transition-colors"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="1.33" y="3.33" width="10.67" height="9.33" rx="2" stroke="white" strokeWidth="1.33"/>
+                    <path d="M12 6L14.67 4.67V11.33L12 10" stroke="white" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="text-sm font-medium text-white">Видео</span>
+                </button>
+              </div>
             </div>
           </Panel>
         )}
 
-        {/* Top-left: Section dropdown */}
+        {/* Top-left: Home button + FLOW section dropdown */}
         <Panel position="top-left" className="!m-4">
-          <div className="relative">
-            <button
-              onClick={() => setIsSectionDropdownOpen(!isSectionDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#171717] hover:bg-[#1f1f1f] transition-colors"
-            >
-              <Image src="/baseCRLogo.svg" alt="BASE CRAFT" width={65} height={18} />
-              <ChevronDown className={`w-5 h-5 text-white transition-transform ${isSectionDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {/* Section dropdown */}
-            {isSectionDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsSectionDropdownOpen(false)} />
-                <div className="absolute top-full left-0 mt-2 p-3 min-w-[280px] rounded-2xl bg-[#171717] shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] z-50">
-                  {/* Navigation items */}
-                  <div className="flex flex-col gap-2">
-                    {NAV_SECTIONS.map((section, idx) => (
-                      <button
-                        key={section.href}
-                        onClick={() => {
-                          router.push(section.href);
-                          setIsSectionDropdownOpen(false);
-                        }}
-                        className={`w-full px-3 py-3 text-left text-sm font-medium text-white rounded-[10px] transition-colors ${
-                          idx === 0 ? 'bg-[#232323]' : 'hover:bg-[#232323]'
-                        }`}
-                      >
-                        {section.label}
-                      </button>
-                    ))}
+          <div className={`flex items-center gap-2 transition-all duration-500 ease-out ${isUIReady ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
+            {/* Avatar - links to profile */}
+            <Tooltip text="Профиль" position="bottom">
+              <Link
+                href="/profile"
+                className="flex items-center justify-center w-11 h-11 rounded-xl overflow-hidden border-2 border-[#171717] hover:border-[#303030] transition-colors"
+              >
+                {avatarUrl ? (
+                  <Image 
+                    src={avatarUrl} 
+                    alt="Avatar" 
+                    width={44} 
+                    height={44} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#7357FF] flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold">
+                      {(displayName || email || 'U').slice(0, 2).toUpperCase()}
+                    </span>
                   </div>
-                </div>
-              </>
-            )}
+                )}
+              </Link>
+            </Tooltip>
+
+            {/* FLOW dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsSectionDropdownOpen(!isSectionDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#171717] hover:bg-[#1f1f1f] transition-colors"
+              >
+                <span className="font-inter font-medium text-xs uppercase tracking-[-0.01em] text-white">
+                  FLOW
+                </span>
+                <ChevronDown className={`w-5 h-5 text-white transition-transform ${isSectionDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Section dropdown */}
+              {isSectionDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsSectionDropdownOpen(false)} />
+                  <div className="absolute top-full left-0 mt-2 p-3 min-w-[280px] rounded-2xl bg-[#171717] shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)] z-50">
+                    {/* Navigation items */}
+                    <div className="flex flex-col gap-2">
+                      {NAV_SECTIONS.map((section) => (
+                        <button
+                          key={section.href}
+                          onClick={() => {
+                            router.push(section.href);
+                            setIsSectionDropdownOpen(false);
+                          }}
+                          className="w-full px-3 py-3 text-left text-sm font-medium text-white rounded-[10px] transition-colors hover:bg-[#232323]"
+                        >
+                          {section.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </Panel>
 
         {/* Top-right: Assistant, Share, Reset and Save buttons */}
         <Panel position="top-right" className="!m-4">
-          <div className="flex items-center gap-1">
+          <div className={`flex items-center gap-1 transition-all duration-500 ease-out delay-100 ${isUIReady ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
             {/* Assistant button */}
-            <button
-              onClick={() => setIsAssistantOpen(true)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors overflow-hidden"
-              title="Ассистент"
-            >
-              <Image src="/icon-assistant-flow.svg" alt="Ассистент" width={36} height={36} />
-            </button>
+            <Tooltip text="Ассистент" position="bottom">
+              <button
+                onClick={() => setIsAssistantOpen(true)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors overflow-hidden"
+              >
+                <Image src="/icon-assistant-flow.svg" alt="Ассистент" width={36} height={36} />
+              </button>
+            </Tooltip>
             {/* Share button - icon only */}
-            <button
-              onClick={() => setIsShareModalOpen(true)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors overflow-hidden"
-              title="Поделиться Flow"
-            >
-              <Image src="/icon-share-flow.svg" alt="Поделиться" width={36} height={36} />
-            </button>
+            <Tooltip text="Поделиться" position="bottom">
+              <button
+                onClick={() => setIsShareModalOpen(true)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors overflow-hidden"
+              >
+                <Image src="/icon-share-flow.svg" alt="Поделиться" width={36} height={36} />
+              </button>
+            </Tooltip>
             {/* Reset button */}
             <button
               onClick={handleClearFlow}
@@ -461,7 +575,7 @@ function FlowCanvasInner() {
 
         {/* Bottom-center: Flow controls */}
         <Panel position="bottom-center" className="!mb-4">
-          <div className="flex items-center gap-1">
+          <div className={`flex items-center gap-1 transition-all duration-500 ease-out delay-200 ${isUIReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Plus button - create new block */}
             <button
               onClick={handleCreateBlock}
@@ -607,7 +721,7 @@ function FlowCanvasInner() {
 
         {/* Zoom controls & snap toggle - bottom left */}
         <Panel position="bottom-left" className="!m-4">
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 transition-all duration-500 ease-out delay-200 ${isUIReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Snap to grid toggle */}
             <button
               onClick={() => setSnapToGrid(!snapToGrid)}
@@ -644,7 +758,7 @@ function FlowCanvasInner() {
 
         {/* Status indicator - bottom right */}
         <Panel position="bottom-right" className="!m-4">
-          <div className="flex items-center gap-2 px-4 h-10 rounded-xl bg-[#212121]">
+          <div className={`flex items-center gap-2 px-4 h-10 rounded-xl bg-[#212121] transition-all duration-500 ease-out delay-200 ${isUIReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500'}`} />
             <span className="text-sm text-white">
               {isSaving ? 'Сохранение...' : hasUnsavedChanges ? 'Несохранённо' : 'Сохранено'}
@@ -655,30 +769,36 @@ function FlowCanvasInner() {
         {/* Welcome message - bottom center, below flow controls */}
         {showWelcomeMessage && (
           <Panel position="bottom-center" className="!mb-20">
-            <div className="flex items-center gap-6 px-4 py-2 rounded-xl bg-[#212121] border border-transparent">
-              {/* Icon */}
-              <div className="flex-shrink-0">
-                <GitBranch className="w-5 h-5 text-white" />
-              </div>
-              
+            <div className={`flex items-center gap-6 px-4 py-3 rounded-2xl bg-[#212121] transition-all duration-500 ease-out delay-400 ${isUIReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               {/* Text content */}
               <div className="flex flex-col gap-0.5">
-                <p className="text-sm text-white leading-[1.286em]">
-                  Тестируем новый функционал FLOW.
+                <p className="text-sm font-medium text-white leading-[1.286em]">
+                  Тестируем новый функционал FLOW
                 </p>
                 <p className="text-xs text-[#959595] leading-[1.5em]">
                   По всем неточностям и доработкам пишите в группу в Telegram
                 </p>
               </div>
               
-              {/* Close button */}
-              <button
-                onClick={handleCloseWelcomeMessage}
-                className="flex-shrink-0 w-6 h-6 rounded-full hover:bg-[#2a2a2a] transition-colors flex items-center justify-center"
-                aria-label="Закрыть"
-              >
-                <X className="w-4 h-4 text-[#7E7E7E]" strokeWidth={1.8} />
-              </button>
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                {/* Documentation link */}
+                <Link
+                  href="/docs/flow"
+                  className="flex items-center justify-center h-8 px-3 rounded-xl bg-[#050505] hover:bg-[#1a1a1a] transition-colors text-sm font-medium text-white"
+                >
+                  Подробнее
+                </Link>
+                
+                {/* Close button */}
+                <button
+                  onClick={handleCloseWelcomeMessage}
+                  className="flex-shrink-0 w-6 h-6 rounded-full bg-[#4F4F4F] hover:bg-[#5a5a5a] transition-colors flex items-center justify-center"
+                  aria-label="Закрыть"
+                >
+                  <X className="w-[9px] h-[9px] text-white" strokeWidth={1.8} />
+                </button>
+              </div>
             </div>
           </Panel>
         )}
