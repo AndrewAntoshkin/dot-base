@@ -78,9 +78,16 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     }
   }, []);
 
-  // Initial fetch
+  // Initial fetch and polling every 30 seconds
   useEffect(() => {
     fetchNotifications();
+    
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [fetchNotifications]);
 
   // Notify parent about popover state changes
