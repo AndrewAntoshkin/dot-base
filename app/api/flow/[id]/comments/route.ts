@@ -43,10 +43,11 @@ export async function GET(
     const userIds = [...new Set(comments.map(c => c.user_id))];
     
     // Получаем данные пользователей отдельным запросом
-    const { data: users } = await adminClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: users } = await (adminClient as any)
       .from('users')
       .select('id, email, avatar_url, display_name')
-      .in('id', userIds);
+      .in('id', userIds) as { data: Array<{ id: string; email: string; avatar_url: string | null; display_name: string | null }> | null };
     
     // Создаем map пользователей
     const usersMap = new Map((users || []).map(u => [u.id, u]));
