@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, X, Megaphone } from 'lucide-react';
 import { NotificationsSidebar } from './notifications-sidebar';
 import { NotificationMessageModal } from './notification-message-modal';
+import { createClient } from '@/lib/supabase/client';
 
 // Bell icon
 function BellIcon({ className }: { className?: string }) {
@@ -78,16 +79,43 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     }
   }, []);
 
-  // Initial fetch and polling every 30 seconds
+  // Initial fetch and realtime subscription
   useEffect(() => {
     fetchNotifications();
     
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 30000);
+    // Subscribe to new notifications via Supabase Realtime
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     
-    return () => clearInterval(interval);
+    // Get current user and subscribe to their notifications
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      
+      channel = supabase
+        .channel('notifications-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // Add new notification to the top of the list
+            const newNotification = payload.new as Notification;
+            setNotifications(prev => [newNotification, ...prev].slice(0, 5));
+            setUnreadCount(prev => prev + 1);
+          }
+        )
+        .subscribe();
+    });
+    
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [fetchNotifications]);
 
   // Notify parent about popover state changes
