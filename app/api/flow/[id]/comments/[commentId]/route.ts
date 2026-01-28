@@ -60,7 +60,7 @@ export async function PATCH(
         .from('flows')
         .select('user_id')
         .eq('id', flowId)
-        .single();
+        .single() as { data: { user_id: string } | null; error: any };
 
       if (existingComment.user_id !== user.id && flow?.user_id !== user.id) {
         return NextResponse.json({ error: 'No permission to resolve' }, { status: 403 });
@@ -131,7 +131,7 @@ export async function DELETE(
       .from('flows')
       .select('user_id')
       .eq('id', flowId)
-      .single();
+      .single() as { data: { user_id: string } | null; error: any };
 
     if (existingComment.user_id !== user.id && flow?.user_id !== user.id) {
       return NextResponse.json({ error: 'No permission to delete' }, { status: 403 });
