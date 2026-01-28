@@ -81,9 +81,9 @@ export async function PATCH(
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: comment, error: updateError } = await adminClient
+    const { data: comment, error: updateError } = await (adminClient as any)
       .from('flow_comments')
-      .update(updates as any)
+      .update(updates)
       .eq('id', commentId)
       .select()
       .single();
@@ -138,7 +138,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'No permission to delete' }, { status: 403 });
     }
 
-    const { error: deleteError } = await adminClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: deleteError } = await (adminClient as any)
       .from('flow_comments')
       .delete()
       .eq('id', commentId);

@@ -98,7 +98,8 @@ export async function POST(
     }
 
     // Создаём комментарий
-    const { data: comment, error } = await adminClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: comment, error } = await (adminClient as any)
       .from('flow_comments')
       .insert({
         flow_id: flowId,
