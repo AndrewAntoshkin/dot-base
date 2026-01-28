@@ -86,29 +86,42 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     // Subscribe to new notifications via Supabase Realtime
     const supabase = createClient();
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let currentUserId: string | null = null;
     
     // Get current user and subscribe to their notifications
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!user) {
+        console.log('[Notifications] No user found, skipping realtime subscription');
+        return;
+      }
+      
+      currentUserId = user.id;
+      console.log('[Notifications] Setting up realtime for user:', user.id);
       
       channel = supabase
-        .channel('notifications-realtime')
+        .channel('notifications-changes')
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
             table: 'notifications',
-            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
-            // Add new notification to the top of the list
-            const newNotification = payload.new as Notification;
-            setNotifications(prev => [newNotification, ...prev].slice(0, 5));
-            setUnreadCount(prev => prev + 1);
+            console.log('[Notifications] Received realtime event:', payload);
+            const newNotification = payload.new as Notification & { user_id: string };
+            
+            // Filter client-side to only show notifications for current user
+            if (newNotification.user_id === currentUserId) {
+              console.log('[Notifications] Adding notification for current user');
+              setNotifications(prev => [newNotification, ...prev].slice(0, 5));
+              setUnreadCount(prev => prev + 1);
+            }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Notifications] Subscription status:', status);
+        });
     });
     
     return () => {
