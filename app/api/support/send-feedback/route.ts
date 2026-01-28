@@ -15,8 +15,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { subject, message } = body;
+    // Support both JSON and FormData
+    const contentType = request.headers.get('content-type') || '';
+    let subject: string;
+    let message: string;
+    const images: File[] = [];
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      subject = formData.get('subject') as string;
+      message = formData.get('message') as string;
+      
+      // Collect all images
+      for (let i = 0; i < 5; i++) {
+        const image = formData.get(`image_${i}`) as File | null;
+        if (image && image.size > 0) {
+          images.push(image);
+        }
+      }
+    } else {
+      const body = await request.json();
+      subject = body.subject;
+      message = body.message;
+    }
 
     if (!subject || !message) {
       return NextResponse.json(
@@ -77,7 +98,7 @@ ${escapeMarkdown(message)}
 ---
 🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} MSK`;
 
-    // Отправляем в Telegram
+    // Отправляем текстовое сообщение в Telegram
     const telegramResponse = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
@@ -100,6 +121,29 @@ ${escapeMarkdown(message)}
         { error: 'Не удалось отправить сообщение. Попробуйте позже.' },
         { status: 500 }
       );
+    }
+
+    // Отправляем изображения, если есть
+    if (images.length > 0) {
+      for (const image of images) {
+        try {
+          const imageFormData = new FormData();
+          imageFormData.append('chat_id', TELEGRAM_CHAT_ID);
+          imageFormData.append('photo', image);
+          imageFormData.append('caption', `📎 Приложение к обращению от ${userInfo}`);
+
+          await fetch(
+            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`,
+            {
+              method: 'POST',
+              body: imageFormData,
+            }
+          );
+        } catch (imageError) {
+          console.error('Failed to send image to Telegram:', imageError);
+          // Continue with other images even if one fails
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

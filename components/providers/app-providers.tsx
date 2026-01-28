@@ -5,6 +5,7 @@ import { GenerationsProvider } from '@/contexts/generations-context';
 import { UserProvider, UserRole } from '@/contexts/user-context';
 import { GenerationToastContainer } from '@/components/generation-toast';
 import { LimitToastProvider } from '@/components/limit-toast';
+import { SupportButton } from '@/components/support-button';
 
 interface AppProvidersProps {
   initialUserEmail: string | null;
@@ -26,6 +27,8 @@ export function AppProviders({
           {children}
           {/* Generation status notifications */}
           <GenerationToastContainer />
+          {/* Support button - shows on all pages */}
+          <SupportButton />
         </LimitToastProvider>
       </GenerationsProvider>
     </UserProvider>

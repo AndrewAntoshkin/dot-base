@@ -763,8 +763,8 @@ function FlowCanvasInner() {
           </div>
         </Panel>
 
-        {/* Status indicator - bottom right */}
-        <Panel position="bottom-right" className="!m-4">
+        {/* Status indicator - bottom right, with extra margin for support button */}
+        <Panel position="bottom-right" className="!mb-4 !mr-14">
           <div className={`flex items-center gap-2 px-4 h-10 rounded-xl bg-[#212121] transition-all duration-500 ease-out delay-200 ${isUIReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500'}`} />
             <span className="text-sm text-white">
