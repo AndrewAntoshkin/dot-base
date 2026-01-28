@@ -28,7 +28,7 @@ export async function GET(
       .from('flow_comments')
       .select('*')
       .eq('flow_id', flowId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true }) as { data: FlowComment[] | null; error: any };
 
     if (error) {
       console.error('Error fetching comments:', error);

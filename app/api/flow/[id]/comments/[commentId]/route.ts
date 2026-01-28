@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
+// Тип для комментария (пока таблица не в types.ts)
+interface FlowComment {
+  id: string;
+  flow_id: string;
+  node_id: string;
+  user_id: string;
+  content: string;
+  is_resolved: boolean;
+  read_by: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 // PATCH - обновить комментарий
 export async function PATCH(
   request: NextRequest,
@@ -22,7 +35,7 @@ export async function PATCH(
       .select('*')
       .eq('id', commentId)
       .eq('flow_id', flowId)
-      .single();
+      .single() as { data: FlowComment | null; error: any };
 
     if (fetchError || !existingComment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
@@ -107,7 +120,7 @@ export async function DELETE(
       .select('user_id')
       .eq('id', commentId)
       .eq('flow_id', flowId)
-      .single();
+      .single() as { data: { user_id: string } | null; error: any };
 
     if (fetchError || !existingComment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
