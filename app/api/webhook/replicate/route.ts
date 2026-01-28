@@ -305,43 +305,36 @@ export async function POST(request: NextRequest) {
               updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
             }
           } else {
-            // Асинхронное сохранение медиа - не блокируем вебхук
-            // Сначала обновляем статус с временными URL от Replicate
-            updateData.status = 'completed';
-            updateData.output_urls = replicateUrls;
-            updateData.output_thumbs = null;
+            // Синхронное сохранение медиа в Supabase Storage
+            // Важно: в serverless среде (Vercel) background tasks не работают после отправки ответа
+            const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(replicateUrls, generation.id);
             
-            // Сохраняем медиа в фоне (не ждём завершения)
-            saveGenerationMedia(replicateUrls, generation.id)
-              .then(async ({ urls: savedUrls, thumbs: savedThumbs }) => {
-                if (savedUrls.length > 0) {
-                  // Обновляем generations с постоянными URL
-                  await (supabase.from('generations') as any)
-                    .update({
-                      output_urls: savedUrls,
-                      output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
-                    })
-                    .eq('id', generation.id);
-                  
-                  // Также обновляем flow_nodes с постоянными URL
-                  const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
-                    .select('id')
-                    .eq('generation_id', generation.id);
-                  
-                  if (flowNodes && flowNodes.length > 0) {
-                    for (const node of flowNodes) {
-                      await (supabase.from('flow_nodes') as any)
-                        .update({ output_url: savedUrls[0] })
-                        .eq('id', node.id);
-                    }
-                    logger.debug(`Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
-                  }
+            if (savedUrls.length > 0) {
+              updateData.status = 'completed';
+              updateData.output_urls = savedUrls;
+              updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+              
+              // Обновляем flow_nodes с постоянными URL
+              const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
+                .select('id')
+                .eq('generation_id', generation.id);
+              
+              if (flowNodes && flowNodes.length > 0) {
+                for (const node of flowNodes) {
+                  await (supabase.from('flow_nodes') as any)
+                    .update({ output_url: savedUrls[0] })
+                    .eq('id', node.id);
                 }
-              })
-              .catch((error: any) => {
-                // Логируем ошибку, но не меняем статус - генерация уже completed
-                logger.error('Background media save failed:', generation.id, error.message);
-              });
+                logger.debug(`Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
+              }
+            } else {
+              // Если не удалось сохранить в Storage, используем временные URL
+              // Они будут работать ~1 час, но лучше чем ничего
+              logger.warn('Media save failed, using temporary Replicate URLs:', generation.id);
+              updateData.status = 'completed';
+              updateData.output_urls = replicateUrls;
+              updateData.output_thumbs = null;
+            }
           }
         }
       }

@@ -169,45 +169,39 @@ export async function POST(request: NextRequest) {
         updateData.status = 'failed';
         updateData.error_message = 'Не удалось получить результат генерации';
       } else {
-        // Асинхронное сохранение медиа - не блокируем вебхук
-        // Сначала обновляем статус с временными URL от Fal.ai
-        updateData.status = 'completed';
-        updateData.output_urls = mediaUrls;
-        updateData.output_thumbs = null;
+        logger.info('[Fal Webhook] Generation completed, saving media:', generation.id);
         
-        logger.info('[Fal Webhook] Generation completed:', generation.id, 'URLs:', updateData.output_urls);
+        // Синхронное сохранение медиа в Supabase Storage
+        // Важно: в serverless среде (Vercel) background tasks не работают после отправки ответа
+        const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(mediaUrls, generation.id);
         
-        // Сохраняем медиа в фоне (не ждём завершения)
-        saveGenerationMedia(mediaUrls, generation.id)
-          .then(async ({ urls: savedUrls, thumbs: savedThumbs }) => {
-            if (savedUrls.length > 0) {
-              // Обновляем generations с постоянными URL
-              await (supabase.from('generations') as any)
-                .update({
-                  output_urls: savedUrls,
-                  output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
-                })
-                .eq('id', generation.id);
-              
-              // Также обновляем flow_nodes с постоянными URL
-              const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
-                .select('id')
-                .eq('generation_id', generation.id);
-              
-              if (flowNodes && flowNodes.length > 0) {
-                for (const node of flowNodes) {
-                  await (supabase.from('flow_nodes') as any)
-                    .update({ output_url: savedUrls[0] })
-                    .eq('id', node.id);
-                }
-                logger.debug(`[Fal Webhook] Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
-              }
+        if (savedUrls.length > 0) {
+          updateData.status = 'completed';
+          updateData.output_urls = savedUrls;
+          updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+          
+          logger.info('[Fal Webhook] Media saved successfully:', generation.id, 'URLs:', savedUrls);
+          
+          // Обновляем flow_nodes с постоянными URL
+          const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
+            .select('id')
+            .eq('generation_id', generation.id);
+          
+          if (flowNodes && flowNodes.length > 0) {
+            for (const node of flowNodes) {
+              await (supabase.from('flow_nodes') as any)
+                .update({ output_url: savedUrls[0] })
+                .eq('id', node.id);
             }
-          })
-          .catch((error: any) => {
-            // Логируем ошибку, но не меняем статус - генерация уже completed
-            logger.error('[Fal Webhook] Background media save failed:', generation.id, error.message);
-          });
+            logger.debug(`[Fal Webhook] Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
+          }
+        } else {
+          // Если не удалось сохранить в Storage, используем временные URL
+          logger.warn('[Fal Webhook] Media save failed, using temporary Fal URLs:', generation.id);
+          updateData.status = 'completed';
+          updateData.output_urls = mediaUrls;
+          updateData.output_thumbs = null;
+        }
         
         // Deduct credits
         try {
