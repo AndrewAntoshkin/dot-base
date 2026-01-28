@@ -5,14 +5,13 @@ import { Notification } from './notifications-button';
 
 // Parse text and convert URLs to clickable links
 function parseTextWithLinks(text: string): React.ReactNode[] {
-  // Regex to match URLs
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const parts = text.split(urlRegex);
+  // Regex to match URLs (with capturing group for split)
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlPattern);
   
   return parts.map((part, index) => {
-    if (urlRegex.test(part)) {
-      // Reset regex lastIndex
-      urlRegex.lastIndex = 0;
+    // Check if this part is a URL (use a fresh regex without 'g' flag)
+    if (/^https?:\/\/[^\s]+$/.test(part)) {
       return (
         <a
           key={index}
@@ -25,7 +24,7 @@ function parseTextWithLinks(text: string): React.ReactNode[] {
         </a>
       );
     }
-    return part;
+    return <span key={index}>{part}</span>;
   });
 }
 
