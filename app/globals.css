@@ -531,14 +531,67 @@
   stroke-width: 2px;
 }
 
-/* Handles for connections - invisible but clickable */
-.react-flow__handle,
-.flow-handle-overlay {
-  background: transparent !important;
-  border: none !important;
-  opacity: 0 !important;
-  pointer-events: all !important;
+/* Handles for connections - invisible but clickable, positioned at node edge */
+/* React Flow handles - visible with dark border, connection enters center */
+.react-flow__handle {
+  width: 14px !important;
+  height: 14px !important;
+  background: #FFFFFF !important;
+  border: 3px solid #1a1a1a !important;
+  border-radius: 50% !important;
   cursor: crosshair !important;
+  transition: all 0.2s ease !important;
+  position: absolute !important;
+  z-index: 10 !important;
+}
+
+/* Hover state - bigger with plus icon */
+.react-flow__handle:hover {
+  width: 24px !important;
+  height: 24px !important;
+  background: #FFFFFF !important;
+  border: 3px solid #1a1a1a !important;
+  cursor: crosshair !important;
+}
+
+/* Plus icon - hidden by default, visible on hover */
+.react-flow__handle::after {
+  content: '+';
+  color: #1a1a1a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.react-flow__handle:hover::after {
+  opacity: 1;
+}
+
+/* Position handles at node edge - centered on border */
+.react-flow__handle.react-flow__handle-left {
+  left: 0 !important;
+  transform: translateY(-50%) translateX(-50%) !important;
+}
+
+.react-flow__handle.react-flow__handle-right {
+  right: 0 !important;
+  left: auto !important;
+  transform: translateY(-50%) translateX(50%) !important;
+}
+
+/* Fix transform on hover to maintain position */
+.react-flow__handle.react-flow__handle-left:hover {
+  transform: translateY(-50%) translateX(-50%) !important;
+}
+
+.react-flow__handle.react-flow__handle-right:hover {
+  transform: translateY(-50%) translateX(50%) !important;
 }
 
 .react-flow__background {

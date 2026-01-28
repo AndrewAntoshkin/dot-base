@@ -1,14 +1,17 @@
 'use client';
 
-import { memo, useCallback, useState, useMemo, useRef } from 'react';
-import { Handle, Position, useEdges, useNodes } from '@xyflow/react';
+import { memo, useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import { Handle, Position, useEdges, useNodes, useUpdateNodeInternals } from '@xyflow/react';
 import type { NodeProps, Node } from '@xyflow/react';
 import { ReactFlowNodeData, FlowNodeStatus } from '@/lib/flow/types';
 import { useFlowStore } from '@/lib/flow/store';
 import { cn } from '@/lib/utils';
-import { Loader2, Plus, FileText, Play, ImagePlus, X, Video, Copy, Check } from 'lucide-react';
+import { Loader2, FileText, Play, ImagePlus, X, Video, Copy, Check } from 'lucide-react';
 import Image from 'next/image';
 import { NodeAuthorBadge } from './node-author-badge';
+import { FlowCommentMarker } from './flow-comment-marker';
+import { FlowCommentThread } from './flow-comment-thread';
+import { useCommentsStore } from '@/lib/flow/comments-store';
 
 type FlowTextNodeType = Node<ReactFlowNodeData, 'flow-text'>;
 
@@ -22,10 +25,36 @@ interface MediaItem {
 }
 
 function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeType>) {
-  const { selectNode, updateNodeData, runGeneration } = useFlowStore();
+  const { selectNode, updateNodeData, runGeneration, flowId } = useFlowStore();
   const [isUploading, setIsUploading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const updateNodeInternals = useUpdateNodeInternals();
+  
+  // Comments
+  const { 
+    comments, 
+    currentUserId, 
+    openThreadNodeId,
+    startAddingComment, 
+    openThread,
+    closeThread,
+  } = useCommentsStore();
+  const nodeComments = comments.filter(c => c.node_id === id);
+  const isThreadOpen = openThreadNodeId === id;
+  
+  // Update node internals after mount to sync handle positions
+  // Use requestAnimationFrame to ensure CSS is applied first
+  useEffect(() => {
+    // Double RAF to ensure styles are computed
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateNodeInternals(id);
+      });
+    });
+  }, [id, updateNodeInternals]);
   
   // Copy text to clipboard
   const handleCopy = useCallback(async (text: string) => {
@@ -146,10 +175,17 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
     ? 'Задай вопрос по картинке/видео...' 
     : 'Напиши текст или промпт для AI...';
 
+  // Состояние hover для маркера комментариев
+  const [isMarkerHovered, setIsMarkerHovered] = useState(false);
+  const effectiveHover = isHovered || isMarkerHovered;
+
   return (
     <div
-      className="relative group"
+      ref={nodeRef}
+      className="relative group overflow-visible"
       onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Author badge - показываем сверху ноды */}
       {data.createdByEmail && (
@@ -169,42 +205,19 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
           data.status === 'running' && 'animate-pulse-glow'
         )}
       >
-        {/* Handles for connections - positioned at the visual edge */}
+        {/* Left handle - styled via CSS */}
         <Handle
           type="target"
           position={Position.Left}
           id="input"
-          style={{ left: 0, top: '50%' }}
-          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
-        {/* Visual indicator for target handle */}
-        <div 
-          className={cn(
-            "absolute top-1/2 left-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
-            "transform -translate-x-1/2 -translate-y-1/2",
-            "opacity-0 group-hover:opacity-100"
-          )}
-        >
-          <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
-        </div>
         
+        {/* Right handle - styled via CSS */}
         <Handle
           type="source"
           position={Position.Right}
           id="output"
-          style={{ right: 0, top: '50%' }}
-          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
-        {/* Visual indicator for source handle */}
-        <div 
-          className={cn(
-            "absolute top-1/2 right-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
-            "transform translate-x-1/2 -translate-y-1/2",
-            "opacity-0 group-hover:opacity-100"
-          )}
-        >
-          <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
-        </div>
         
         {/* Header */}
         <div className="flex items-center justify-between px-1 mb-3">
@@ -462,6 +475,27 @@ function FlowTextNodeComponent({ id, data, selected }: NodeProps<FlowTextNodeTyp
           className="hidden"
         />
       </div>
+
+      {/* Comment marker - справа от ноды (через NodeToolbar) */}
+      <FlowCommentMarker
+        nodeId={id}
+        comments={nodeComments}
+        currentUserId={currentUserId || undefined}
+        isHovered={effectiveHover}
+        onAddComment={() => startAddingComment(id)}
+        onOpenThread={() => openThread(id)}
+        onMarkerHover={setIsMarkerHovered}
+      />
+
+      {/* Comment thread popup - через Portal */}
+      {isThreadOpen && flowId && (
+        <FlowCommentThread
+          flowId={flowId}
+          nodeId={id}
+          nodeRef={nodeRef}
+          onClose={closeThread}
+        />
+      )}
     </div>
   );
 }

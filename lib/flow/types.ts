@@ -201,3 +201,41 @@ export function reactFlowEdgeToDb(
     edge_type: edge.type || 'default',
   };
 }
+
+// === Комментарии ===
+
+export interface FlowComment {
+  id: string;
+  flow_id: string;
+  node_id?: string | null;      // ID ноды если привязан, null если на канвасе
+  parent_id?: string | null;    // ID родительского комментария для цепочек
+  user_id: string;
+  content: string;
+  position_x?: number | null;   // Только для комментариев на канвасе
+  position_y?: number | null;
+  is_resolved: boolean;
+  read_by: string[];            // Массив user_id кто прочитал
+  created_at: string;
+  updated_at: string;
+  // Присоединённые данные
+  user_email?: string;          // Email автора (из join)
+  replies_count?: number;       // Количество ответов
+}
+
+export interface FlowCommentWithUser extends FlowComment {
+  user_email: string;
+  user_avatar_url?: string;
+}
+
+// Группировка комментариев по нодам
+export interface NodeCommentsGroup {
+  node_id: string;
+  comments: FlowCommentWithUser[];
+  unread_count: number;
+}
+
+// Комментарии на канвасе (без привязки к ноде)
+export interface CanvasComment extends FlowCommentWithUser {
+  position_x: number;
+  position_y: number;
+}

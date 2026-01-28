@@ -26,6 +26,7 @@ export const CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'seedream-4', displayName: 'SeeDream 4', description: 'ByteDance - генерация и редактирование до 4K разрешения', action: 'create' },
   { id: 'seedream-4.5', displayName: 'SeeDream 4.5', description: 'ByteDance - улучшенная модель с лучшим пониманием пространства и знаний', action: 'create' },
   { id: 'nano-banana-pro', displayName: 'Nano Banana Pro', description: 'Генерация с текстом и до 14 референсов. ⏱️ 1-2 мин', action: 'create' },
+  { id: 'nano-banana', displayName: 'Nano Banana', description: 'Google Gemini 2.5 - быстрая генерация, до 3 референсов', action: 'create' },
   { id: 'ideogram-v3-turbo', displayName: 'Ideogram V3 Turbo', description: 'Быстрая генерация с поддержкой стилей и inpainting', action: 'create' },
   { id: 'flux-1.1-pro', displayName: 'FLUX 1.1 Pro', description: 'Быстрая генерация с отличным качеством', action: 'create' },
   { id: 'imagen-4-ultra', displayName: 'Imagen 4 Ultra', description: 'Google - максимальное качество', action: 'create' },

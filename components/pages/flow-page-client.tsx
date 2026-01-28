@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFlowStore } from '@/lib/flow/store';
+import { useCommentsStore } from '@/lib/flow/comments-store';
 import { FlowCanvas } from '@/components/flow/flow-canvas';
 import { FlowCreateModal } from '@/components/flow/flow-create-modal';
 import { dbNodeToReactFlow, dbEdgeToReactFlow } from '@/lib/flow/types';
@@ -20,17 +21,6 @@ export function FlowPageClient() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Получаем текущего пользователя
-  useEffect(() => {
-    const getUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setIsUserLoading(false);
-    };
-    getUser();
-  }, []);
-
   const {
     setFlowId,
     loadFlow,
@@ -40,6 +30,27 @@ export function FlowPageClient() {
     viewport,
     reset,
   } = useFlowStore();
+
+  const { 
+    fetchComments, 
+    setCurrentUserId,
+    reset: resetComments,
+  } = useCommentsStore();
+
+  // Получаем текущего пользователя
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+      setIsUserLoading(false);
+    };
+    getUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Загрузка flow из API (обходит RLS через adminClient)
   const loadFlowFromDb = useCallback(async (id: string) => {
@@ -60,11 +71,14 @@ export function FlowPageClient() {
       setFlowId(id);
       loadFlow(reactFlowNodes, reactFlowEdges, flowData.name);
 
+      // Загружаем комментарии
+      fetchComments(id);
+
     } catch (err) {
       console.error('Error loading flow:', err);
       setError(err instanceof Error ? err.message : 'Failed to load flow');
     }
-  }, [setFlowId, loadFlow]);
+  }, [setFlowId, loadFlow, fetchComments]);
 
   // Показать модалку создания нового flow
   const showCreateFlowModal = useCallback(() => {
@@ -215,8 +229,9 @@ export function FlowPageClient() {
   useEffect(() => {
     return () => {
       reset();
+      resetComments();
     };
-  }, [reset]);
+  }, [reset, resetComments]);
 
   if (isUserLoading || isLoading) {
     return (

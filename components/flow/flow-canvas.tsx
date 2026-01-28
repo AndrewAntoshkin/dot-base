@@ -15,6 +15,7 @@ import { useFlowStore } from '@/lib/flow/store';
 import { FlowTextNode } from './flow-text-node';
 import { FlowImageNode } from './flow-image-node';
 import { FlowVideoNode } from './flow-video-node';
+import { FlowEdge } from './flow-edge';
 import { FlowBlockModal } from './flow-block-modal';
 import { FlowSaveModal } from './flow-save-modal';
 import { Plus, Minus, ChevronDown, Clock, Magnet, GitBranch, X, Loader2, Trash2, FilePlus } from 'lucide-react';
@@ -42,6 +43,11 @@ const nodeTypes = {
   'flow-text': FlowTextNode,
   'flow-image': FlowImageNode,
   'flow-video': FlowVideoNode,
+} as const;
+
+// Регистрация типов связей
+const edgeTypes = {
+  'default': FlowEdge,
 } as const;
 
 // Grid configuration
@@ -336,6 +342,7 @@ function FlowCanvasInner() {
         onPaneClick={onPaneClick}
         onMoveEnd={onMoveEnd}
         nodeTypes={nodeTypes as any}
+        edgeTypes={edgeTypes as any}
         fitView={false}
         panOnScroll
         selectionOnDrag

@@ -41,7 +41,7 @@ export class ReplicateClient {
     // Модели, которые НЕ поддерживают match_input_image
     const modelsWithoutMatchInput = ['flux-2-pro', 'black-forest-labs/flux-2-pro'];
     // Модели, которые ЯВНО поддерживают match_input_image (не удаляем его)
-    const modelsWithMatchInputSupport = ['nano-banana-pro', 'google/nano-banana-pro'];
+    const modelsWithMatchInputSupport = ['nano-banana-pro', 'google/nano-banana-pro', 'nano-banana', 'google/nano-banana'];
     
     const modelLowerName = (modelName || '').toLowerCase();
     const modelDoesntSupportMatchInput = modelsWithoutMatchInput.some(m => modelLowerName.includes(m.toLowerCase()));

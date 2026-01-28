@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       if (settings.quality) {
         const quality = settings.quality.toUpperCase(); // Normalize to uppercase
         // Nano Banana uses 'resolution'
-        if (modelId === 'nano-banana-pro') {
+        if (modelId === 'nano-banana-pro' || modelId === 'nano-banana') {
           input.resolution = quality;
         }
         // FLUX models use output_quality
@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
       // Map model to correct reference field
       const refFieldMap: Record<string, string> = {
         'nano-banana-pro': 'image_input',
+        'nano-banana': 'image_input',
         'flux-2-max': 'input_images',
         'flux-2-pro': 'input_images',
         'ideogram-v3-turbo': 'style_reference_images',

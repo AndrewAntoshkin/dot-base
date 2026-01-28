@@ -533,6 +533,9 @@ function MultiFileUploader({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  // Drag-and-drop reordering state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   // Храним текущее значение в ref для доступа из async callbacks
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -624,6 +627,58 @@ function MultiFileUploader({
     }
   }, [onSelectIndex]);
 
+  // Drag-and-drop reordering handlers
+  const handleReorderDragStart = useCallback((e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  }, []);
+
+  const handleReorderDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  }, [draggedIndex]);
+
+  const handleReorderDragLeave = useCallback(() => {
+    setDragOverIndex(null);
+  }, []);
+
+  const handleReorderDrop = useCallback((e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newValue = [...value];
+    const [draggedItem] = newValue.splice(draggedIndex, 1);
+    newValue.splice(targetIndex, 0, draggedItem);
+    
+    onChange(newValue);
+    
+    // Update selected index if needed
+    if (onSelectIndex && selectedIndex !== undefined) {
+      if (selectedIndex === draggedIndex) {
+        onSelectIndex(targetIndex);
+      } else if (draggedIndex < selectedIndex && targetIndex >= selectedIndex) {
+        onSelectIndex(selectedIndex - 1);
+      } else if (draggedIndex > selectedIndex && targetIndex <= selectedIndex) {
+        onSelectIndex(selectedIndex + 1);
+      }
+    }
+    
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  }, [draggedIndex, value, onChange, onSelectIndex, selectedIndex]);
+
+  const handleReorderDragEnd = useCallback(() => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  }, []);
+
   return (
     <div>
       {/* Зона загрузки */}
@@ -665,19 +720,27 @@ function MultiFileUploader({
         </div>
       )}
 
-      {/* Превью загруженных изображений - под областью загрузки, 4 в ряд */}
+      {/* Превью загруженных изображений - под областью загрузки, 4 в ряд, с drag-and-drop перестановкой */}
       {value.length > 0 && (
         <div className="grid grid-cols-4 gap-2 mt-3">
           {value.map((img, index) => (
             <div 
               key={index} 
+              draggable
+              onDragStart={(e) => handleReorderDragStart(e, index)}
+              onDragOver={(e) => handleReorderDragOver(e, index)}
+              onDragLeave={handleReorderDragLeave}
+              onDrop={(e) => handleReorderDrop(e, index)}
+              onDragEnd={handleReorderDragEnd}
               onClick={() => handleSelectImage(index)}
               className={`
-                relative rounded-[8px] overflow-hidden bg-[#0a0a0a] cursor-pointer transition-all
+                relative rounded-[8px] overflow-hidden bg-[#0a0a0a] cursor-grab active:cursor-grabbing transition-all duration-150
                 ${selectedIndex === index 
                   ? 'ring-2 ring-white ring-offset-2 ring-offset-neutral-900' 
                   : 'hover:ring-1 hover:ring-white/50'
                 }
+                ${draggedIndex === index ? 'opacity-50 scale-95' : ''}
+                ${dragOverIndex === index ? 'ring-2 ring-white ring-offset-2 ring-offset-neutral-900' : ''}
               `}
             >
               <img
@@ -685,6 +748,10 @@ function MultiFileUploader({
                 alt={`Uploaded ${index + 1}`}
                 className="w-full aspect-square object-cover"
               />
+              {/* Index badge */}
+              <div className="absolute bottom-1 left-1 bg-black/70 rounded px-1.5 py-0.5 text-[9px] font-medium text-white">
+                {index + 1}
+              </div>
               <button
                 type="button"
                 onClick={(e) => {

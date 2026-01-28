@@ -1,17 +1,114 @@
 'use client';
 
-import { memo, useCallback, useState, useMemo, useRef } from 'react';
-import { Handle, Position, useEdges, useNodes } from '@xyflow/react';
+import { memo, useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import { Handle, Position, useEdges, useNodes, useUpdateNodeInternals } from '@xyflow/react';
 import type { NodeProps, Node } from '@xyflow/react';
 import { ReactFlowNodeData, FlowNodeStatus } from '@/lib/flow/types';
 import { useFlowStore } from '@/lib/flow/store';
 import { cn } from '@/lib/utils';
-import { Loader2, ChevronDown, Plus, ImagePlus, RefreshCw, Expand, Download, FileImage, Play, Link, X } from 'lucide-react';
+import { Loader2, ChevronDown, ImagePlus, RefreshCw, Expand, Download, FileImage, Play, Link, X } from 'lucide-react';
 import Image from 'next/image';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
 import { NodeAuthorBadge } from './node-author-badge';
+import { FlowCommentMarker } from './flow-comment-marker';
+import { FlowCommentThread } from './flow-comment-thread';
+import { useCommentsStore } from '@/lib/flow/comments-store';
 
 type FlowImageNodeType = Node<ReactFlowNodeData, 'flow-image'>;
+
+// Draggable References Grid Component
+interface DraggableReferencesGridProps {
+  images: string[];
+  maxImages: number;
+  onReorder: (images: string[]) => void;
+  onRemove: (index: number) => void;
+}
+
+function DraggableReferencesGrid({ images, maxImages, onReorder, onRemove }: DraggableReferencesGridProps) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newImages = [...images];
+    const [draggedImage] = newImages.splice(draggedIndex, 1);
+    newImages.splice(targetIndex, 0, draggedImage);
+    
+    onReorder(newImages);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  return (
+    <div className="mt-4">
+      <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#959595] mb-2 flex items-center justify-between">
+        <span>Загружено: {images.length} из {maxImages}</span>
+        <span className="text-[9px] normal-case tracking-normal opacity-70">⌘V для вставки</span>
+      </p>
+      <div className="grid grid-cols-4 gap-2">
+        {images.map((url, index) => (
+          <div 
+            key={index} 
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, index)}
+            onDragEnd={handleDragEnd}
+            className={cn(
+              "relative w-full aspect-square rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-all duration-150",
+              draggedIndex === index && "opacity-50 scale-95",
+              dragOverIndex === index && "ring-2 ring-white ring-offset-2 ring-offset-[#171717]"
+            )}
+          >
+            <Image src={url} alt={`Reference ${index + 1}`} fill className="object-cover" />
+            {/* Index badge */}
+            <div className="absolute bottom-1 left-1 bg-black/70 rounded px-1.5 py-0.5 text-[9px] font-medium text-white">
+              {index + 1}
+            </div>
+            <button
+              className="absolute top-1 right-1 bg-black/50 rounded-full p-0.5 text-white hover:bg-black/70"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(index);
+              }}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Model options - must match ids from models-config.ts
 // Models with reference image support
@@ -25,6 +122,7 @@ interface ImageModel {
 
 const IMAGE_MODELS: ImageModel[] = [
   { id: 'nano-banana-pro', label: 'Nano Banana Pro', supportsReferences: true, maxReferences: 14, referenceField: 'image_input' },
+  { id: 'nano-banana', label: 'Nano Banana', supportsReferences: true, maxReferences: 3, referenceField: 'image_input' },
   { id: 'flux-2-max', label: 'FLUX 2 Max', supportsReferences: true, maxReferences: 8, referenceField: 'input_images' },
   { id: 'flux-2-pro', label: 'FLUX 2 Pro', supportsReferences: true, maxReferences: 8, referenceField: 'input_images' },
   { id: 'imagen-4-ultra', label: 'Imagen 4', supportsReferences: false },
@@ -36,10 +134,36 @@ const ASPECT_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'];
 const QUALITY_OPTIONS = ['4K', '2K', '1K'];
 
 function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeType>) {
-  const { selectNode, updateNodeData, runGeneration } = useFlowStore();
+  const { selectNode, updateNodeData, runGeneration, flowId } = useFlowStore();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const updateNodeInternals = useUpdateNodeInternals();
+  
+  // Comments
+  const { 
+    comments, 
+    currentUserId, 
+    openThreadNodeId,
+    startAddingComment, 
+    openThread,
+    closeThread,
+  } = useCommentsStore();
+  const nodeComments = comments.filter(c => c.node_id === id);
+  const isThreadOpen = openThreadNodeId === id;
+  
+  // Update node internals after mount to sync handle positions
+  // Use requestAnimationFrame to ensure CSS is applied first
+  useEffect(() => {
+    // Double RAF to ensure styles are computed
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateNodeInternals(id);
+      });
+    });
+  }, [id, updateNodeInternals]);
   
   // Get connected source nodes to show inherited prompt
   const edges = useEdges();
@@ -121,11 +245,20 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
 
   const hasOutput = !!(data.outputUrl || data.output);
 
+  // Состояние hover для маркера комментариев
+  const [isMarkerHovered, setIsMarkerHovered] = useState(false);
+  const effectiveHover = isHovered || isMarkerHovered;
+
   return (
     <div
-      className="relative group pb-16"
+      ref={nodeRef}
+      className="relative group pb-16 overflow-visible"
       onClick={handleClick}
-      onMouseLeave={() => setOpenDropdown(null)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setOpenDropdown(null);
+      }}
     >
       {/* Author badge - показываем сверху ноды */}
       {data.createdByEmail && (
@@ -145,42 +278,19 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
           data.status === 'running' && 'animate-pulse-glow'
         )}
       >
-        {/* Handles for connections - positioned at the visual edge */}
+        {/* Left handle - styled via CSS */}
         <Handle
           type="target"
           position={Position.Left}
           id="input"
-          style={{ left: 0, top: '50%' }}
-          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
-        {/* Visual indicator for target handle */}
-        <div 
-          className={cn(
-            "absolute top-1/2 left-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
-            "transform -translate-x-1/2 -translate-y-1/2",
-            "opacity-0 group-hover:opacity-100"
-          )}
-        >
-          <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
-        </div>
         
+        {/* Right handle - styled via CSS */}
         <Handle
           type="source"
           position={Position.Right}
           id="output"
-          style={{ right: 0, top: '50%' }}
-          className="!w-6 !h-6 !min-w-0 !min-h-0 flow-handle-overlay"
         />
-        {/* Visual indicator for source handle */}
-        <div 
-          className={cn(
-            "absolute top-1/2 right-0 w-6 h-6 rounded-full border border-white/30 bg-white/5 transition-opacity duration-200 pointer-events-none",
-            "transform translate-x-1/2 -translate-y-1/2",
-            "opacity-0 group-hover:opacity-100"
-          )}
-        >
-          <Plus className="w-6 h-6 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" strokeWidth={2} />
-        </div>
         {/* Header */}
         <div className="flex items-center justify-between px-1 mb-3">
           <div className="flex items-center gap-1">
@@ -482,25 +592,17 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
                   </p>
                 </div>
                 
-                {/* Uploaded images grid */}
+                {/* Uploaded images grid with drag-and-drop reordering */}
                 {data.referenceImages && data.referenceImages.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 mt-4">
-                    {data.referenceImages.map((url, index) => (
-                      <div key={index} className="relative w-full aspect-square rounded-lg overflow-hidden">
-                        <Image src={url} alt={`Reference ${index + 1}`} fill className="object-cover" />
-                        <button
-                          className="absolute top-1 right-1 bg-black/50 rounded-full p-0.5 text-white hover:bg-black/70"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updatedImages = data.referenceImages?.filter((_, i) => i !== index) || [];
-                            updateNodeData(id, { referenceImages: updatedImages });
-                          }}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  <DraggableReferencesGrid 
+                    images={data.referenceImages}
+                    maxImages={currentModel.maxReferences || 8}
+                    onReorder={(newImages) => updateNodeData(id, { referenceImages: newImages })}
+                    onRemove={(index) => {
+                      const updatedImages = data.referenceImages?.filter((_, i) => i !== index) || [];
+                      updateNodeData(id, { referenceImages: updatedImages });
+                    }}
+                  />
                 )}
               </div>
             )}
@@ -536,8 +638,28 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
           </div>
         )}
         </div>
-
       </div>
+
+      {/* Comment marker - справа от ноды (через NodeToolbar) */}
+      <FlowCommentMarker
+        nodeId={id}
+        comments={nodeComments}
+        currentUserId={currentUserId || undefined}
+        isHovered={effectiveHover}
+        onAddComment={() => startAddingComment(id)}
+        onOpenThread={() => openThread(id)}
+        onMarkerHover={setIsMarkerHovered}
+      />
+
+      {/* Comment thread popup - через Portal */}
+      {isThreadOpen && flowId && (
+        <FlowCommentThread
+          flowId={flowId}
+          nodeId={id}
+          nodeRef={nodeRef}
+          onClose={closeThread}
+        />
+      )}
       
       {/* Fullscreen Image Viewer */}
       {data.outputUrl && (

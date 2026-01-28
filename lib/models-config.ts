@@ -629,6 +629,89 @@ export const CREATE_MODELS: Model[] = [
     ],
   },
 
+  // 3b. Nano Banana (google/nano-banana) - базовая версия
+  {
+    id: 'nano-banana',
+    name: 'nano-banana',
+    displayName: 'Nano Banana',
+    replicateModel: 'google/nano-banana',
+    action: 'create',
+    runs: '76.4M runs',
+    price: 'Priced by multiple properties',
+    description: 'Google Gemini 2.5 Flash Image - быстрая генерация и редактирование. До 3 изображений.',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Опишите изображение...',
+        description: 'Текст для генерации или редактирования. Поддерживает multilingual.',
+      },
+      {
+        name: 'image_input',
+        label: 'Референсные изображения',
+        type: 'file_array',
+        description: 'До 3 изображений для трансформации или объединения (multi-image fusion)',
+        maxFiles: 3,
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '2K',
+        options: [
+          { value: '1K', label: '1K (быстрее)' },
+          { value: '2K', label: '2K (рекомендуется)' },
+          { value: '4K', label: '4K (медленнее)' },
+        ],
+        description: 'Выше разрешение = дольше генерация',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: 'match_input_image',
+        options: [
+          { value: 'match_input_image', label: 'Как входное изображение' },
+          { value: '1:1', label: '1:1 (квадрат)' },
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:4', label: '3:4' },
+          { value: '3:2', label: '3:2' },
+          { value: '2:3', label: '2:3' },
+          { value: '4:5', label: '4:5' },
+          { value: '5:4', label: '5:4' },
+          { value: '21:9', label: '21:9 (ультраширокий)' },
+        ],
+      },
+      {
+        name: 'output_format',
+        label: 'Формат',
+        type: 'select',
+        default: 'jpg',
+        options: [
+          { value: 'jpg', label: 'JPG' },
+          { value: 'png', label: 'PNG' },
+          { value: 'webp', label: 'WebP' },
+        ],
+      },
+      {
+        name: 'safety_filter_level',
+        label: 'Уровень фильтрации',
+        type: 'select',
+        default: 'block_only_high',
+        options: [
+          { value: 'block_only_high', label: 'Минимальный (рекомендуется)' },
+          { value: 'block_medium_and_above', label: 'Средний' },
+          { value: 'block_low_and_above', label: 'Строгий' },
+        ],
+        description: 'При ошибках safety попробуйте Минимальный уровень',
+      },
+    ],
+  },
+
   // 4. Ideogram V3 Turbo
   {
     id: 'ideogram-v3-turbo',
