@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
     // Create notification for the user
     const supabase = createAdminSupabaseClient();
     
-    const { error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
       .from('notifications')
       .insert({
         user_id: userId,

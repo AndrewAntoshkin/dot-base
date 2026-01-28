@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const { data: notifications, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: notifications, error } = await (supabase as any)
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
@@ -28,7 +29,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get unread count
-    const { count: unreadCount } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count: unreadCount } = await (supabase as any)
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)

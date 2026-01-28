@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
 
     if (markAll) {
       // Mark all notifications as read
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', user.id)
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
       }
     } else if (notificationId) {
       // Mark single notification as read
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId)

@@ -14,11 +14,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin
-    const { data: userProfile } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: userProfile } = await (supabase as any)
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .single() as { data: { role: string } | null };
 
     if (!userProfile || userProfile.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest) {
     // Create notification using admin client
     const adminSupabase = createAdminSupabaseClient();
 
-    const { data: notification, error } = await adminSupabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: notification, error } = await (adminSupabase as any)
       .from('notifications')
       .insert({
         user_id: userId,
