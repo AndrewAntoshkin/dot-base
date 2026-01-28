@@ -90,13 +90,9 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     
     // Get current user and subscribe to their notifications
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        console.log('[Notifications] No user found, skipping realtime subscription');
-        return;
-      }
+      if (!user) return;
       
       currentUserId = user.id;
-      console.log('[Notifications] Setting up realtime for user:', user.id);
       
       channel = supabase
         .channel('notifications-changes')
@@ -108,20 +104,16 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
             table: 'notifications',
           },
           (payload) => {
-            console.log('[Notifications] Received realtime event:', payload);
             const newNotification = payload.new as Notification & { user_id: string };
             
             // Filter client-side to only show notifications for current user
             if (newNotification.user_id === currentUserId) {
-              console.log('[Notifications] Adding notification for current user');
               setNotifications(prev => [newNotification, ...prev].slice(0, 5));
               setUnreadCount(prev => prev + 1);
             }
           }
         )
-        .subscribe((status) => {
-          console.log('[Notifications] Subscription status:', status);
-        });
+        .subscribe();
     });
     
     return () => {
