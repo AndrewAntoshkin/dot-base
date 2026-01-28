@@ -44,7 +44,7 @@ export async function PATCH(
     const body = await request.json();
     const { content, is_resolved, mark_as_read } = body;
 
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
 
     // Обновить контент может только автор
     if (content !== undefined) {
@@ -80,9 +80,10 @@ export async function PATCH(
       return NextResponse.json({ comment: existingComment });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: comment, error: updateError } = await adminClient
       .from('flow_comments')
-      .update(updates)
+      .update(updates as any)
       .eq('id', commentId)
       .select()
       .single();
