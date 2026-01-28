@@ -118,10 +118,10 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     };
   }, [fetchNotifications]);
 
-  // Notify parent about popover state changes
+  // Notify parent about popover/sidebar state changes (to hide tooltip)
   useEffect(() => {
-    onOpenChange?.(isPopoverOpen);
-  }, [isPopoverOpen, onOpenChange]);
+    onOpenChange?.(isPopoverOpen || isSidebarOpen);
+  }, [isPopoverOpen, isSidebarOpen, onOpenChange]);
 
   // Close popover on outside click
   useEffect(() => {
