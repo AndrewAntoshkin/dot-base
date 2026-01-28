@@ -79,7 +79,7 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     }
   }, []);
 
-  // Initial fetch and realtime subscription
+  // Initial fetch, realtime subscription, and fallback polling
   useEffect(() => {
     fetchNotifications();
     
@@ -108,13 +108,21 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
             setUnreadCount(prev => prev + 1);
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Notifications] Realtime subscription status:', status);
+        });
     });
+    
+    // Fallback polling every 30 seconds (in case realtime doesn't work)
+    const pollInterval = setInterval(() => {
+      fetchNotifications();
+    }, 30000);
     
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
       }
+      clearInterval(pollInterval);
     };
   }, [fetchNotifications]);
 
