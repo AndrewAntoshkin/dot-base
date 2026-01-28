@@ -152,16 +152,16 @@ export function NotificationsSidebar({ isOpen, onClose, onNotificationClick }: N
                     {group.date}
                   </div>
 
-                  {/* Notifications */}
-                  <div className="space-y-2">
+                  {/* Notifications - gap 20px between items */}
+                  <div className="flex flex-col gap-5">
                     {group.notifications.map((notification) => (
                       <button
                         key={notification.id}
                         onClick={() => onNotificationClick(notification)}
-                        className="w-full flex items-start gap-3 text-left group"
+                        className="w-full flex items-start gap-3 text-left"
                       >
                         {/* Icon */}
-                        <div className="flex-shrink-0 mt-0.5">
+                        <div className="flex-shrink-0">
                           {notification.type === 'support_reply' ? (
                             <SupportIcon className="w-5 h-5 text-white" />
                           ) : (
@@ -169,25 +169,25 @@ export function NotificationsSidebar({ isOpen, onClose, onNotificationClick }: N
                           )}
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <span className={`text-sm font-medium leading-tight ${notification.is_read ? 'text-[#717171]' : 'text-white'}`}>
+                        {/* Content - gap 4px between title and subtitle */}
+                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                          <span className={`text-sm font-medium leading-[1.29] ${notification.is_read ? 'text-[#717171]' : 'text-white'}`}>
                             {notification.type === 'support_reply' ? 'Поддержка' : notification.title}
                           </span>
-                          <p className="text-xs text-[#959595] mt-0.5 line-clamp-2">
+                          <p className="text-xs leading-[1.5] text-[#959595] line-clamp-2">
                             {notification.type === 'support_reply' 
                               ? 'Ответ на запрос' 
                               : notification.message || notification.title}
                           </p>
                         </div>
 
-                        {/* Date & indicator */}
+                        {/* Date & indicator - gap 8px */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className="text-xs text-[#717171]">
                             {formatDate(notification.created_at)}
                           </span>
                           {!notification.is_read && (
-                            <span className="w-2 h-2 rounded-full bg-[#FA5252]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#FA5252]" />
                           )}
                         </div>
                       </button>
