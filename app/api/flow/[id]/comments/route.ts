@@ -121,11 +121,12 @@ export async function POST(
     }
 
     // Получаем профиль пользователя для avatar_url
-    const { data: userProfile } = await adminClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: userProfile } = await (adminClient as any)
       .from('users')
       .select('avatar_url, display_name')
       .eq('id', user.id)
-      .single();
+      .single() as { data: { avatar_url: string | null; display_name: string | null } | null };
 
     return NextResponse.json({ 
       comment: {
