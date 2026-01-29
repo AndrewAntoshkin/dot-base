@@ -73,16 +73,25 @@ const SearchInput = memo(function SearchInput({
 const UserCard = memo(function UserCard({ 
   user, 
   index, 
-  onUserClick 
+  onUserClick,
+  onImportGenerations,
+  isImporting,
 }: { 
   user: WorkspaceUser; 
   index: number; 
   onUserClick: (userId: string) => void;
+  onImportGenerations?: (userId: string) => void;
+  isImporting?: boolean;
 }) {
   const [isVisible, setIsVisible] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const avatarColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
   const initials = user.email.split('@')[0].substring(0, 2).toUpperCase();
+  
+  // Показываем кнопку импорта если:
+  // - Нет превью (генераций в этом пространстве)
+  // - Но есть генерации всего (в других пространствах)
+  const canImportGenerations = user.previews.length === 0 && user.generations_count > 0;
 
   // Lazy load: показываем изображения только когда карточка видна
   useEffect(() => {
@@ -202,10 +211,22 @@ const UserCard = memo(function UserCard({
             </div>
           </div>
         ) : (
-          <div className="h-[170px] bg-[#1a1a1a] rounded-[12px] flex items-center justify-center">
+          <div className="h-[170px] bg-[#1a1a1a] rounded-[12px] flex flex-col items-center justify-center gap-3">
             <span className="font-inter text-[13px] text-[#4d4d4d]">
-              Нет генераций
+              {canImportGenerations ? 'Генерации в другом пространстве' : 'Нет генераций'}
             </span>
+            {canImportGenerations && onImportGenerations && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImportGenerations(user.id);
+                }}
+                disabled={isImporting}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-[12px] text-white font-medium transition-colors disabled:opacity-50"
+              >
+                {isImporting ? 'Перенос...' : `Перенести ${user.generations_count} генераций`}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -298,6 +319,9 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
     archived: 0,
   });
   const [isLoadingFlows, setIsLoadingFlows] = useState(false);
+  
+  // Import generations state
+  const [importingUserId, setImportingUserId] = useState<string | null>(null);
 
   // Callback для поиска - стабильная ссылка
   const handleSearch = useCallback((query: string) => {
@@ -415,6 +439,36 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
     // Переходим в историю с предустановленным фильтром по пользователю
     router.push(`/history?workspaceId=${workspaceId}&creatorId=${userId}&onlyMine=false`);
   }, [router, workspaceId]);
+
+  // Импорт генераций пользователя в это пространство
+  const handleImportGenerations = useCallback(async (userId: string) => {
+    if (importingUserId) return;
+    
+    setImportingUserId(userId);
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/import-user-generations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`Imported ${data.importedCount} generations`);
+        // Перезагружаем список пользователей чтобы обновить превью
+        fetchUsers();
+      } else {
+        const data = await response.json();
+        console.error('Import failed:', data.error);
+        alert(data.error || 'Ошибка импорта генераций');
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('Ошибка сети');
+    } finally {
+      setImportingUserId(null);
+    }
+  }, [workspaceId, importingUserId, fetchUsers]);
 
   if (isLoading) {
     return (
@@ -546,6 +600,8 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
                     user={user}
                     index={index}
                     onUserClick={handleUserClick}
+                    onImportGenerations={handleImportGenerations}
+                    isImporting={importingUserId === user.id}
                   />
                 ))}
                 
