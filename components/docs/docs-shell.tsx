@@ -1071,7 +1071,6 @@ function FeedbackModal({
                   <option value="Проблема с генерацией">Проблема с генерацией</option>
                   <option value="Предложение по улучшению">Предложение по улучшению</option>
                   <option value="Ошибка / Баг">Ошибка / Баг</option>
-                  <option value="Вопрос по оплате">Вопрос по оплате</option>
                   <option value="Другое">Другое</option>
                 </select>
               </div>
