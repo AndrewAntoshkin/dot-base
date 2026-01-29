@@ -24,6 +24,7 @@ import { UserRole } from '@/lib/supabase/types';
 import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, isSameDay, isWithinInterval, isBefore, isAfter } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import WorkspacesContent from '@/components/workspaces-content';
+import { WorkspaceCreateModal } from '@/components/workspace-create-modal';
 
 interface AdminStats {
   totalWorkspaces: number;
@@ -283,6 +284,9 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
   
   // Dashboard tabs
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  
+  // Create workspace modal
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
   // Получаем isSuperAdmin из контекста
   const { isSuperAdmin } = useUser();
@@ -686,10 +690,18 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
       <Header />
       
       <main className="px-4 lg:px-[80px] py-8">
-        {/* Title */}
-        <h1 className="font-inter font-semibold text-[20px] leading-[28px] tracking-[-0.4px] text-white mb-4">
-          Dashboard
-        </h1>
+        {/* Title + Create Button */}
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-inter font-semibold text-[20px] leading-[28px] tracking-[-0.4px] text-white">
+            Dashboard
+          </h1>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 bg-white text-black px-4 h-10 rounded-xl font-inter font-medium text-[14px] hover:bg-gray-100 transition-colors"
+          >
+            Создать
+          </button>
+        </div>
 
         {/* Tabs */}
         <div className="flex items-end gap-3 border-b border-[#2e2e2e] mb-6">
@@ -1548,6 +1560,18 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Create Workspace Modal */}
+      {isCreateModalOpen && (
+        <WorkspaceCreateModal
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateModalOpen(false);
+            // Switch to workspaces tab to see the new workspace
+            setActiveTab('workspaces');
+          }}
+        />
       )}
     </div>
   );
