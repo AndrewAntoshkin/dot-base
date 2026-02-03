@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
-import { Loader2, Download, Play, Trash2, Type, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, X, Camera, Pencil } from 'lucide-react';
+import { Loader2, Download, Play, Trash2, Type, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, Camera, Pencil } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/contexts/user-context';
 
@@ -1065,57 +1065,83 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
               </div>
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-1 mt-8">
-                  {/* Prev arrow */}
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  
-                  {/* Page numbers */}
-                  {(() => {
-                    const pages: (number | string)[] = [];
-                    if (totalPages <= 7) {
-                      for (let i = 1; i <= totalPages; i++) pages.push(i);
-                    } else {
-                      pages.push(1);
-                      if (page > 3) pages.push('...');
-                      for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
-                        if (!pages.includes(i)) pages.push(i);
+                <div className="flex items-center justify-between mt-8">
+                  {/* Left: Navigation */}
+                  <div className="flex items-center gap-1">
+                    {/* First page */}
+                    <button
+                      onClick={() => setPage(1)}
+                      disabled={page === 1}
+                      className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronsLeft className="w-4 h-4" />
+                    </button>
+                    {/* Prev page */}
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Page numbers */}
+                    {(() => {
+                      const pages: (number | string)[] = [];
+                      if (totalPages <= 7) {
+                        for (let i = 1; i <= totalPages; i++) pages.push(i);
+                      } else {
+                        pages.push(1);
+                        if (page > 3) pages.push('...');
+                        for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+                          if (!pages.includes(i)) pages.push(i);
+                        }
+                        if (page < totalPages - 2) pages.push('...');
+                        if (!pages.includes(totalPages)) pages.push(totalPages);
                       }
-                      if (page < totalPages - 2) pages.push('...');
-                      if (!pages.includes(totalPages)) pages.push(totalPages);
-                    }
-                    return pages.map((p, idx) => (
-                      p === '...' ? (
-                        <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-[#717171] text-[14px]">...</span>
-                      ) : (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p as number)}
-                          className={`w-8 h-8 flex items-center justify-center rounded-[10px] font-inter text-[14px] transition-colors ${
-                            page === p
-                              ? 'bg-white text-black'
-                              : 'text-white hover:bg-[#1f1f1f]'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      )
-                    ));
-                  })()}
+                      return pages.map((p, idx) => (
+                        p === '...' ? (
+                          <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-[#717171] text-[14px]">...</span>
+                        ) : (
+                          <button
+                            key={p}
+                            onClick={() => setPage(p as number)}
+                            className={`w-8 h-8 flex items-center justify-center rounded-[10px] font-inter text-[14px] transition-colors ${
+                              page === p
+                                ? 'bg-white text-black'
+                                : 'text-white hover:bg-[#1f1f1f]'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      ));
+                    })()}
+                    
+                    {/* Next page */}
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    {/* Last page */}
+                    <button
+                      onClick={() => setPage(totalPages)}
+                      disabled={page === totalPages}
+                      className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronsRight className="w-4 h-4" />
+                    </button>
+                  </div>
                   
-                  {/* Next arrow */}
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {/* Right: Counter */}
+                  <div className="flex items-center gap-1 font-inter text-[14px] text-white">
+                    <span>{(page - 1) * 25 + 1} - {Math.min(page * 25, counts.all)}</span>
+                    <span className="text-[#717171]">из</span>
+                    <span>{counts.all}</span>
+                  </div>
                 </div>
               )}
             </>
