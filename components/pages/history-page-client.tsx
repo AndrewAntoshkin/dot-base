@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
-import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, X, Check } from 'lucide-react';
+import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
 import { OnlyMineToggle } from '@/components/only-mine-toggle';
 
 // Типы фильтров
@@ -1022,23 +1022,56 @@ export default function HistoryPageClient() {
 
             {/* Пагинация */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-8">
+              <div className="flex items-center justify-center gap-1 mt-8">
+                {/* Prev arrow */}
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="h-10 px-5 rounded-full border border-[#3a3a3a] font-inter text-[14px] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Назад
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="font-inter text-[14px] text-[#717171] min-w-[60px] text-center">
-                  {page} / {totalPages}
-                </span>
+                
+                {/* Page numbers */}
+                {(() => {
+                  const pages: (number | string)[] = [];
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (page > 3) pages.push('...');
+                    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+                      if (!pages.includes(i)) pages.push(i);
+                    }
+                    if (page < totalPages - 2) pages.push('...');
+                    if (!pages.includes(totalPages)) pages.push(totalPages);
+                  }
+                  return pages.map((p, idx) => (
+                    p === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-[#717171] text-[14px]">...</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p as number)}
+                        className={`w-8 h-8 flex items-center justify-center rounded-[10px] font-inter text-[14px] transition-colors ${
+                          page === p
+                            ? 'bg-white text-black'
+                            : 'text-white hover:bg-[#1f1f1f]'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  ));
+                })()}
+                
+                {/* Next arrow */}
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="h-10 px-5 rounded-full bg-white font-inter text-[14px] text-black hover:bg-[#e5e5e5] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#3a3a3a] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  Вперед
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             )}
