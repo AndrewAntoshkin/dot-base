@@ -1138,7 +1138,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                   
                   {/* Right: Counter */}
                   <div className="flex items-center gap-1 font-inter text-[14px] text-white">
-                    <span>{(page - 1) * 25 + 1} - {Math.min(page * 25, counts.all)}</span>
+                    <span>{(page - 1) * 20 + 1} - {(page - 1) * 20 + generations.length}</span>
                     <span className="text-[#717171]">из</span>
                     <span>{counts.all}</span>
                   </div>
