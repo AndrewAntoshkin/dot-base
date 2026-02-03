@@ -934,12 +934,15 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                               <>
                                 <video
                                   className="absolute inset-0 w-full h-full object-cover rounded-[12px] peer"
-                                  src={(generation.output_urls?.[0] || '') as string}
+                                  src={`${(generation.output_urls?.[0] || '') as string}#t=0.001`}
                                   preload="metadata"
                                   muted
                                   playsInline
                                   loop
-                                  onMouseEnter={(e) => e.currentTarget.play()}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.src = (generation.output_urls?.[0] || '') as string;
+                                    e.currentTarget.play();
+                                  }}
                                   onMouseLeave={(e) => {
                                     e.currentTarget.pause();
                                     e.currentTarget.currentTime = 0;

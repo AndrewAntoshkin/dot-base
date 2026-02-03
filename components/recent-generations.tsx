@@ -95,13 +95,16 @@ export function RecentGenerations({
                     {isVideo ? (
                       <>
                         <video
-                          src={firstUrl}
+                          src={`${firstUrl}#t=0.001`}
                           className="w-full h-full object-cover peer"
                           muted
                           playsInline
                           loop
                           preload="metadata"
-                          onMouseEnter={(e) => e.currentTarget.play()}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.src = firstUrl;
+                            e.currentTarget.play();
+                          }}
                           onMouseLeave={(e) => {
                             e.currentTarget.pause();
                             e.currentTarget.currentTime = 0;
