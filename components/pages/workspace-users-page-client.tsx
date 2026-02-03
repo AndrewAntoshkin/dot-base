@@ -538,8 +538,9 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
           </h1>
         </div>
 
-        {/* Tabs: Участники / Флоу (с подчёркиванием как в Figma) */}
-        <div className="flex items-end gap-3 mb-6 border-b border-[#2e2e2e]">
+        {/* Tabs: Участники / Флоу (с подчёркиванием как в Figma) - Sticky */}
+        <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-[80px] px-4 lg:px-[80px] pt-2 pb-4 mb-2">
+        <div className="flex items-end gap-3 border-b border-[#2e2e2e]">
           <button
             onClick={() => handleTabChange('participants')}
             className={`flex items-center gap-2 px-0 pb-[10px] font-inter text-[14px] transition-colors relative ${
@@ -572,6 +573,7 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
               <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
             )}
           </button>
+        </div>
         </div>
 
         {/* Контент в зависимости от активного таба */}

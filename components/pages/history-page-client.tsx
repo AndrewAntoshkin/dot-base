@@ -671,7 +671,8 @@ export default function HistoryPageClient() {
           </h1>
           </div>
           
-          {/* Tabs и свитч "Только мои" */}
+          {/* Tabs и свитч "Только мои" - Sticky */}
+          <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-[80px] px-4 lg:px-[80px] pt-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#2e2e2e] pb-0">
           {/* Tabs - горизонтальный скролл на мобильных */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -828,6 +829,7 @@ export default function HistoryPageClient() {
                 Сбросить
               </button>
             )}
+          </div>
           </div>
         </div>
 

@@ -804,8 +804,8 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
 
         {/* History Section */}
         <div className="px-4 lg:px-20 py-6">
-          {/* Tabs and Filters */}
-          <div className="flex flex-col gap-4 mb-6">
+          {/* Tabs and Filters - Sticky */}
+          <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-20 px-4 lg:px-20 pt-2 pb-4 mb-2">
             {/* Tabs */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide border-b border-[#2e2e2e] pb-0">
               {TABS.map(tab => {

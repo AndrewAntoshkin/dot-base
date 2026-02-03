@@ -703,8 +703,9 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-end gap-3 border-b border-[#2e2e2e] mb-6">
+        {/* Tabs - Sticky */}
+        <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-[80px] px-4 lg:px-[80px] pt-2 pb-4 mb-2">
+        <div className="flex items-end gap-3 border-b border-[#2e2e2e]">
           <button
             onClick={() => setActiveTab('overview')}
             className={`pb-2.5 px-0 font-inter text-[14px] transition-colors border-b-2 -mb-[1px] ${
@@ -725,6 +726,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           >
             Пространства
           </button>
+        </div>
         </div>
 
         {/* Overview Tab Content */}
