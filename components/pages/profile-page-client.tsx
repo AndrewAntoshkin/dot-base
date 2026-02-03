@@ -931,9 +931,27 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                             </div>
                           ) : (generation.output_thumbs?.[0] || generation.output_urls?.[0]) && isValidMediaUrl((generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string) ? (
                             isVideoUrl((generation.output_urls?.[0] || '') as string) ? (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <Play className="h-8 w-8 lg:h-10 lg:w-10 text-[#656565]" />
-                              </div>
+                              <>
+                                <video
+                                  className="absolute inset-0 w-full h-full object-cover rounded-[12px] peer"
+                                  src={(generation.output_urls?.[0] || '') as string}
+                                  preload="metadata"
+                                  muted
+                                  playsInline
+                                  loop
+                                  onMouseEnter={(e) => e.currentTarget.play()}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.pause();
+                                    e.currentTarget.currentTime = 0;
+                                  }}
+                                />
+                                {/* Play icon overlay - hides when video is playing (hovered) */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none peer-hover:opacity-0 transition-opacity">
+                                  <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-black/50 flex items-center justify-center">
+                                    <Play className="h-5 w-5 lg:h-6 lg:w-6 text-white fill-white" />
+                                  </div>
+                                </div>
+                              </>
                             ) : (
                               <ImageWithShimmer
                                 src={(generation.output_thumbs?.[0] || generation.output_urls?.[0]) as string}

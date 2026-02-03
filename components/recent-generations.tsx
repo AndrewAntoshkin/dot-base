@@ -1,5 +1,7 @@
 'use client';
 
+import { Play } from 'lucide-react';
+
 export interface SessionGeneration {
   id: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
@@ -91,13 +93,27 @@ export function RecentGenerations({
                 ) : hasOutput && firstUrl ? (
                   <>
                     {isVideo ? (
-                      <video
-                        src={firstUrl}
-                        className="w-full h-full object-cover"
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
+                      <>
+                        <video
+                          src={firstUrl}
+                          className="w-full h-full object-cover peer"
+                          muted
+                          playsInline
+                          loop
+                          preload="metadata"
+                          onMouseEnter={(e) => e.currentTarget.play()}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.pause();
+                            e.currentTarget.currentTime = 0;
+                          }}
+                        />
+                        {/* Play icon overlay - hides when video is playing (hovered) */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none peer-hover:opacity-0 transition-opacity">
+                          <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                            <Play className="h-5 w-5 text-white fill-white" />
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <img
                         src={firstUrl}
