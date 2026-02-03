@@ -16,6 +16,7 @@ export interface ModelLite {
   displayName: string;
   description?: string;
   action: ActionType;
+  adminOnly?: boolean;  // Only visible to admin/super_admin users
 }
 
 // Лёгкие данные для селектора моделей - только id, название и описание
@@ -38,6 +39,9 @@ export const CREATE_MODELS_LITE: ModelLite[] = [
   { id: 'reve-create', displayName: 'Reve Create', description: 'Генерация от Reve', action: 'create' },
   { id: 'z-image-turbo', displayName: 'Z-Image Turbo', description: 'Супербыстрая генерация (8 шагов)', action: 'create' },
   // gen4-image-turbo removed - requires reference_images (can't work in brainstorm)
+  // Higgsfield (только для админов)
+  { id: 'higgsfield-soul-standard', displayName: 'Higgsfield Soul', description: 'Higgsfield - флагманская модель для генерации изображений', action: 'create', adminOnly: true },
+  { id: 'higgsfield-soul-reference', displayName: 'Higgsfield Soul Reference', description: 'Higgsfield - генерация с референсами для консистентности', action: 'create', adminOnly: true },
 ];
 
 export const EDIT_MODELS_LITE: ModelLite[] = [
@@ -109,6 +113,11 @@ export const VIDEO_I2V_MODELS_LITE: ModelLite[] = [
   { id: 'kling-v2.0-i2v', displayName: 'Kling v2.0', description: 'Kuaishou - базовая анимация', action: 'video_i2v' },
   { id: 'video-01-director', displayName: 'Video-01 Director', description: 'MiniMax - управление камерой', action: 'video_i2v' },
   { id: 'gen4-turbo-i2v', displayName: 'Runway Gen4 Turbo', description: 'Runway - премиум анимация', action: 'video_i2v' },
+  // Higgsfield DoP (только для админов)
+  { id: 'higgsfield-dop-standard', displayName: 'Higgsfield DoP', description: 'Higgsfield - лучшее качество анимации', action: 'video_i2v', adminOnly: true },
+  { id: 'higgsfield-dop-preview', displayName: 'Higgsfield DoP Preview', description: 'Higgsfield - высококачественная анимация', action: 'video_i2v', adminOnly: true },
+  { id: 'higgsfield-dop-lite', displayName: 'Higgsfield DoP Lite', description: 'Higgsfield - быстрая анимация', action: 'video_i2v', adminOnly: true },
+  { id: 'higgsfield-dop-lite-flf', displayName: 'Higgsfield DoP Lite (First↔Last)', description: 'Higgsfield - интерполяция между первым и последним кадром', action: 'video_i2v', adminOnly: true },
 ];
 
 export const VIDEO_EDIT_MODELS_LITE: ModelLite[] = [
@@ -147,38 +156,62 @@ export const ANALYZE_PROMPT_MODELS_LITE: ModelLite[] = [
 
 /**
  * Получить модели по действию (лёгкая версия)
+ * @param action - тип действия
+ * @param isAdmin - показывать ли модели только для админов (default: false)
  */
-export function getModelsByActionLite(action: ActionType): ModelLite[] {
+export function getModelsByActionLite(action: ActionType, isAdmin: boolean = false): ModelLite[] {
+  let models: ModelLite[];
+  
   switch (action) {
     case 'create':
-      return CREATE_MODELS_LITE;
+      models = CREATE_MODELS_LITE;
+      break;
     case 'upscale':
-      return UPSCALE_MODELS_LITE;
+      models = UPSCALE_MODELS_LITE;
+      break;
     case 'edit':
-      return EDIT_MODELS_LITE;
+      models = EDIT_MODELS_LITE;
+      break;
     case 'remove_bg':
-      return REMOVE_BG_MODELS_LITE;
+      models = REMOVE_BG_MODELS_LITE;
+      break;
     case 'inpaint':
-      return INPAINT_MODELS_LITE;
+      models = INPAINT_MODELS_LITE;
+      break;
     case 'expand':
-      return EXPAND_MODELS_LITE;
+      models = EXPAND_MODELS_LITE;
+      break;
     case 'video_create':
-      return VIDEO_CREATE_MODELS_LITE;
+      models = VIDEO_CREATE_MODELS_LITE;
+      break;
     case 'video_i2v':
-      return VIDEO_I2V_MODELS_LITE;
+      models = VIDEO_I2V_MODELS_LITE;
+      break;
     case 'video_edit':
-      return VIDEO_EDIT_MODELS_LITE;
+      models = VIDEO_EDIT_MODELS_LITE;
+      break;
     case 'video_upscale':
-      return VIDEO_UPSCALE_MODELS_LITE;
+      models = VIDEO_UPSCALE_MODELS_LITE;
+      break;
     case 'analyze_describe':
-      return ANALYZE_DESCRIBE_MODELS_LITE;
+      models = ANALYZE_DESCRIBE_MODELS_LITE;
+      break;
     case 'analyze_ocr':
-      return ANALYZE_OCR_MODELS_LITE;
+      models = ANALYZE_OCR_MODELS_LITE;
+      break;
     case 'analyze_prompt':
-      return ANALYZE_PROMPT_MODELS_LITE;
+      models = ANALYZE_PROMPT_MODELS_LITE;
+      break;
     default:
-      return [];
+      models = [];
   }
+  
+  // Фильтруем adminOnly модели для обычных пользователей
+  if (!isAdmin) {
+    models = models.filter(m => !m.adminOnly);
+  }
+  
+  return models;
 }
 
 /**

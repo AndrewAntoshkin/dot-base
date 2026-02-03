@@ -57,6 +57,9 @@ function getUserFriendlyErrorMessage(error: string | null | undefined): string {
   if (errorLower.includes('invalid') || errorLower.includes('validation')) {
     return 'Некорректные параметры. Проверьте настройки';
   }
+  if (errorLower.includes('credits') || errorLower.includes('balance')) {
+    return 'Недостаточно кредитов. Пополните баланс Higgsfield';
+  }
   if (!error || error === '' || error === 'null') {
     return 'Генерация не удалась. Попробуйте другую модель';
   }
@@ -79,12 +82,13 @@ function isMediaUrl(value: string): boolean {
     return true;
   }
   
+  // Trust Higgsfield CDN and common storage hosts
   const trustedMediaHosts = [
-    'fal.media',
-    'fal.run',
-    'fal-cdn',
+    'higgsfield',
     'storage.googleapis.com',
     'supabase.co/storage',
+    's3.amazonaws.com',
+    'cloudfront.net',
   ];
   if (trustedMediaHosts.some(host => lowercaseUrl.includes(host))) {
     return true;
@@ -94,17 +98,29 @@ function isMediaUrl(value: string): boolean {
 }
 
 /**
- * Fal.ai Webhook Handler
- * Handles completion callbacks from fal.ai
+ * Higgsfield Webhook Handler
+ * Handles completion callbacks from Higgsfield API
+ * 
+ * Payload structure:
+ * - status: 'completed' | 'failed' | 'nsfw'
+ * - request_id: string
+ * - images?: [{ url: string }] (for image generation)
+ * - video?: { url: string } (for video generation)
+ * - error?: string (for failed status)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Fal.ai webhook payload structure
-    const { request_id: requestId, status, payload, error } = body;
+    const { request_id: requestId, status, images, video, error } = body;
 
-    logger.info('[Fal Webhook] Received:', JSON.stringify({ requestId, status, hasPayload: !!payload, error }));
+    logger.info('[Higgsfield Webhook] Received:', JSON.stringify({ 
+      requestId, 
+      status, 
+      hasImages: !!images, 
+      hasVideo: !!video, 
+      error 
+    }));
 
     if (!requestId) {
       return NextResponse.json({ error: 'Missing request ID' }, { status: 400 });
@@ -112,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceRoleClient();
 
-    // Find generation by fal request_id (stored in replicate_prediction_id field)
+    // Find generation by Higgsfield request_id (stored in replicate_prediction_id field)
     let generation: GenerationRecord | null = null;
     try {
       generation = await withRetry(async () => {
@@ -125,7 +141,7 @@ export async function POST(request: NextRequest) {
         return data;
       }) as GenerationRecord;
     } catch {
-      logger.warn('[Fal Webhook] Generation not found:', requestId);
+      logger.warn('[Higgsfield Webhook] Generation not found:', requestId);
       return NextResponse.json({ error: 'Generation not found' }, { status: 404 });
     }
 
@@ -135,54 +151,35 @@ export async function POST(request: NextRequest) {
 
     // Idempotency check
     if (generation.status === 'completed' || generation.status === 'failed') {
-      logger.info('[Fal Webhook] Already processed, skipping:', generation.id);
+      logger.info('[Higgsfield Webhook] Already processed, skipping:', generation.id);
       return NextResponse.json({ success: true, skipped: true });
     }
 
-    const updateData: any = { replicate_output: body };  // Use same column for both providers
+    const updateData: any = { replicate_output: body };  // Use same column for all providers
 
-    if (status === 'COMPLETED' && payload) {
+    if (status === 'completed') {
       let mediaUrls: string[] = [];
       
-      // Extract video URL from fal.ai response
-      // Kling returns: { video: { url: "..." } }
-      if (payload.video?.url && isMediaUrl(payload.video.url)) {
-        mediaUrls = [payload.video.url];
+      // Extract URLs from Higgsfield response
+      // Video generation: { video: { url: "..." } }
+      if (video?.url && isMediaUrl(video.url)) {
+        mediaUrls = [video.url];
       }
-      // Nano Banana Pro returns: { images: [{ url: "...", content_type: "..." }] }
-      else if (payload.images && Array.isArray(payload.images)) {
-        mediaUrls = payload.images
-          .filter((img: any) => img?.url && isMediaUrl(img.url))
-          .map((img: any) => img.url);
-      }
-      // Some models return: { image: { url: "..." } }
-      else if (payload.image?.url && isMediaUrl(payload.image.url)) {
-        mediaUrls = [payload.image.url];
-      }
-      // Some models return direct URL
-      else if (typeof payload === 'string' && isMediaUrl(payload)) {
-        mediaUrls = [payload];
-      }
-      // Array of outputs
-      else if (Array.isArray(payload)) {
-        mediaUrls = payload
-          .filter((item: any) => {
-            if (typeof item === 'string') return isMediaUrl(item);
-            if (item?.url) return isMediaUrl(item.url);
-            return false;
-          })
-          .map((item: any) => typeof item === 'string' ? item : item.url);
+      // Image generation: { images: [{ url: "..." }] }
+      else if (images && Array.isArray(images)) {
+        mediaUrls = images
+          .filter((item: any) => item?.url && isMediaUrl(item.url))
+          .map((item: any) => item.url);
       }
       
       if (mediaUrls.length === 0) {
-        logger.error('[Fal Webhook] No media URLs found in payload:', JSON.stringify(payload));
+        logger.error('[Higgsfield Webhook] No media URLs found in payload:', JSON.stringify(body));
         updateData.status = 'failed';
         updateData.error_message = 'Не удалось получить результат генерации';
       } else {
-        logger.info('[Fal Webhook] Generation completed, saving media:', generation.id);
+        logger.info('[Higgsfield Webhook] Generation completed, saving media:', generation.id);
         
-        // Синхронное сохранение медиа в Supabase Storage
-        // Важно: в serverless среде (Vercel) background tasks не работают после отправки ответа
+        // Save media to Supabase Storage
         const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(mediaUrls, generation.id);
         
         if (savedUrls.length > 0) {
@@ -190,9 +187,9 @@ export async function POST(request: NextRequest) {
           updateData.output_urls = savedUrls;
           updateData.output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
           
-          logger.info('[Fal Webhook] Media saved successfully:', generation.id, 'URLs:', savedUrls);
+          logger.info('[Higgsfield Webhook] Media saved successfully:', generation.id, 'URLs:', savedUrls);
           
-          // Обновляем flow_nodes с постоянными URL
+          // Update flow_nodes with permanent URLs
           const { data: flowNodes } = await (supabase.from('flow_nodes') as any)
             .select('id')
             .eq('generation_id', generation.id);
@@ -203,11 +200,11 @@ export async function POST(request: NextRequest) {
                 .update({ output_url: savedUrls[0] })
                 .eq('id', node.id);
             }
-            logger.debug(`[Fal Webhook] Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
+            logger.debug(`[Higgsfield Webhook] Updated ${flowNodes.length} flow node(s) with permanent URL for generation ${generation.id}`);
           }
         } else {
-          // Если не удалось сохранить в Storage, используем временные URL
-          logger.warn('[Fal Webhook] Media save failed, using temporary Fal URLs:', generation.id);
+          // If storage save failed, use temporary URLs
+          logger.warn('[Higgsfield Webhook] Media save failed, using temporary Higgsfield URLs:', generation.id);
           updateData.status = 'completed';
           updateData.output_urls = mediaUrls;
           updateData.output_thumbs = null;
@@ -221,11 +218,16 @@ export async function POST(request: NextRequest) {
           });
         } catch {}
       }
-    } else if (status === 'FAILED' || error) {
+    } else if (status === 'failed' || error) {
       updateData.status = 'failed';
       updateData.error_message = getUserFriendlyErrorMessage(error || 'Генерация не удалась');
       
-      logger.error('[Fal Webhook] Generation failed:', generation.id, error);
+      logger.error('[Higgsfield Webhook] Generation failed:', generation.id, error);
+    } else if (status === 'nsfw') {
+      updateData.status = 'failed';
+      updateData.error_message = 'Контент заблокирован фильтром безопасности';
+      
+      logger.warn('[Higgsfield Webhook] Generation flagged as NSFW:', generation.id);
     }
 
     // Update DB
@@ -237,14 +239,13 @@ export async function POST(request: NextRequest) {
         if (updateError) throw updateError;
       });
     } catch (updateError: any) {
-      logger.error('[Fal Webhook] Failed to update generation:', updateError.message);
+      logger.error('[Higgsfield Webhook] Failed to update generation:', updateError.message);
       return NextResponse.json({ error: 'Failed to save result' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    logger.error('[Fal Webhook] Error:', error.message);
+    logger.error('[Higgsfield Webhook] Error:', error.message);
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
-

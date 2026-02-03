@@ -37,7 +37,7 @@ export interface ModelSetting {
   hidden?: boolean;
 }
 
-export type ProviderType = 'replicate' | 'fal';
+export type ProviderType = 'replicate' | 'fal' | 'higgsfield';
 
 export interface Model {
   id: string;
@@ -51,6 +51,7 @@ export interface Model {
   runs?: string;
   price?: string;
   provider?: ProviderType;  // Default: 'replicate'
+  adminOnly?: boolean;  // Only visible to admin/super_admin users
 }
 
 /**
@@ -1564,6 +1565,139 @@ export const CREATE_MODELS: Model[] = [
         name: 'seed',
         label: 'Seed',
         type: 'number',
+      },
+    ],
+  },
+
+  // 15. Higgsfield Soul Standard - флагманская text-to-image модель
+  {
+    id: 'higgsfield-soul-standard',
+    name: 'soul-standard',
+    displayName: 'Higgsfield Soul',
+    replicateModel: 'higgsfield-ai/soul/standard',
+    action: 'create',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для админов
+    price: '$0.09-0.19',
+    description: 'Higgsfield - фотореалистичная генерация с 50+ стилями. Fashion-ready качество!',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'A stylish woman in Tokyo streetwear, golden hour lighting...',
+        description: 'Детальное описание. Поддерживает стили: Y2K, Tokyo Streetstyle, iPhone flash и др.',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '9:16',
+        options: [
+          { value: '1:1', label: '1:1 (квадрат)' },
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '4:3', label: '4:3 (ландшафт)' },
+          { value: '3:4', label: '3:4 (портрет)' },
+          { value: '3:2', label: '3:2 (классика)' },
+          { value: '2:3', label: '2:3 (портрет)' },
+        ],
+        description: 'Выберите формат изображения',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '720p', label: '720p' },
+          { value: '1080p', label: '1080p' },
+        ],
+        description: 'Выше разрешение = лучше качество',
+      },
+      {
+        name: 'enhance_prompt',
+        label: 'Улучшить промпт',
+        type: 'checkbox',
+        default: true,
+        description: 'AI автоматически улучшит промпт для лучшего качества',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости результата (1-1000000)',
+      },
+    ],
+  },
+
+  // 16. Higgsfield Soul Reference - генерация с референсными изображениями
+  {
+    id: 'higgsfield-soul-reference',
+    name: 'soul-reference',
+    displayName: 'Higgsfield Soul Reference',
+    replicateModel: 'higgsfield-ai/soul/reference',
+    action: 'create',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для админов
+    price: '$0.09-0.19',
+    description: 'Higgsfield - генерация с референсами для консистентных персонажей и стилей',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'The same person in a different setting...',
+        description: 'Опишите сцену. Референсы сохранят идентичность персонажей',
+      },
+      {
+        name: 'reference_images',
+        label: 'Референсные изображения',
+        type: 'file_array',
+        description: 'До 4 референсов: персонажи, локации, стиль, настроение',
+        maxFiles: 4,
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '9:16',
+        options: [
+          { value: '1:1', label: '1:1 (квадрат)' },
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '4:3', label: '4:3 (ландшафт)' },
+          { value: '3:4', label: '3:4 (портрет)' },
+          { value: '3:2', label: '3:2 (классика)' },
+          { value: '2:3', label: '2:3 (портрет)' },
+        ],
+        description: 'Выберите формат изображения',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '1080p',
+        options: [
+          { value: '720p', label: '720p ($0.09)' },
+          { value: '1080p', label: '1080p ($0.19)' },
+        ],
+        description: 'Выше разрешение = лучше качество',
+      },
+      {
+        name: 'enhance_prompt',
+        label: 'Улучшить промпт',
+        type: 'checkbox',
+        default: true,
+        description: 'AI автоматически улучшит промпт',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости результата',
       },
     ],
   },
@@ -4438,6 +4572,297 @@ export const VIDEO_I2V_MODELS: Model[] = [
       },
     ],
   },
+
+  // Higgsfield DoP Preview - высококачественная анимация изображений
+  {
+    id: 'higgsfield-dop-preview',
+    name: 'dop-preview',
+    displayName: 'Higgsfield DoP Preview',
+    replicateModel: 'higgsfield-ai/dop/preview',
+    action: 'video_i2v',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для админов
+    price: '$0.56',
+    description: 'Higgsfield - премиум качество с 100+ motion-пресетами',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Cinematic camera movement through the scene...',
+        description: 'Опишите движение камеры и анимацию объектов',
+      },
+      {
+        name: 'image_url',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Исходное изображение (до 2048x2048px)',
+      },
+      {
+        name: 'motion',
+        label: 'Motion-пресет',
+        type: 'select',
+        default: 'general',
+        options: [
+          { value: 'general', label: 'General (авто)' },
+          { value: 'cinematic', label: 'Cinematic' },
+          { value: 'static', label: 'Static' },
+          { value: 'dolly_in', label: 'Dolly In' },
+          { value: 'dolly_out', label: 'Dolly Out' },
+          { value: 'dolly_left', label: 'Dolly Left' },
+          { value: 'dolly_right', label: 'Dolly Right' },
+          { value: 'zoom_in', label: 'Zoom In' },
+          { value: 'zoom_out', label: 'Zoom Out' },
+          { value: 'crane_up', label: 'Crane Up' },
+          { value: 'crane_down', label: 'Crane Down' },
+          { value: 'tilt_up', label: 'Tilt Up' },
+          { value: 'tilt_down', label: 'Tilt Down' },
+          { value: 'arc_left', label: 'Arc Left' },
+          { value: 'arc_right', label: 'Arc Right' },
+          { value: '3d_rotation', label: '3D Rotation' },
+          { value: '360_orbit', label: '360 Orbit' },
+          { value: 'crash_zoom_in', label: 'Crash Zoom In' },
+          { value: 'crash_zoom_out', label: 'Crash Zoom Out' },
+          { value: 'handheld', label: 'Handheld' },
+          { value: 'hyperlapse', label: 'Hyperlapse' },
+          { value: 'object_pov', label: 'Object POV' },
+        ],
+        description: 'Выберите стиль движения камеры',
+      },
+      {
+        name: 'motion_strength',
+        label: 'Сила движения',
+        type: 'slider',
+        default: 0.6,
+        min: 0.3,
+        max: 1.0,
+        step: 0.1,
+        description: '0.3 - мягкое, 0.6 - среднее, 1.0 - драматичное',
+      },
+      {
+        name: 'enhance_prompt',
+        label: 'Улучшить промпт',
+        type: 'checkbox',
+        default: true,
+        description: 'AI улучшит промпт для сложных сцен',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости (1-1000000)',
+      },
+    ],
+  },
+
+  // Higgsfield DoP Standard - стандартная анимация изображений
+  {
+    id: 'higgsfield-dop-standard',
+    name: 'dop-standard',
+    displayName: 'Higgsfield DoP',
+    replicateModel: 'higgsfield-ai/dop/standard',
+    action: 'video_i2v',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для админов
+    price: '$0.56',
+    description: 'Higgsfield - лучшее качество анимации с 100+ motion-пресетами',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Camera slowly pans across the scene with cinematic lighting...',
+        description: 'Опишите движение камеры и анимацию объектов',
+      },
+      {
+        name: 'image_url',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Исходное изображение (до 2048x2048px)',
+      },
+      {
+        name: 'motion',
+        label: 'Motion-пресет',
+        type: 'select',
+        default: 'general',
+        options: [
+          { value: 'general', label: 'General (авто)' },
+          { value: 'cinematic', label: 'Cinematic' },
+          { value: 'static', label: 'Static' },
+          { value: 'dolly_in', label: 'Dolly In' },
+          { value: 'dolly_out', label: 'Dolly Out' },
+          { value: 'dolly_left', label: 'Dolly Left' },
+          { value: 'dolly_right', label: 'Dolly Right' },
+          { value: 'zoom_in', label: 'Zoom In' },
+          { value: 'zoom_out', label: 'Zoom Out' },
+          { value: 'crane_up', label: 'Crane Up' },
+          { value: 'crane_down', label: 'Crane Down' },
+          { value: 'tilt_up', label: 'Tilt Up' },
+          { value: 'tilt_down', label: 'Tilt Down' },
+          { value: 'arc_left', label: 'Arc Left' },
+          { value: 'arc_right', label: 'Arc Right' },
+          { value: '3d_rotation', label: '3D Rotation' },
+          { value: '360_orbit', label: '360 Orbit' },
+          { value: 'crash_zoom_in', label: 'Crash Zoom In' },
+          { value: 'crash_zoom_out', label: 'Crash Zoom Out' },
+          { value: 'handheld', label: 'Handheld' },
+          { value: 'hyperlapse', label: 'Hyperlapse' },
+          { value: 'object_pov', label: 'Object POV' },
+        ],
+        description: 'Выберите стиль движения камеры',
+      },
+      {
+        name: 'motion_strength',
+        label: 'Сила движения',
+        type: 'slider',
+        default: 0.6,
+        min: 0.3,
+        max: 1.0,
+        step: 0.1,
+        description: '0.3 - мягкое, 0.6 - среднее, 1.0 - драматичное',
+      },
+      {
+        name: 'enhance_prompt',
+        label: 'Улучшить промпт',
+        type: 'checkbox',
+        default: true,
+        description: 'AI улучшит промпт для сложных сцен',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости (1-1000000)',
+      },
+    ],
+  },
+
+  // Higgsfield DoP Lite - быстрая анимация изображений
+  {
+    id: 'higgsfield-dop-lite',
+    name: 'dop-lite',
+    displayName: 'Higgsfield DoP Lite',
+    replicateModel: 'higgsfield-ai/dop/lite',
+    action: 'video_i2v',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для админов
+    price: '$0.12',
+    description: 'Higgsfield - самая дешёвая анимация! 100+ motion-пресетов',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'The camera slowly zooms in on the subject...',
+        description: 'Опишите движение камеры и анимацию',
+      },
+      {
+        name: 'image_url',
+        label: 'Изображение',
+        type: 'file',
+        required: true,
+        description: 'Исходное изображение (до 2048x2048px)',
+      },
+      {
+        name: 'motion',
+        label: 'Motion-пресет',
+        type: 'select',
+        default: 'general',
+        options: [
+          { value: 'general', label: 'General (авто)' },
+          { value: 'cinematic', label: 'Cinematic' },
+          { value: 'static', label: 'Static' },
+          { value: 'dolly_in', label: 'Dolly In' },
+          { value: 'dolly_out', label: 'Dolly Out' },
+          { value: 'zoom_in', label: 'Zoom In' },
+          { value: 'zoom_out', label: 'Zoom Out' },
+          { value: 'crane_up', label: 'Crane Up' },
+          { value: 'crane_down', label: 'Crane Down' },
+          { value: 'tilt_up', label: 'Tilt Up' },
+          { value: 'tilt_down', label: 'Tilt Down' },
+          { value: 'arc_left', label: 'Arc Left' },
+          { value: 'arc_right', label: 'Arc Right' },
+          { value: '360_orbit', label: '360 Orbit' },
+          { value: 'handheld', label: 'Handheld' },
+        ],
+        description: 'Стиль движения камеры',
+      },
+      {
+        name: 'motion_strength',
+        label: 'Сила движения',
+        type: 'slider',
+        default: 0.5,
+        min: 0.3,
+        max: 1.0,
+        step: 0.1,
+        description: '0.3 - мягкое, 1.0 - драматичное',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости',
+      },
+    ],
+  },
+
+  // Higgsfield DoP Lite (First Last Frame) - интерполяция между кадрами
+  {
+    id: 'higgsfield-dop-lite-flf',
+    name: 'dop-lite-flf',
+    displayName: 'Higgsfield DoP Lite (First↔Last)',
+    replicateModel: 'higgsfield-ai/dop/lite',
+    action: 'video_i2v',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для админов
+    price: '$0.12',
+    description: 'Higgsfield - интерполяция между двумя кадрами. AI создаёт плавный переход!',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Smooth transition from day to night...',
+        description: 'Опишите переход между первым и последним кадром',
+      },
+      {
+        name: 'image_url',
+        label: 'Первый кадр',
+        type: 'file',
+        required: true,
+        description: 'Начальное изображение',
+      },
+      {
+        name: 'tail_image_url',
+        label: 'Последний кадр',
+        type: 'file',
+        required: true,
+        description: 'Конечное изображение — AI создаст плавный переход',
+      },
+      {
+        name: 'motion_strength',
+        label: 'Сила движения',
+        type: 'slider',
+        default: 0.5,
+        min: 0.3,
+        max: 1.0,
+        step: 0.1,
+        description: '0.3 - мягкий переход, 1.0 - драматичный',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости',
+      },
+    ],
+  },
 ];
 
 /**
@@ -5277,38 +5702,62 @@ export const ALL_MODELS: Model[] = [
 
 /**
  * Получить модели по действию
+ * @param action - тип действия
+ * @param isAdmin - показывать ли модели только для админов (default: false)
  */
-export function getModelsByAction(action: ActionType): Model[] {
+export function getModelsByAction(action: ActionType, isAdmin: boolean = false): Model[] {
+  let models: Model[];
+  
   switch (action) {
     case 'create':
-      return CREATE_MODELS;
+      models = CREATE_MODELS;
+      break;
     case 'upscale':
-      return UPSCALE_MODELS;
+      models = UPSCALE_MODELS;
+      break;
     case 'edit':
-      return EDIT_MODELS;
+      models = EDIT_MODELS;
+      break;
     case 'remove_bg':
-      return REMOVE_BG_MODELS;
+      models = REMOVE_BG_MODELS;
+      break;
     case 'inpaint':
-      return INPAINT_MODELS;
+      models = INPAINT_MODELS;
+      break;
     case 'expand':
-      return ALL_MODELS.filter(m => m.action === 'expand');
+      models = ALL_MODELS.filter(m => m.action === 'expand');
+      break;
     case 'video_create':
-      return VIDEO_CREATE_MODELS;
+      models = VIDEO_CREATE_MODELS;
+      break;
     case 'video_i2v':
-      return VIDEO_I2V_MODELS;
+      models = VIDEO_I2V_MODELS;
+      break;
     case 'video_edit':
-      return VIDEO_EDIT_MODELS;
+      models = VIDEO_EDIT_MODELS;
+      break;
     case 'video_upscale':
-      return VIDEO_UPSCALE_MODELS;
+      models = VIDEO_UPSCALE_MODELS;
+      break;
     case 'analyze_describe':
-      return ANALYZE_DESCRIBE_MODELS;
+      models = ANALYZE_DESCRIBE_MODELS;
+      break;
     case 'analyze_ocr':
-      return ANALYZE_OCR_MODELS;
+      models = ANALYZE_OCR_MODELS;
+      break;
     case 'analyze_prompt':
-      return ANALYZE_PROMPT_MODELS;
+      models = ANALYZE_PROMPT_MODELS;
+      break;
     default:
-      return [];
+      models = [];
   }
+  
+  // Фильтруем adminOnly модели для обычных пользователей
+  if (!isAdmin) {
+    models = models.filter(m => !m.adminOnly);
+  }
+  
+  return models;
 }
 
 /**

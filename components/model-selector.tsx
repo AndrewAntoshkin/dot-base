@@ -62,9 +62,9 @@ export function ModelSelector({ action, value, onChange, onLoraSelect }: ModelSe
   }, [action, lorasLoaded, isAdmin]);
 
   // Мемоизируем список моделей - пересчитывается только при смене action
-  // Фильтруем flux-dev-lora для неадминов
+  // Фильтруем adminOnly модели (включая flux-dev-lora и Higgsfield) для неадминов
   const models = useMemo(() => {
-    const allModels = getModelsByActionLite(action);
+    const allModels = getModelsByActionLite(action, isAdmin);
     if (!isAdmin) {
       return allModels.filter(m => m.id !== 'flux-dev-lora');
     }

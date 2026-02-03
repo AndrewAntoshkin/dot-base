@@ -47,7 +47,7 @@ function VideoContent() {
   // Сессионные генерации (только текущая сессия, не из БД)
   const [sessionGenerations, setSessionGenerations] = useState<SessionGeneration[]>([]);
   const { addGeneration } = useGenerations();
-  const { selectedWorkspaceId } = useUser();
+  const { selectedWorkspaceId, isAdmin } = useUser();
   
   // Form ref для управления формой без глобальных переменных
   const formRef = useRef<SettingsFormRef | null>(null);
@@ -112,8 +112,8 @@ function VideoContent() {
         // Get first model for this action from LITE list (matches ModelSelector)
         const { getModelsByActionLite } = await import('@/lib/models-lite');
         const { getModelsByAction } = await import('@/lib/models-config');
-        const modelsLite = getModelsByActionLite(actionParam as ActionType);
-        const modelsFull = getModelsByAction(actionParam as ActionType);
+        const modelsLite = getModelsByActionLite(actionParam as ActionType, isAdmin);
+        const modelsFull = getModelsByAction(actionParam as ActionType, isAdmin);
         
         // Use first model from lite list for ID, but full list for settings
         const modelId = modelsLite[0]?.id;
@@ -484,21 +484,29 @@ function VideoContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (formRef.current && !isGenerating) {
-                      setIsGenerating(true);
-                      // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
-                      const safetyTimeout = setTimeout(() => {
-                        console.warn('[Generate] Safety timeout triggered');
-                        setIsGenerating(false);
-                      }, 60000);
-                      try {
-                        await formRef.current.submit();
-                      } catch (error) {
-                        console.error('[Generate] Submit error:', error);
-                      } finally {
-                        clearTimeout(safetyTimeout);
-                        setIsGenerating(false);
-                      }
+                    console.log('[Video Desktop] Click', { formRef: !!formRef.current, isGenerating });
+                    if (!formRef.current) {
+                      console.warn('[Video Desktop] formRef.current is null');
+                      return;
+                    }
+                    if (isGenerating) {
+                      console.warn('[Video Desktop] Already generating, ignoring click');
+                      return;
+                    }
+                    setIsGenerating(true);
+                    // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                    const safetyTimeout = setTimeout(() => {
+                      console.warn('[Video Desktop] Safety timeout triggered');
+                      setIsGenerating(false);
+                    }, 60000);
+                    try {
+                      await formRef.current.submit();
+                    } catch (error) {
+                      console.error('[Video Desktop] Submit error:', error);
+                    } finally {
+                      clearTimeout(safetyTimeout);
+                      setIsGenerating(false);
+                      console.log('[Video Desktop] Done');
                     }
                   }}
                   disabled={isGenerating}
@@ -622,21 +630,29 @@ function VideoContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (formRef.current && !isGenerating) {
-                            setIsGenerating(true);
-                            // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
-                            const safetyTimeout = setTimeout(() => {
-                              console.warn('[Generate] Safety timeout triggered');
-                              setIsGenerating(false);
-                            }, 60000);
-                            try {
-                              await formRef.current.submit();
-                            } catch (error) {
-                              console.error('[Generate] Submit error:', error);
-                            } finally {
-                              clearTimeout(safetyTimeout);
-                              setIsGenerating(false);
-                            }
+                          console.log('[Video Mobile] Click', { formRef: !!formRef.current, isGenerating });
+                          if (!formRef.current) {
+                            console.warn('[Video Mobile] formRef.current is null');
+                            return;
+                          }
+                          if (isGenerating) {
+                            console.warn('[Video Mobile] Already generating, ignoring click');
+                            return;
+                          }
+                          setIsGenerating(true);
+                          // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                          const safetyTimeout = setTimeout(() => {
+                            console.warn('[Video Mobile] Safety timeout triggered');
+                            setIsGenerating(false);
+                          }, 60000);
+                          try {
+                            await formRef.current.submit();
+                          } catch (error) {
+                            console.error('[Video Mobile] Submit error:', error);
+                          } finally {
+                            clearTimeout(safetyTimeout);
+                            setIsGenerating(false);
+                            console.log('[Video Mobile] Done');
                           }
                         }}
                         disabled={isGenerating}

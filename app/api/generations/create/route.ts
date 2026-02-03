@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getFalClient } from '@/lib/fal/client';
+import { getHiggsfieldClient } from '@/lib/higgsfield/client';
 import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
@@ -236,6 +237,37 @@ export async function POST(request: NextRequest) {
           status: 'processing',
           provider: 'fal',
         });
+      } else if (provider === 'higgsfield') {
+        // Higgsfield provider
+        const higgsfieldClient = getHiggsfieldClient();
+        
+        const higgsfieldWebhookUrl = process.env.NODE_ENV === 'production' 
+          ? `${process.env.NEXTAUTH_URL}/api/webhook/higgsfield`
+          : undefined;
+        
+        logger.info('[Higgsfield] Starting generation for model:', model.replicateModel);
+
+        const { requestId } = await higgsfieldClient.submit({
+          model: model.replicateModel,
+          input: replicateInput,
+          webhook: higgsfieldWebhookUrl,
+        });
+
+        logger.debug('Higgsfield generation started:', generation.id, requestId);
+
+        await (supabase.from('generations') as any)
+          .update({
+            replicate_prediction_id: requestId,  // Store higgsfield request_id in same field
+            status: 'processing',
+          })
+          .eq('id', generation.id);
+
+        return NextResponse.json({
+          id: generation.id,
+          prediction_id: requestId,
+          status: 'processing',
+          provider: 'higgsfield',
+        });
       } else {
         // Replicate provider (default)
         const replicateClient = getReplicateClient();
@@ -249,29 +281,100 @@ export async function POST(request: NextRequest) {
           logger.info('[Veo Debug] replicateInput:', JSON.stringify(replicateInput, null, 2));
         }
 
-        const { prediction, tokenId } = await replicateClient.run({
-          model: model.replicateModel,
-          version: model.version,
-          input: replicateInput,
-          webhook: webhookUrl,
-          webhook_events_filter: webhookUrl ? ['completed'] : undefined,
-        });
+        // Models that support fal.ai fallback
+        const FALLBACK_TO_FAL_MODELS = ['nano-banana-pro', 'nano-banana-pro-edit'];
+        const supportsFalFallback = FALLBACK_TO_FAL_MODELS.includes(validatedData.model_id);
 
-        logger.debug('Generation started:', generation.id, prediction.id);
+        try {
+          const { prediction, tokenId } = await replicateClient.run({
+            model: model.replicateModel,
+            version: model.version,
+            input: replicateInput,
+            webhook: webhookUrl,
+            webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+          });
 
-        await (supabase.from('generations') as any)
-          .update({
-            replicate_prediction_id: prediction.id,
-            replicate_token_index: tokenId,
+          logger.debug('Generation started:', generation.id, prediction.id);
+
+          await (supabase.from('generations') as any)
+            .update({
+              replicate_prediction_id: prediction.id,
+              replicate_token_index: tokenId,
+              status: 'processing',
+            })
+            .eq('id', generation.id);
+
+          return NextResponse.json({
+            id: generation.id,
+            prediction_id: prediction.id,
             status: 'processing',
-          })
-          .eq('id', generation.id);
+          });
+        } catch (replicateError: any) {
+          // Try fal.ai fallback for supported models
+          if (supportsFalFallback) {
+            logger.warn(`[Fallback] Replicate failed for ${validatedData.model_id}, trying fal.ai:`, replicateError.message);
+            
+            const falClient = getFalClient();
+            const falWebhookUrl = process.env.NODE_ENV === 'production' 
+              ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
+              : undefined;
+            
+            // Map input params for fal.ai nano-banana-pro
+            const falInput: Record<string, any> = {
+              prompt: replicateInput.prompt,
+              aspect_ratio: replicateInput.aspect_ratio === 'match_input_image' ? '1:1' : (replicateInput.aspect_ratio || '1:1'),
+              resolution: replicateInput.resolution || '2K',
+            };
+            
+            // Map image_input to image_url for references
+            if (replicateInput.image_input) {
+              // fal.ai expects image_url or image_urls for references
+              if (Array.isArray(replicateInput.image_input)) {
+                falInput.image_urls = replicateInput.image_input;
+              } else {
+                falInput.image_url = replicateInput.image_input;
+              }
+            }
+            
+            // For edit action, map image field
+            if (replicateInput.image) {
+              falInput.image_url = replicateInput.image;
+            }
+            
+            try {
+              const { requestId } = await falClient.submitToQueue({
+                model: 'fal-ai/nano-banana-pro',
+                input: falInput,
+                webhook: falWebhookUrl,
+              });
 
-        return NextResponse.json({
-          id: generation.id,
-          prediction_id: prediction.id,
-          status: 'processing',
-        });
+              logger.info('[Fallback] Fal.ai generation started:', generation.id, requestId);
+
+              await (supabase.from('generations') as any)
+                .update({
+                  replicate_prediction_id: requestId,
+                  replicate_model: 'fal-ai/nano-banana-pro',  // Update to fal model
+                  status: 'processing',
+                  settings: { ...generation.settings, fallback_provider: 'fal', original_error: replicateError.message },
+                })
+                .eq('id', generation.id);
+
+              return NextResponse.json({
+                id: generation.id,
+                prediction_id: requestId,
+                status: 'processing',
+                provider: 'fal',
+                fallback: true,
+              });
+            } catch (falError: any) {
+              logger.error('[Fallback] Fal.ai also failed:', falError.message);
+              // Fall through to original error handling
+              throw replicateError;
+            }
+          } else {
+            throw replicateError;
+          }
+        }
       }
     } catch (providerError: any) {
       logger.error(`${provider} error:`, providerError.message);

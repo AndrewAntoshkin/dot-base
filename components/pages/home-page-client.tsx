@@ -45,7 +45,7 @@ function HomeContent() {
   const [mobileShowForm, setMobileShowForm] = useState(false);
   const [sessionGenerations, setSessionGenerations] = useState<SessionGeneration[]>([]);
   const { addGeneration } = useGenerations();
-  const { selectedWorkspaceId } = useUser();
+  const { selectedWorkspaceId, isAdmin } = useUser();
   
   const formRef = useRef<SettingsFormRef | null>(null);
 
@@ -72,8 +72,8 @@ function HomeContent() {
         
         const { getModelsByActionLite } = await import('@/lib/models-lite');
         const { getModelsByAction } = await import('@/lib/models-config');
-        const modelsLite = getModelsByActionLite(actionParam as ActionType);
-        const modelsFull = getModelsByAction(actionParam as ActionType);
+        const modelsLite = getModelsByActionLite(actionParam as ActionType, isAdmin);
+        const modelsFull = getModelsByAction(actionParam as ActionType, isAdmin);
         
         const modelId = modelsLite[0]?.id;
         const model = modelsFull.find(m => m.id === modelId);
@@ -462,8 +462,27 @@ function HomeContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (formRef.current) {
+                    console.log('[Generate Desktop] Click', { formRef: !!formRef.current, isGenerating });
+                    if (!formRef.current) {
+                      console.warn('[Generate Desktop] formRef.current is null');
+                      return;
+                    }
+                    if (isGenerating) {
+                      console.warn('[Generate Desktop] Already generating, ignoring click');
+                      return;
+                    }
+                    setIsGenerating(true);
+                    // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                    const safetyTimeout = setTimeout(() => {
+                      console.warn('[Generate Desktop] Safety timeout triggered');
+                      setIsGenerating(false);
+                    }, 60000);
+                    try {
                       await formRef.current.submit();
+                    } finally {
+                      clearTimeout(safetyTimeout);
+                      setIsGenerating(false);
+                      console.log('[Generate Desktop] Done');
                     }
                   }}
                   disabled={isGenerating}
@@ -603,8 +622,27 @@ function HomeContent() {
               <button
                 type="button"
                 onClick={async () => {
-                  if (formRef.current) {
+                  console.log('[Generate Mobile] Click', { formRef: !!formRef.current, isGenerating });
+                  if (!formRef.current) {
+                    console.warn('[Generate Mobile] formRef.current is null');
+                    return;
+                  }
+                  if (isGenerating) {
+                    console.warn('[Generate Mobile] Already generating, ignoring click');
+                    return;
+                  }
+                  setIsGenerating(true);
+                  // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                  const safetyTimeout = setTimeout(() => {
+                    console.warn('[Generate Mobile] Safety timeout triggered');
+                    setIsGenerating(false);
+                  }, 60000);
+                  try {
                     await formRef.current.submit();
+                  } finally {
+                    clearTimeout(safetyTimeout);
+                    setIsGenerating(false);
+                    console.log('[Generate Mobile] Done');
                   }
                 }}
                 disabled={isGenerating}
