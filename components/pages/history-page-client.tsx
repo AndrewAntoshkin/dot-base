@@ -672,7 +672,7 @@ export default function HistoryPageClient() {
           </div>
           
           {/* Tabs и свитч "Только мои" - Sticky */}
-          <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-[80px] px-4 lg:px-[80px] pt-2">
+          <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-[80px] px-4 lg:px-[80px] pt-2 pb-2 flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#2e2e2e] pb-0">
           {/* Tabs - горизонтальный скролл на мобильных */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -712,7 +712,7 @@ export default function HistoryPageClient() {
           </div>
           
           {/* Фильтры */}
-          <div className="flex flex-wrap items-center gap-2 py-3">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Переключатель пространства - только если больше одного */}
             {allWorkspaces.length > 1 && (
               <div className="relative">
@@ -903,14 +903,11 @@ export default function HistoryPageClient() {
                               <video
                                 className="absolute inset-0 w-full h-full object-cover rounded-[12px] peer"
                                 src={`${(generation.output_urls?.[0] || '') as string}#t=0.001`}
-                                preload="metadata"
+                                preload="auto"
                                 muted
                                 playsInline
                                 loop
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.src = (generation.output_urls?.[0] || '') as string;
-                                  e.currentTarget.play();
-                                }}
+                                onMouseEnter={(e) => e.currentTarget.play()}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.pause();
                                   e.currentTarget.currentTime = 0;

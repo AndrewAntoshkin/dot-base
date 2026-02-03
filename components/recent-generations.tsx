@@ -100,11 +100,8 @@ export function RecentGenerations({
                           muted
                           playsInline
                           loop
-                          preload="metadata"
-                          onMouseEnter={(e) => {
-                            e.currentTarget.src = firstUrl;
-                            e.currentTarget.play();
-                          }}
+                          preload="auto"
+                          onMouseEnter={(e) => e.currentTarget.play()}
                           onMouseLeave={(e) => {
                             e.currentTarget.pause();
                             e.currentTarget.currentTime = 0;

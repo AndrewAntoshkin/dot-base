@@ -805,7 +805,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
         {/* History Section */}
         <div className="px-4 lg:px-20 py-6">
           {/* Tabs and Filters - Sticky */}
-          <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-20 px-4 lg:px-20 pt-2 pb-4 mb-2">
+          <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-20 px-4 lg:px-20 pt-2 pb-4 mb-2 flex flex-col gap-4">
             {/* Tabs */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide border-b border-[#2e2e2e] pb-0">
               {TABS.map(tab => {
@@ -935,14 +935,11 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                                 <video
                                   className="absolute inset-0 w-full h-full object-cover rounded-[12px] peer"
                                   src={`${(generation.output_urls?.[0] || '') as string}#t=0.001`}
-                                  preload="metadata"
+                                  preload="auto"
                                   muted
                                   playsInline
                                   loop
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.src = (generation.output_urls?.[0] || '') as string;
-                                    e.currentTarget.play();
-                                  }}
+                                  onMouseEnter={(e) => e.currentTarget.play()}
                                   onMouseLeave={(e) => {
                                     e.currentTarget.pause();
                                     e.currentTarget.currentTime = 0;
