@@ -211,7 +211,21 @@ export class HiggsfieldClient {
         throw new Error(`Failed to get status: HTTP ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Normalize response: extract video/images from payload if nested
+      // Some Higgsfield responses have media at top level, others in payload
+      const normalized: HiggsfieldPrediction = {
+        request_id: data.request_id,
+        status: data.status,
+        error: data.error,
+        video: data.video || data.payload?.video,
+        images: data.images || data.payload?.images,
+        status_url: data.status_url,
+        cancel_url: data.cancel_url,
+      };
+      
+      return normalized;
     } catch (error: any) {
       logger.error('[Higgsfield] Get status failed:', error.message);
       throw error;

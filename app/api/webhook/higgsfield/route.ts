@@ -112,13 +112,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const { request_id: requestId, status, images, video, error } = body;
+    // Handle both direct and nested payload structures
+    // Some Higgsfield responses have video/images at top level, others in payload
+    const { request_id: requestId, status, error, payload } = body;
+    const images = body.images || payload?.images;
+    const video = body.video || payload?.video;
 
     logger.info('[Higgsfield Webhook] Received:', JSON.stringify({ 
       requestId, 
       status, 
       hasImages: !!images, 
       hasVideo: !!video, 
+      hasPayload: !!payload,
       error 
     }));
 
