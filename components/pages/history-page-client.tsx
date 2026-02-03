@@ -1022,21 +1022,21 @@ export default function HistoryPageClient() {
 
             {/* Пагинация */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-4 mt-8">
+              <div className="flex items-center justify-center gap-3 mt-8">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter text-sm text-white hover:bg-[#1f1f1f] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 px-5 rounded-full border border-[#3a3a3a] font-inter text-[14px] text-white hover:bg-[#1f1f1f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Назад
                 </button>
-                <span className="font-inter text-sm text-[#8c8c8c]">
+                <span className="font-inter text-[14px] text-[#717171] min-w-[60px] text-center">
                   {page} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="h-10 px-4 rounded-xl border border-[#2f2f2f] font-inter text-sm text-white hover:bg-[#1f1f1f] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 px-5 rounded-full bg-white font-inter text-[14px] text-black hover:bg-[#e5e5e5] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Вперед
                 </button>
