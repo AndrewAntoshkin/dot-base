@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getFalClient } from '@/lib/fal/client';
+import { getHiggsfieldClient } from '@/lib/higgsfield/client';
 import { getModelById } from '@/lib/models-config';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
@@ -81,7 +82,18 @@ export async function POST() {
 
       // Determine provider from model config
       const modelConfig = getModelById(gen.model_id);
-      const provider = modelConfig?.provider || 'replicate';
+      
+      // Fallback: detect provider from replicate_model field if model not found
+      let provider = modelConfig?.provider || 'replicate';
+      if (!modelConfig && gen.replicate_model) {
+        if (gen.replicate_model.includes('higgsfield')) {
+          provider = 'higgsfield';
+          logger.warn(`[Sync] Model not found for id "${gen.model_id}", falling back to higgsfield`);
+        } else if (gen.replicate_model.startsWith('fal-ai/') || gen.replicate_model.includes('fal.ai')) {
+          provider = 'fal';
+          logger.warn(`[Sync] Model not found for id "${gen.model_id}", falling back to fal`);
+        }
+      }
 
       try {
         if (provider === 'fal') {
@@ -127,6 +139,67 @@ export async function POST() {
             syncedCount++;
           }
           // If IN_QUEUE or IN_PROGRESS - skip
+          continue;
+        }
+
+        if (provider === 'higgsfield') {
+          // Higgsfield sync
+          const higgsfieldClient = getHiggsfieldClient();
+          const status = await higgsfieldClient.getStatus(gen.replicate_prediction_id);
+          
+          logger.debug(`[Sync] Generation ${gen.id}: Higgsfield status = ${status.status}`, {
+            requestId: gen.replicate_prediction_id,
+            action: gen.action,
+          });
+
+          if (status.status === 'completed') {
+            let outputUrls: string[] = [];
+            
+            // Video output
+            if (status.video?.url) {
+              outputUrls = [status.video.url];
+            }
+            // Image output
+            else if (status.images && status.images.length > 0) {
+              outputUrls = status.images.map(img => img.url);
+            }
+
+            if (outputUrls.length > 0) {
+              const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(outputUrls, gen.id);
+              
+              await (supabase.from('generations') as any)
+                .update({
+                  status: 'completed',
+                  output_urls: savedUrls.length > 0 ? savedUrls : outputUrls,
+                  output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
+                  replicate_output: status,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', gen.id);
+              syncedCount++;
+            }
+          } else if (status.status === 'failed') {
+            await (supabase.from('generations') as any)
+              .update({
+                status: 'failed',
+                error_message: status.error || 'Генерация не удалась',
+                replicate_output: status,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', gen.id);
+            syncedCount++;
+          } else if (status.status === 'nsfw') {
+            await (supabase.from('generations') as any)
+              .update({
+                status: 'failed',
+                error_message: 'Контент заблокирован фильтром безопасности',
+                replicate_output: status,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', gen.id);
+            syncedCount++;
+          }
+          // If queued or in_progress - skip
           continue;
         }
 

@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getFalClient } from '@/lib/fal/client';
+import { getHiggsfieldClient } from '@/lib/higgsfield/client';
 import { getModelById } from '@/lib/models-config';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
@@ -171,7 +172,20 @@ export async function GET(
     ) {
       // Determine provider from model config
       const modelConfig = generation.model_id ? getModelById(generation.model_id) : null;
-      const provider = modelConfig?.provider || 'replicate';
+      
+      // Fallback: detect provider from replicate_model field if model not found
+      let provider = modelConfig?.provider || 'replicate';
+      if (!modelConfig && generation.replicate_model) {
+        if (generation.replicate_model.includes('higgsfield')) {
+          provider = 'higgsfield';
+          logger.warn(`[GET Generation] ${id}: Model not found for id "${generation.model_id}", falling back to higgsfield based on replicate_model "${generation.replicate_model}"`);
+        } else if (generation.replicate_model.startsWith('fal-ai/') || generation.replicate_model.includes('fal.ai')) {
+          provider = 'fal';
+          logger.warn(`[GET Generation] ${id}: Model not found for id "${generation.model_id}", falling back to fal based on replicate_model "${generation.replicate_model}"`);
+        }
+      }
+      
+      logger.debug(`[GET Generation] ${id}: Checking status, model_id="${generation.model_id}", provider="${provider}", modelConfig found: ${!!modelConfig}`);
 
       try {
         if (provider === 'fal') {
@@ -232,6 +246,81 @@ export async function GET(
             generation.error_message = 'Генерация не удалась';
           }
           // If IN_QUEUE or IN_PROGRESS - do nothing, generation is still processing
+        } else if (provider === 'higgsfield') {
+          // Higgsfield status check
+          const higgsfieldClient = getHiggsfieldClient();
+          
+          const status = await higgsfieldClient.getStatus(generation.replicate_prediction_id);
+          
+          logger.debug(`[GET Generation] ${id}: Higgsfield status = ${status.status}`, {
+            action: generation.action,
+            model: generation.model_name,
+            requestId: generation.replicate_prediction_id,
+          });
+
+          if (status.status === 'completed') {
+            let outputUrls: string[] = [];
+            
+            // Video output
+            if (status.video?.url) {
+              outputUrls = [status.video.url];
+            }
+            // Image output
+            else if (status.images && status.images.length > 0) {
+              outputUrls = status.images.map(img => img.url);
+            }
+
+            if (outputUrls.length > 0) {
+              const { urls: savedUrls, thumbs: savedThumbs } = await saveGenerationMedia(outputUrls, generation.id);
+              
+              const { error: updateError } = await (supabase.from('generations') as any)
+                .update({
+                  status: 'completed',
+                  output_urls: savedUrls.length > 0 ? savedUrls : outputUrls,
+                  output_thumbs: savedThumbs.length > 0 ? savedThumbs : null,
+                  replicate_output: status,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('id', id);
+
+              if (updateError) {
+                logger.error(`[GET Generation] Failed to update Higgsfield generation ${id}:`, updateError);
+              } else {
+                logger.info(`[GET Generation] Successfully updated Higgsfield generation ${id} to completed`);
+              }
+
+              generation.status = 'completed';
+              generation.output_urls = savedUrls.length > 0 ? savedUrls : outputUrls;
+              (generation as any).output_thumbs = savedThumbs.length > 0 ? savedThumbs : null;
+            }
+          } else if (status.status === 'failed') {
+            const errorMessage = status.error || 'Генерация не удалась';
+            
+            await (supabase.from('generations') as any)
+              .update({
+                status: 'failed',
+                error_message: errorMessage,
+                replicate_output: status,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', id);
+
+            generation.status = 'failed';
+            generation.error_message = errorMessage;
+          } else if (status.status === 'nsfw') {
+            await (supabase.from('generations') as any)
+              .update({
+                status: 'failed',
+                error_message: 'Контент заблокирован фильтром безопасности',
+                replicate_output: status,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', id);
+
+            generation.status = 'failed';
+            generation.error_message = 'Контент заблокирован фильтром безопасности';
+          }
+          // If queued or in_progress - do nothing, generation is still processing
         } else {
           // Replicate status check (default)
           const replicateClient = getReplicateClient();
@@ -442,6 +531,10 @@ export async function DELETE(
           // Fal.ai doesn't have a direct cancel API for queued requests
           // Just log it - the generation will fail/timeout on its own
           logger.debug(`[DELETE] Fal.ai generation ${id} - no cancel API available`);
+        } else if (provider === 'higgsfield') {
+          // Higgsfield cancel
+          const higgsfieldClient = getHiggsfieldClient();
+          await higgsfieldClient.cancel(generation.replicate_prediction_id);
         } else {
           // Replicate cancel
           const replicateClient = getReplicateClient();
