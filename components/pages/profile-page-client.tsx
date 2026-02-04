@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
-import { Loader2, Download, Play, Trash2, Type, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, Camera, Pencil } from 'lucide-react';
+import { Loader2, Download, Play, Trash2, Type, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, Camera, Pencil, MoreHorizontal } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/contexts/user-context';
 
@@ -369,6 +369,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [counts, setCounts] = useState<TabCounts>({ all: 0, processing: 0, favorites: 0, failed: 0 });
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+  const [openCardMenu, setOpenCardMenu] = useState<string | null>(null);
   
   // Filter states
   const [filterDate, setFilterDate] = useState<string>('');
@@ -472,6 +473,15 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [openDropdown]);
+
+  // Close card menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenCardMenu(null);
+    if (openCardMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openCardMenu]);
 
   const handleLogout = async () => {
     try {
@@ -885,12 +895,15 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
           {/* Generations Grid */}
           {isLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {Array.from({ length: 15 }).map((_, i) => (
+              {Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="border border-[#252525] rounded-[16px] p-1">
-                  <div className="relative aspect-square rounded-[12px] overflow-hidden bg-[#252525] before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#3a3a3a] before:to-transparent" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-4 w-3/4 bg-[#252525] rounded" />
-                    <div className="h-3 w-1/2 bg-[#252525] rounded" />
+                  <div className="relative aspect-square rounded-[12px] overflow-hidden bg-[#1a1a1a] before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.5s_infinite] before:bg-gradient-to-r before:from-transparent before:via-[#2a2a2a] before:to-transparent" />
+                  <div className="py-[6px] px-[10px] flex items-center justify-between">
+                    <div className="h-4 w-20 bg-[#1a1a1a] rounded" />
+                    <div className="flex gap-1">
+                      <div className="h-7 w-7 bg-[#1a1a1a] rounded-[6px]" />
+                      <div className="h-7 w-7 bg-[#1a1a1a] rounded-[6px]" />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -924,6 +937,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                       onClick={() => handleClick(generation)}
                     >
                       <div className="p-1 flex flex-col">
+                        {/* Image container - 1:1 aspect ratio */}
                         <div className="relative aspect-square rounded-[12px] overflow-hidden bg-[#151515]">
                           {isFailed ? (
                             <div className="absolute inset-0 flex items-center justify-center">
@@ -1007,53 +1021,80 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
                               </div>
                             </div>
                           )}
-                          
-                          <div className="absolute bottom-2 sm:bottom-auto sm:top-2 left-2 bg-[#181818] px-1.5 py-1 rounded-[8px]">
-                            <span className="font-inter font-medium text-[10px] text-[#bbbbbb] uppercase tracking-[-0.2px] leading-4">{generation.model_name}</span>
-                          </div>
-
-                          {!isFailed && (
-                            <button
-                              onClick={(e) => handleToggleFavorite(e, generation.id)}
-                              className="absolute top-2 right-2 bg-[#181818] border border-[#2f2f2f] p-2 rounded-[8px] hover:bg-[#252525] transition-colors"
-                            >
-                              {generation.is_favorite ? <HeartFilledIcon /> : <HeartOutlineIcon />}
-                            </button>
-                          )}
                         </div>
 
-                        <div className="p-2 lg:p-3 flex flex-col gap-2 lg:gap-3">
-                          <p className="font-inter font-normal text-[11px] lg:text-[12px] text-[#8c8c8c] leading-4 line-clamp-3">
-                            {generation.prompt || 'Без промпта'}
-                          </p>
-
-                          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-                            <span className="font-inter font-medium text-[10px] lg:text-[12px] text-[#4d4d4d] leading-5 whitespace-nowrap">
-                              {formatDateCustom(generation.created_at)}
-                            </span>
-                            <div className="flex items-center gap-1 self-end sm:self-auto">
+                        {/* Info section - Figma: padding 6px 10px, one row with model + buttons */}
+                        <div className="py-[6px] px-[10px] flex items-center justify-between gap-2">
+                          {/* Model name - left */}
+                          <span className="font-inter font-medium text-[10px] leading-[1.6] tracking-[-0.02em] uppercase text-[#bbbbbb]">
+                            {generation.model_name}
+                          </span>
+                          
+                          {/* Buttons - right: favorite + more menu */}
+                          <div className="flex items-center gap-1">
+                            {!isFailed && (
                               <button
-                                onClick={(e) => handleDelete(e, generation.id)}
-                                className="p-1.5 lg:p-2 rounded-[6px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
+                                onClick={(e) => handleToggleFavorite(e, generation.id)}
+                                className="p-[6px] hover:bg-[#1f1f1f] rounded-[6px] transition-colors"
                               >
-                                <Trash2 className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                                {generation.is_favorite ? <HeartFilledIcon /> : <HeartOutlineIcon />}
+                              </button>
+                            )}
+                            
+                            {/* Three-dot menu */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenCardMenu(openCardMenu === generation.id ? null : generation.id);
+                                }}
+                                className="p-[6px] hover:bg-[#1f1f1f] rounded-[6px] transition-colors"
+                              >
+                                <MoreHorizontal className="h-4 w-4 text-[#bbbbbb]" />
                               </button>
                               
-                              {isFailed ? (
-                                <button
-                                  onClick={(e) => handleRetry(e, generation.id)}
-                                  disabled={isRetrying}
-                                  className="p-1.5 lg:p-2 rounded-[6px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors disabled:opacity-50"
+                              {/* Dropdown menu */}
+                              {openCardMenu === generation.id && (
+                                <div 
+                                  className="absolute right-0 bottom-full mb-1 min-w-[140px] bg-[#1a1a1a] border border-[#2e2e2e] rounded-[10px] shadow-lg z-50 py-1 overflow-hidden"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <RefreshCw className={`h-3.5 w-3.5 lg:h-4 lg:w-4 ${isRetrying ? 'animate-spin' : ''}`} />
-                                </button>
-                              ) : generation.output_urls?.[0] && (
-                                <button
-                                  onClick={(e) => handleDownload(e, generation.output_urls![0], generation.id)}
-                                  className="p-1.5 lg:p-2 rounded-[6px] border border-[#2f2f2f] text-white hover:bg-[#1f1f1f] transition-colors"
-                                >
-                                  <Download className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
-                                </button>
+                                  {isFailed ? (
+                                    <button
+                                      onClick={(e) => {
+                                        handleRetry(e, generation.id);
+                                        setOpenCardMenu(null);
+                                      }}
+                                      disabled={isRetrying}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[#959595] hover:bg-[#252525] hover:text-white transition-colors disabled:opacity-50"
+                                    >
+                                      <RefreshCw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                                      <span>Повторить</span>
+                                    </button>
+                                  ) : generation.output_urls?.[0] && (
+                                    <button
+                                      onClick={(e) => {
+                                        handleDownload(e, generation.output_urls![0], generation.id);
+                                        setOpenCardMenu(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[#959595] hover:bg-[#252525] hover:text-white transition-colors"
+                                    >
+                                      <Download className="h-4 w-4" />
+                                      <span>Скачать</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      handleDelete(e, generation.id);
+                                      setOpenCardMenu(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[#ff4949] hover:bg-[#252525] transition-colors"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span>Удалить</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>

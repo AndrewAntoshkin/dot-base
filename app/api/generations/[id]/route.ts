@@ -203,11 +203,21 @@ export async function GET(
 
           if (status.status === 'COMPLETED') {
             const result = await falClient.getResult(falModel, generation.replicate_prediction_id);
-            const output = result.output;
+            const output = result.output as any;
             
             let outputUrls: string[] = [];
+            
+            // Handle video output (video models)
             if (output?.video?.url) {
               outputUrls = [output.video.url];
+            }
+            // Handle images output (image models like nano-banana-pro)
+            else if (output?.images && Array.isArray(output.images)) {
+              outputUrls = output.images.map((img: any) => img.url).filter(Boolean);
+            }
+            // Handle single image output
+            else if (output?.image?.url) {
+              outputUrls = [output.image.url];
             }
 
             if (outputUrls.length > 0) {

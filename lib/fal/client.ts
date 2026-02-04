@@ -85,6 +85,30 @@ export class FalClient {
     return cleaned;
   }
   
+  /**
+   * Check if error is related to insufficient credits/balance
+   */
+  isInsufficientCreditsError(error: any): boolean {
+    const message = (error?.message || '').toLowerCase();
+    const body = JSON.stringify(error?.body || error?.response || {}).toLowerCase();
+    const combined = message + ' ' + body;
+    
+    const creditPatterns = [
+      'insufficient',
+      'balance',
+      'credits',
+      'quota',
+      'limit exceeded',
+      'payment required',
+      'billing',
+      'subscription',
+      'no funds',
+      'out of credits',
+    ];
+    
+    return creditPatterns.some(pattern => combined.includes(pattern));
+  }
+
   private sanitizeErrorMessage(error: any): string {
     let message = error.message || 'Произошла ошибка при генерации';
     
@@ -94,6 +118,7 @@ export class FalClient {
     message = message.replace(/fal-ai[^\s]*/gi, '');
     
     const errorMappings: [RegExp, string][] = [
+      [/insufficient|balance|credits|quota|payment required/i, 'Недостаточно кредитов на Fal.ai аккаунте'],
       [/image_url is required/i, 'Для этой модели требуется входное изображение'],
       [/prompt is required/i, 'Требуется ввести описание (prompt)'],
       [/rate limit/i, 'Слишком много запросов. Подождите немного'],

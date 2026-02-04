@@ -44,6 +44,7 @@ export interface Model {
   name: string;
   displayName: string;
   replicateModel: string;  // For fal.ai models, this is the fal model path
+  fallbackModel?: string;  // Fallback model for different provider (e.g., Replicate when Fal fails)
   version?: string;
   action: ActionType;
   description?: string;
@@ -547,16 +548,18 @@ export const CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 3. Nano Banana Pro (Google)
+  // 3. Nano Banana Pro (Google) - Primary: Fal.ai, Fallback: Replicate
   {
     id: 'nano-banana-pro',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
-    replicateModel: 'google/nano-banana-pro',
+    replicateModel: 'fal-ai/nano-banana-pro',  // Fal.ai model
+    fallbackModel: 'google/nano-banana-pro',   // Replicate fallback
     action: 'create',
+    provider: 'fal',  // Primary provider is Fal.ai (faster)
     runs: '4.8M runs',
     price: 'Priced by multiple properties',
-    description: 'Генерация с текстом и до 14 референсов. ⏱️ 1-2 мин',
+    description: 'Генерация с текстом и до 14 референсов. ⏱️ ~25 сек',
     settings: [
       {
         name: 'prompt',
@@ -1701,21 +1704,78 @@ export const CREATE_MODELS: Model[] = [
       },
     ],
   },
+
+  // 17. Higgs Banana - Nano Banana Pro via Higgsfield (TEST)
+  {
+    id: 'higgs-banana',
+    name: 'nano-banana-pro',
+    displayName: 'Higgs Banana',
+    replicateModel: 'nano-banana-pro',
+    action: 'create',
+    provider: 'higgsfield',
+    adminOnly: true,  // Только для тестирования
+    price: '$0.05',
+    description: 'Nano Banana Pro via Higgsfield - Google DeepMind модель с продвинутым рендерингом текста!',
+    settings: [
+      {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        placeholder: 'A beautiful sunset over mountains with "Hello World" text overlay...',
+        description: 'Детальное описание. Отлично рендерит текст на изображениях!',
+      },
+      {
+        name: 'aspect_ratio',
+        label: 'Соотношение сторон',
+        type: 'select',
+        default: '1:1',
+        options: [
+          { value: '1:1', label: '1:1 (квадрат)' },
+          { value: '16:9', label: '16:9 (горизонталь)' },
+          { value: '9:16', label: '9:16 (вертикаль)' },
+          { value: '4:3', label: '4:3 (ландшафт)' },
+          { value: '3:4', label: '3:4 (портрет)' },
+        ],
+        description: 'Выберите формат изображения',
+      },
+      {
+        name: 'resolution',
+        label: 'Разрешение',
+        type: 'select',
+        default: '2k',
+        options: [
+          { value: '1k', label: '1K (быстро)' },
+          { value: '2k', label: '2K (рекомендуется)' },
+          { value: '4k', label: '4K (максимум)' },
+        ],
+        description: 'Выше разрешение = лучше качество, но дольше',
+      },
+      {
+        name: 'seed',
+        label: 'Seed',
+        type: 'number',
+        description: 'Для воспроизводимости результата',
+      },
+    ],
+  },
 ];
 
 /**
  * РЕДАКТИРОВАТЬ - 8 моделей
  */
 export const EDIT_MODELS: Model[] = [
-  // 1. Nano Banana Pro (Edit)
+  // 1. Nano Banana Pro (Edit) - Primary: Fal.ai, Fallback: Replicate
   {
     id: 'nano-banana-pro-edit',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
-    replicateModel: 'google/nano-banana-pro',
+    replicateModel: 'fal-ai/nano-banana-pro',  // Fal.ai model
+    fallbackModel: 'google/nano-banana-pro',   // Replicate fallback
     action: 'edit',
+    provider: 'fal',  // Primary provider is Fal.ai (faster)
     runs: '4.8M runs',
-    description: 'Редактирование с текстом на изображении. ⏱️ 1-2 мин',
+    description: 'Редактирование с текстом на изображении. ⏱️ ~25 сек',
     settings: [
       {
         name: 'prompt',

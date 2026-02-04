@@ -42,6 +42,7 @@ export const CREATE_MODELS_LITE: ModelLite[] = [
   // Higgsfield (только для админов)
   { id: 'higgsfield-soul-standard', displayName: 'Higgsfield Soul', description: 'Higgsfield - флагманская модель для генерации изображений', action: 'create', adminOnly: true },
   { id: 'higgsfield-soul-reference', displayName: 'Higgsfield Soul Reference', description: 'Higgsfield - генерация с референсами для консистентности', action: 'create', adminOnly: true },
+  { id: 'higgs-banana', displayName: 'Higgs Banana', description: 'Nano Banana Pro via Higgsfield - отличный рендеринг текста!', action: 'create', adminOnly: true },
 ];
 
 export const EDIT_MODELS_LITE: ModelLite[] = [

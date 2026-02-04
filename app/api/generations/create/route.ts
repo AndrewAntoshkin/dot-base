@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
     // Start prediction based on provider
     try {
       if (provider === 'fal') {
-        // Fal.ai provider
+        // Fal.ai provider with fallback to Replicate
         const falClient = getFalClient();
         
         const falWebhookUrl = process.env.NODE_ENV === 'production' 
@@ -216,27 +216,86 @@ export async function POST(request: NextRequest) {
         
         logger.info('[Fal.ai] Starting generation for model:', model.replicateModel);
 
-        const { requestId } = await falClient.submitToQueue({
-          model: model.replicateModel,
-          input: replicateInput,
-          webhook: falWebhookUrl,
-        });
+        try {
+          const { requestId } = await falClient.submitToQueue({
+            model: model.replicateModel,
+            input: replicateInput,
+            webhook: falWebhookUrl,
+          });
 
-        logger.debug('Fal.ai generation started:', generation.id, requestId);
+          logger.debug('Fal.ai generation started:', generation.id, requestId);
 
-        await (supabase.from('generations') as any)
-          .update({
-            replicate_prediction_id: requestId,  // Store fal request_id in same field
+          await (supabase.from('generations') as any)
+            .update({
+              replicate_prediction_id: requestId,  // Store fal request_id in same field
+              status: 'processing',
+            })
+            .eq('id', generation.id);
+
+          return NextResponse.json({
+            id: generation.id,
+            prediction_id: requestId,
             status: 'processing',
-          })
-          .eq('id', generation.id);
+            provider: 'fal',
+          });
+        } catch (falError: any) {
+          // Check if we have a fallback model and error is retryable
+          const hasFallback = model.fallbackModel;
+          const isCreditsError = falClient.isInsufficientCreditsError(falError);
+          const isRetryableError = isCreditsError || 
+            /rate limit|timeout|unavailable|503|502|500/i.test(falError.message || '');
+          
+          if (hasFallback && isRetryableError) {
+            logger.warn(`[Fal.ai -> Replicate Fallback] Fal.ai failed (${isCreditsError ? 'credits' : 'error'}), trying Replicate:`, falError.message);
+            
+            // Fallback to Replicate
+            const replicateClient = getReplicateClient();
+            const webhookUrl = process.env.NODE_ENV === 'production' 
+              ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
+              : undefined;
+            
+            try {
+              const { prediction, tokenId } = await replicateClient.run({
+                model: model.fallbackModel!,
+                version: model.version,
+                input: replicateInput,
+                webhook: webhookUrl,
+                webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+              });
 
-        return NextResponse.json({
-          id: generation.id,
-          prediction_id: requestId,
-          status: 'processing',
-          provider: 'fal',
-        });
+              logger.info('[Fallback] Replicate generation started:', generation.id, prediction.id);
+
+              await (supabase.from('generations') as any)
+                .update({
+                  replicate_prediction_id: prediction.id,
+                  replicate_token_index: tokenId,
+                  replicate_model: model.fallbackModel,  // Update to fallback model
+                  status: 'processing',
+                  settings: { 
+                    ...generation.settings, 
+                    fallback_provider: 'replicate', 
+                    original_provider: 'fal',
+                    original_error: falError.message 
+                  },
+                })
+                .eq('id', generation.id);
+
+              return NextResponse.json({
+                id: generation.id,
+                prediction_id: prediction.id,
+                status: 'processing',
+                provider: 'replicate',
+                fallback: true,
+                original_error: isCreditsError ? 'Fal.ai credits depleted' : falError.message,
+              });
+            } catch (replicateError: any) {
+              logger.error('[Fallback] Replicate also failed:', replicateError.message);
+              throw replicateError;  // Throw replicate error as final error
+            }
+          } else {
+            throw falError;  // No fallback or non-retryable error
+          }
+        }
       } else if (provider === 'higgsfield') {
         // Higgsfield provider
         const higgsfieldClient = getHiggsfieldClient();
@@ -281,8 +340,9 @@ export async function POST(request: NextRequest) {
           logger.info('[Veo Debug] replicateInput:', JSON.stringify(replicateInput, null, 2));
         }
 
-        // Models that support fal.ai fallback
-        const FALLBACK_TO_FAL_MODELS = ['nano-banana-pro', 'nano-banana-pro-edit'];
+        // Models that support fal.ai fallback (when Replicate is primary)
+        // Note: nano-banana-pro models now use Fal as primary, so they're handled above
+        const FALLBACK_TO_FAL_MODELS: string[] = [];  // Add model IDs here if needed
         const supportsFalFallback = FALLBACK_TO_FAL_MODELS.includes(validatedData.model_id);
 
         try {
