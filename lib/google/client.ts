@@ -108,13 +108,33 @@ export class GoogleAIClient {
       // Add prompt
       parts.push({ text: prompt });
 
+      // Build imageConfig from input settings
+      const imageConfig: Record<string, any> = {};
+      
+      // Map aspect_ratio
+      if (options.input.aspect_ratio && options.input.aspect_ratio !== 'match_input_image') {
+        imageConfig.aspectRatio = options.input.aspect_ratio;
+      }
+      
+      // Map resolution to imageSize (Google uses uppercase: 1K, 2K, 4K)
+      if (options.input.resolution) {
+        imageConfig.imageSize = options.input.resolution;
+      }
+
       // Build request body
-      const requestBody = {
+      const requestBody: Record<string, any> = {
         contents: [{ parts }],
         generationConfig: {
           responseModalities: ['TEXT', 'IMAGE'],
         },
       };
+      
+      // Add imageConfig if we have any settings
+      if (Object.keys(imageConfig).length > 0) {
+        requestBody.generationConfig.imageConfig = imageConfig;
+      }
+      
+      logger.debug('[Google AI] Request body:', JSON.stringify(requestBody.generationConfig, null, 2));
 
       // Make API call
       const response = await fetch(
