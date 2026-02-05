@@ -40,6 +40,8 @@ import { AspectRatioSelector } from './aspect-ratio-selector';
 import { DirectionalExpandSelector, ExpandDirection } from './directional-expand-selector';
 import { useUser } from '@/contexts/user-context';
 import { useLimitToast } from '@/components/limit-toast';
+import { PresetsSection } from './presets-section';
+import { modelSupportsPresets } from '@/lib/presets-config';
 
 // Helper function to get image dimensions
 function getImageDimensions(imageSrc: string): Promise<{ width: number; height: number }> {
@@ -860,11 +862,11 @@ export function SettingsForm({
       };
     }
     
+    // Не очищаем formRef.current в cleanup - это может вызвать race condition
+    // при переключении табов на мобиле. При следующем монтировании
+    // useEffect автоматически установит новые функции.
     return () => {
-      // Don't clear window globals - they're needed for mobile
-      if (formRef) {
-        formRef.current = null;
-      }
+      // Don't clear anything - formRef will be updated on next mount
     };
   }, [model, formRef]);
 
@@ -917,6 +919,7 @@ export function SettingsForm({
       const errorMessage = `Заполните обязательные поля: ${fieldLabels.join(', ')}`;
       setError(errorMessage);
       if (onError) onError(errorMessage);
+      if (onSubmitEnd) onSubmitEnd(); // Важно: сбросить isGenerating при ошибке валидации
       return;
     }
     
@@ -1320,6 +1323,12 @@ export function SettingsForm({
           return null;
         }
         
+        // Скрываем motion dropdown если модель поддерживает пресеты камеры
+        // (чтобы не дублировать UI - пресеты уже управляют этим параметром)
+        if (setting.name === 'motion' && modelSupportsPresets(model.id)) {
+          return null;
+        }
+        
         const meta = getSettingMeta(setting);
         const isAspectRatio = setting.name === 'aspect_ratio';
         
@@ -1385,6 +1394,15 @@ export function SettingsForm({
           </div>
         );
       })}
+
+      {/* Пресеты для I2V моделей */}
+      {model.action === 'video_i2v' && modelSupportsPresets(model.id) && (
+        <PresetsSection
+          modelId={model.id}
+          formData={formData}
+          onApplyPreset={(updatedData) => setFormData(updatedData)}
+        />
+      )}
 
       {/* Error message if any */}
       {error && (

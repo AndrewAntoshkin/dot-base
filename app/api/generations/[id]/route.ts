@@ -188,7 +188,12 @@ export async function GET(
       logger.debug(`[GET Generation] ${id}: Checking status, model_id="${generation.model_id}", provider="${provider}", modelConfig found: ${!!modelConfig}`);
 
       try {
-        if (provider === 'fal') {
+        if (provider === 'google') {
+          // Google AI is synchronous - generation should already be completed
+          // No external status check needed, just return current state from database
+          logger.debug(`[GET Generation] ${id}: Google provider - using database status: ${generation.status}`);
+          // Nothing to do - generation.status is already set from database
+        } else if (provider === 'fal') {
           // Fal.ai status check
           const falClient = getFalClient();
           const falModel = generation.replicate_model || modelConfig?.replicateModel || '';
@@ -537,7 +542,10 @@ export async function DELETE(
       const provider = modelConfig?.provider || 'replicate';
 
       try {
-        if (provider === 'fal') {
+        if (provider === 'google') {
+          // Google AI is synchronous - nothing to cancel
+          logger.debug(`[DELETE] Google generation ${id} - synchronous, nothing to cancel`);
+        } else if (provider === 'fal') {
           // Fal.ai doesn't have a direct cancel API for queued requests
           // Just log it - the generation will fail/timeout on its own
           logger.debug(`[DELETE] Fal.ai generation ${id} - no cancel API available`);

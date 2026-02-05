@@ -102,8 +102,10 @@ export function BrainstormImageSheet({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, handlePrevious, handleNext]);
 
-  // Download image - конвертируем в реальный PNG через canvas
-  // Это решает проблему с WebP файлами от Replicate, которые не показывают превью на macOS/iOS
+  // Check if current generation is video
+  const isVideo = generation?.mediaType === 'video';
+
+  // Download media
   const handleDownload = useCallback(async () => {
     const url = generation?.resultUrl;
     if (!url) return;
@@ -112,52 +114,19 @@ export function BrainstormImageSheet({
       const response = await fetch(url);
       const blob = await response.blob();
       
-      // Конвертируем в PNG через canvas
-      const imageBitmap = await createImageBitmap(blob);
-      const canvas = document.createElement('canvas');
-      canvas.width = imageBitmap.width;
-      canvas.height = imageBitmap.height;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Canvas context not available');
-      }
-      
-      ctx.drawImage(imageBitmap, 0, 0);
-      
-      // Конвертируем в PNG blob
-      const pngBlob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => {
-          if (b) resolve(b);
-          else reject(new Error('Failed to create PNG blob'));
-        }, 'image/png');
-      });
-      
-      const objectUrl = window.URL.createObjectURL(pngBlob);
-      const a = document.createElement('a');
-      a.href = objectUrl;
-      a.download = `brainstorm-${generation.modelName}-${Date.now()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(objectUrl);
-    } catch (error) {
-      console.error('Download failed:', error);
-    }
-  }, [generation]);
-
-  // Copy image to clipboard (same method as in output-panel)
-  const handleCopyImage = useCallback(async () => {
-    const url = generation?.resultUrl;
-    if (!url) return;
-
-    try {
-      // Создаём Promise для blob (асинхронно)
-      const pngBlobPromise = (async () => {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        
-        // Конвертируем в PNG через canvas
+      if (isVideo) {
+        // For video, just download directly
+        const objectUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = `brainstorm-${generation.modelName}-${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(objectUrl);
+      } else {
+        // For images, convert to PNG through canvas
+        // This solves the issue with WebP files from Replicate that don't show preview on macOS/iOS
         const imageBitmap = await createImageBitmap(blob);
         const canvas = document.createElement('canvas');
         canvas.width = imageBitmap.width;
@@ -170,7 +139,53 @@ export function BrainstormImageSheet({
         
         ctx.drawImage(imageBitmap, 0, 0);
         
-        // toBlob через Promise
+        // Convert to PNG blob
+        const pngBlob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((b) => {
+            if (b) resolve(b);
+            else reject(new Error('Failed to create PNG blob'));
+          }, 'image/png');
+        });
+        
+        const objectUrl = window.URL.createObjectURL(pngBlob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = `brainstorm-${generation.modelName}-${Date.now()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(objectUrl);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  }, [generation, isVideo]);
+
+  // Copy image to clipboard (same method as in output-panel) - only for images
+  const handleCopyImage = useCallback(async () => {
+    const url = generation?.resultUrl;
+    if (!url || isVideo) return; // Can't copy video to clipboard
+
+    try {
+      // Create Promise for blob (async)
+      const pngBlobPromise = (async () => {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        
+        // Convert to PNG through canvas
+        const imageBitmap = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = imageBitmap.width;
+        canvas.height = imageBitmap.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          throw new Error('Canvas context not available');
+        }
+        
+        ctx.drawImage(imageBitmap, 0, 0);
+        
+        // toBlob via Promise
         return new Promise<Blob>((resolve, reject) => {
           canvas.toBlob((b) => {
             if (b) resolve(b);
@@ -179,7 +194,7 @@ export function BrainstormImageSheet({
         });
       })();
       
-      // Передаём Promise напрямую в ClipboardItem - браузер сам дождётся
+      // Pass Promise directly to ClipboardItem - browser will await it
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': pngBlobPromise })
       ]);
@@ -189,7 +204,7 @@ export function BrainstormImageSheet({
     } catch (error) {
       console.error('Copy image error:', error);
     }
-  }, [generation]);
+  }, [generation, isVideo]);
 
   // Open in fullscreen
   const handleOpenFullscreen = useCallback(() => {
@@ -226,6 +241,17 @@ export function BrainstormImageSheet({
   const handleOutpaint = useCallback(() => {
     if (!generation?.resultUrl) return;
     router.push(`/expand?imageUrl=${encodeURIComponent(generation.resultUrl)}`);
+  }, [generation, router]);
+
+  // Video-specific actions
+  const handleVideoEdit = useCallback(() => {
+    if (!generation?.resultUrl) return;
+    router.push(`/video?action=video_edit&videoUrl=${encodeURIComponent(generation.resultUrl)}`);
+  }, [generation, router]);
+
+  const handleVideoUpscale = useCallback(() => {
+    if (!generation?.resultUrl) return;
+    router.push(`/video?action=video_upscale&videoUrl=${encodeURIComponent(generation.resultUrl)}`);
   }, [generation, router]);
 
   // Don't render anything if not open or no generation
@@ -289,19 +315,30 @@ export function BrainstormImageSheet({
         <div className="flex-1 flex flex-col gap-4 overflow-hidden">
           {/* Image container */}
           <div className="flex-1 flex flex-col gap-3 min-h-0">
-            {/* Image */}
+            {/* Media (Image or Video) */}
             <div className="relative flex-1 rounded-xl overflow-hidden bg-[#101010] flex items-center justify-center">
-              <img
-                src={generation.resultUrl}
-                alt={generation.modelName}
-                className="max-w-full max-h-full object-contain"
-              />
+              {isVideo ? (
+                <video
+                  src={generation.resultUrl}
+                  className="max-w-full max-h-full object-contain"
+                  controls
+                  autoPlay
+                  loop
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={generation.resultUrl}
+                  alt={generation.modelName}
+                  className="max-w-full max-h-full object-contain"
+                />
+              )}
               
               {/* Hover overlay with fullscreen button */}
-              <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center group">
+              <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center group pointer-events-none">
                 <button
                   onClick={handleOpenFullscreen}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 p-3 rounded-lg"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 p-3 rounded-lg pointer-events-auto"
                   aria-label="Open in fullscreen"
                 >
                   <Maximize2 className="w-4 h-4" />
@@ -310,62 +347,87 @@ export function BrainstormImageSheet({
             </div>
           </div>
 
-          {/* Quick actions */}
+          {/* Quick actions - different for image vs video */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleAnimate}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
-            >
-              <Play className="w-3.5 h-3.5" />
-              <span>Анимировать</span>
-            </button>
-            <button
-              onClick={handleEdit}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              <span>Редактировать</span>
-            </button>
-            <button
-              onClick={handleUpscale}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Улучшить</span>
-            </button>
-            <button
-              onClick={handleRemoveBg}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
-            >
-              <Eraser className="w-3.5 h-3.5" />
-              <span>Удалить фон</span>
-            </button>
-            <button
-              onClick={handleInpaint}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
-            >
-              <PaintBucket className="w-3.5 h-3.5" />
-              <span>Inpaint</span>
-            </button>
-            <button
-              onClick={handleOutpaint}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-              <span>Outpaint</span>
-            </button>
+            {isVideo ? (
+              <>
+                {/* Video actions */}
+                <button
+                  onClick={handleVideoEdit}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Редактировать</span>
+                </button>
+                <button
+                  onClick={handleVideoUpscale}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Улучшить</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Image actions */}
+                <button
+                  onClick={handleAnimate}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Анимировать</span>
+                </button>
+                <button
+                  onClick={handleEdit}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Редактировать</span>
+                </button>
+                <button
+                  onClick={handleUpscale}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Улучшить</span>
+                </button>
+                <button
+                  onClick={handleRemoveBg}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                  <span>Удалить фон</span>
+                </button>
+                <button
+                  onClick={handleInpaint}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <PaintBucket className="w-3.5 h-3.5" />
+                  <span>Inpaint</span>
+                </button>
+                <button
+                  onClick={handleOutpaint}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 h-8 border border-[#4D4D4D] rounded-[10px] font-inter font-medium text-xs text-white hover:bg-[#1f1f1f] hover:border-[#666] transition-colors whitespace-nowrap"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Outpaint</span>
+                </button>
+              </>
+            )}
 
             {/* Divider */}
             <div className="w-px h-6 bg-[#2F2F2F]" />
 
-            {/* Action buttons: Copy, Download */}
-            <button
-              onClick={handleCopyImage}
-              className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#4D4D4D] hover:bg-[#1f1f1f] hover:border-[#666] transition-colors"
-              aria-label="Copy image"
-            >
-              {copiedImage ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-            </button>
+            {/* Action buttons: Copy (only for images), Download */}
+            {!isVideo && (
+              <button
+                onClick={handleCopyImage}
+                className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#4D4D4D] hover:bg-[#1f1f1f] hover:border-[#666] transition-colors"
+                aria-label="Copy image"
+              >
+                {copiedImage ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+              </button>
+            )}
             <button
               onClick={handleDownload}
               className="w-8 h-8 flex items-center justify-center rounded-[10px] border border-[#4D4D4D] hover:bg-[#1f1f1f] hover:border-[#666] transition-colors"

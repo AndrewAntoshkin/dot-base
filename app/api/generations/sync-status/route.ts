@@ -96,6 +96,12 @@ export async function POST() {
       }
 
       try {
+        if (provider === 'google') {
+          // Google AI is synchronous - skip status check, use database state
+          logger.debug(`[Sync] Generation ${gen.id}: Google provider - skipping (synchronous)`);
+          continue;
+        }
+        
         if (provider === 'fal') {
           // Fal.ai sync
           const status = await falClient.getQueueStatus(gen.replicate_model, gen.replicate_prediction_id);

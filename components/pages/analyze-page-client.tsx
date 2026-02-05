@@ -237,10 +237,27 @@ function AnalyzeContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (formRef.current) {
-                      setIsGenerating(true);
-                      await formRef.current.submit();
+                    console.log('[Analyze Desktop] Click', { formRef: !!formRef.current, isGenerating });
+                    if (!formRef.current) {
+                      console.warn('[Analyze Desktop] formRef.current is null');
+                      return;
+                    }
+                    if (isGenerating) {
+                      console.warn('[Analyze Desktop] Already generating, ignoring click');
+                      return;
+                    }
+                    setIsGenerating(true);
+                    // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                    const safetyTimeout = setTimeout(() => {
+                      console.warn('[Analyze Desktop] Safety timeout triggered');
                       setIsGenerating(false);
+                    }, 60000);
+                    try {
+                      await formRef.current.submit();
+                    } finally {
+                      clearTimeout(safetyTimeout);
+                      setIsGenerating(false);
+                      console.log('[Analyze Desktop] Done');
                     }
                   }}
                   disabled={isGenerating}
@@ -354,10 +371,27 @@ function AnalyzeContent() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (formRef.current) {
-                            setIsGenerating(true);
-                            await formRef.current.submit();
+                          console.log('[Analyze Mobile] Click', { formRef: !!formRef.current, isGenerating });
+                          if (!formRef.current) {
+                            console.warn('[Analyze Mobile] formRef.current is null');
+                            return;
+                          }
+                          if (isGenerating) {
+                            console.warn('[Analyze Mobile] Already generating, ignoring click');
+                            return;
+                          }
+                          setIsGenerating(true);
+                          // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
+                          const safetyTimeout = setTimeout(() => {
+                            console.warn('[Analyze Mobile] Safety timeout triggered');
                             setIsGenerating(false);
+                          }, 60000);
+                          try {
+                            await formRef.current.submit();
+                          } finally {
+                            clearTimeout(safetyTimeout);
+                            setIsGenerating(false);
+                            console.log('[Analyze Mobile] Done');
                           }
                         }}
                         disabled={isGenerating}
