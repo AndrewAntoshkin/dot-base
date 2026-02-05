@@ -348,7 +348,7 @@ export async function POST(request: NextRequest) {
             const filePath = `generations/${userId}/${fileName}`;
             
             const { error: uploadError } = await supabase.storage
-              .from('images')
+              .from('generations')
               .upload(filePath, buffer, {
                 contentType: result.mimeType || 'image/png',
                 upsert: true,
@@ -361,7 +361,7 @@ export async function POST(request: NextRequest) {
             
             // Get public URL
             const { data: urlData } = supabase.storage
-              .from('images')
+              .from('generations')
               .getPublicUrl(filePath);
             
             const outputUrl = urlData.publicUrl;
@@ -371,7 +371,7 @@ export async function POST(request: NextRequest) {
               .update({
                 replicate_prediction_id: `google-${Date.now()}`,
                 status: 'completed',
-                output_url: outputUrl,
+                output_urls: [outputUrl],
                 completed_at: new Date().toISOString(),
               })
               .eq('id', generation.id);
@@ -381,7 +381,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({
               id: generation.id,
               status: 'completed',
-              output_url: outputUrl,
+              output_urls: [outputUrl],
               provider: 'google',
               time_ms: result.timeMs,
             });

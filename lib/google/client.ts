@@ -53,6 +53,16 @@ export class GoogleAIClient {
     logger.info(`[Google AI] Starting generation with model: ${googleModel}`);
     logger.debug('[Google AI] Input:', JSON.stringify(options.input, null, 2));
 
+    // Validate prompt
+    const prompt = options.input.prompt;
+    if (!prompt || typeof prompt !== 'string') {
+      return {
+        success: false,
+        error: 'Требуется ввести описание (prompt)',
+        timeMs: 0,
+      };
+    }
+
     try {
       // Build content parts
       const parts: any[] = [];
@@ -96,7 +106,7 @@ export class GoogleAIClient {
       }
       
       // Add prompt
-      parts.push({ text: options.input.prompt });
+      parts.push({ text: prompt });
 
       // Build request body
       const requestBody = {
