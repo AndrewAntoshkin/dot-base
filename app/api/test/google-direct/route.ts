@@ -61,12 +61,11 @@ export async function GET(request: NextRequest) {
     results.tests.listModels = { success: false, error: error.message };
   }
 
-  // Test 2: Try various image generation models
+  // Test 2: Try the OFFICIAL Nano Banana models (from Google docs)
+  // https://ai.google.dev/gemini-api/docs/image-generation
   const modelsToTest = [
-    'gemini-2.0-flash-exp-image-generation',  // Most likely correct name
-    'gemini-2.0-flash-preview-image-generation',
-    'imagen-3.0-generate-001',
-    'imagen-3.0-fast-generate-001',
+    'gemini-3-pro-image-preview',  // Nano Banana Pro - professional quality
+    'gemini-2.5-flash-image',      // Nano Banana - fast generation
   ];
 
   for (const modelName of modelsToTest) {
@@ -79,6 +78,9 @@ export async function GET(request: NextRequest) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseModalities: ['TEXT', 'IMAGE'],
+            },
           }),
         }
       );
