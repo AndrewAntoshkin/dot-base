@@ -548,14 +548,15 @@ export const CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 3. Nano Banana Pro (Google) - Direct Replicate
+  // 3. Nano Banana Pro (Google) - Direct Google API
   {
     id: 'nano-banana-pro',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
-    replicateModel: 'google/nano-banana-pro',
+    replicateModel: 'gemini-3-pro-image-preview',  // Google model name
+    fallbackModel: 'google/nano-banana-pro',       // Replicate fallback
     action: 'create',
-    provider: 'replicate',
+    provider: 'google',  // Direct Google API
     runs: '4.8M runs',
     price: 'Priced by multiple properties',
     description: 'Генерация с текстом и до 14 референсов. ⏱️ ~25 сек',
@@ -1764,14 +1765,15 @@ export const CREATE_MODELS: Model[] = [
  * РЕДАКТИРОВАТЬ - 8 моделей
  */
 export const EDIT_MODELS: Model[] = [
-  // 1. Nano Banana Pro (Edit) - Direct Replicate
+  // 1. Nano Banana Pro (Edit) - Direct Google API
   {
     id: 'nano-banana-pro-edit',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
-    replicateModel: 'google/nano-banana-pro',
+    replicateModel: 'gemini-3-pro-image-preview',  // Google model name
+    fallbackModel: 'google/nano-banana-pro',       // Replicate fallback
     action: 'edit',
-    provider: 'replicate',
+    provider: 'google',  // Direct Google API
     runs: '4.8M runs',
     description: 'Редактирование с текстом на изображении. ⏱️ ~25 сек',
     settings: [
