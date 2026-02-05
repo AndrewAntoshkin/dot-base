@@ -37,7 +37,7 @@ export interface ModelSetting {
   hidden?: boolean;
 }
 
-export type ProviderType = 'replicate' | 'fal' | 'higgsfield';
+export type ProviderType = 'replicate' | 'fal' | 'higgsfield' | 'google';
 
 export interface Model {
   id: string;
