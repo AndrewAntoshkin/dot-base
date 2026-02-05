@@ -624,7 +624,7 @@ export default function BrainstormPageClient() {
                 return {
                   ...g,
                   id: result.id,
-                  status: 'completed' as const,
+                  status: 'succeeded' as const,
                   resultUrl: result.output_urls[0],
                 };
               }
