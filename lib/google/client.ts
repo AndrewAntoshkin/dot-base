@@ -16,13 +16,7 @@ export const GOOGLE_MODELS = {
 
 export interface GoogleGenerateOptions {
   model: string;
-  input: {
-    prompt: string;
-    image_input?: string | string[];
-    aspect_ratio?: string;
-    resolution?: string;
-    [key: string]: any;
-  };
+  input: Record<string, any>;
 }
 
 export interface GoogleGenerateResult {
