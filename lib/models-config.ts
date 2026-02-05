@@ -548,15 +548,14 @@ export const CREATE_MODELS: Model[] = [
     ],
   },
 
-  // 3. Nano Banana Pro (Google) - Primary: Fal.ai, Fallback: Replicate
+  // 3. Nano Banana Pro (Google) - Direct Replicate
   {
     id: 'nano-banana-pro',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
-    replicateModel: 'fal-ai/nano-banana-pro',  // Fal.ai model
-    fallbackModel: 'google/nano-banana-pro',   // Replicate fallback
+    replicateModel: 'google/nano-banana-pro',
     action: 'create',
-    provider: 'fal',  // Primary provider is Fal.ai (faster)
+    provider: 'replicate',
     runs: '4.8M runs',
     price: 'Priced by multiple properties',
     description: 'Генерация с текстом и до 14 референсов. ⏱️ ~25 сек',
@@ -1765,15 +1764,14 @@ export const CREATE_MODELS: Model[] = [
  * РЕДАКТИРОВАТЬ - 8 моделей
  */
 export const EDIT_MODELS: Model[] = [
-  // 1. Nano Banana Pro (Edit) - Primary: Fal.ai, Fallback: Replicate
+  // 1. Nano Banana Pro (Edit) - Direct Replicate
   {
     id: 'nano-banana-pro-edit',
     name: 'nano-banana-pro',
     displayName: 'Nano Banana Pro',
-    replicateModel: 'fal-ai/nano-banana-pro',  // Fal.ai model
-    fallbackModel: 'google/nano-banana-pro',   // Replicate fallback
+    replicateModel: 'google/nano-banana-pro',
     action: 'edit',
-    provider: 'fal',  // Primary provider is Fal.ai (faster)
+    provider: 'replicate',
     runs: '4.8M runs',
     description: 'Редактирование с текстом на изображении. ⏱️ ~25 сек',
     settings: [
