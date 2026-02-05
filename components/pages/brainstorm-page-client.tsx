@@ -646,7 +646,6 @@ export default function BrainstormPageClient() {
             status: result.status || 'processing',
             created_at: new Date().toISOString(),
             viewed: false,
-            output_urls: result.output_urls,
           });
         } else if (response.status === 429) {
           const errorData = await response.json().catch(() => ({}));
