@@ -6,9 +6,12 @@ import { Header } from '@/components/header';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import { useLimitToast } from '@/components/limit-toast';
-import { CREATE_MODELS_LITE } from '@/lib/models-lite';
+import { CREATE_MODELS_LITE, VIDEO_CREATE_MODELS_LITE, type ModelLite } from '@/lib/models-lite';
 import { BrainstormImageSheet } from '@/components/brainstorm-image-sheet';
-import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronDown, Send, RefreshCw, Loader2, ZoomIn, ZoomOut, Image as ImageIcon, Video } from 'lucide-react';
+
+// Media type for brainstorm
+type MediaType = 'image' | 'video';
 
 // Check icon matching the design
 const CheckIcon = () => (
@@ -27,6 +30,7 @@ export interface BrainstormGeneration {
   position: { x: number; y: number };
   imageSize?: { width: number; height: number };
   prompt?: string;
+  mediaType: MediaType;
 }
 
 // Base card dimensions
@@ -93,7 +97,7 @@ export default function BrainstormPageClient() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { addGeneration } = useGenerations();
-  const { selectedWorkspaceId } = useUser();
+  const { selectedWorkspaceId, isAdmin } = useUser();
   const { showLimitToast } = useLimitToast();
   
   const [prompt, setPrompt] = useState('');
@@ -102,12 +106,34 @@ export default function BrainstormPageClient() {
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
   const [isAspectRatioSelectorOpen, setIsAspectRatioSelectorOpen] = useState(false);
   const [generations, setGenerations] = useState<BrainstormGeneration[]>([]);
+  const [mediaType, setMediaType] = useState<MediaType>('image');
   
-  const ASPECT_RATIOS = [
+  // Aspect ratios depend on media type
+  const IMAGE_ASPECT_RATIOS = [
     { value: '1:1', label: '1:1' },
     { value: '16:9', label: '16:9' },
     { value: '9:16', label: '9:16' },
   ];
+  
+  const VIDEO_ASPECT_RATIOS = [
+    { value: '16:9', label: '16:9' },
+    { value: '9:16', label: '9:16' },
+    { value: '1:1', label: '1:1' },
+  ];
+  
+  const ASPECT_RATIOS = mediaType === 'video' ? VIDEO_ASPECT_RATIOS : IMAGE_ASPECT_RATIOS;
+  
+  // Get models based on media type (filter adminOnly if not admin)
+  const availableModels: ModelLite[] = (mediaType === 'video' ? VIDEO_CREATE_MODELS_LITE : CREATE_MODELS_LITE)
+    .filter(m => isAdmin || !m.adminOnly);
+  
+  // Reset selected models when media type changes
+  const handleMediaTypeChange = useCallback((newType: MediaType) => {
+    setMediaType(newType);
+    setSelectedModels([]);
+    // Set default aspect ratio for media type
+    setSelectedAspectRatio(newType === 'video' ? '16:9' : '1:1');
+  }, []);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedGenerationId, setSelectedGenerationId] = useState<string | null>(null);
   const [modalGeneration, setModalGeneration] = useState<BrainstormGeneration | null>(null);
@@ -144,7 +170,12 @@ export default function BrainstormPageClient() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as BrainstormGeneration[];
-        setGenerations(parsed);
+        // Add default mediaType for backward compatibility
+        const withMediaType = parsed.map(g => ({
+          ...g,
+          mediaType: g.mediaType || 'image' as MediaType,
+        }));
+        setGenerations(withMediaType);
       } catch (e) {
         console.error('Failed to load brainstorm generations:', e);
       }
@@ -383,46 +414,62 @@ export default function BrainstormPageClient() {
             const data = await response.json();
 
             // Use first output_url from the array
-            const imageUrl = data.output_urls?.[0] || gen.resultUrl;
+            const mediaUrl = data.output_urls?.[0] || gen.resultUrl;
             
-            // If we have a new image URL, load it to get dimensions
-            if (imageUrl && imageUrl !== gen.resultUrl) {
-              const img = new Image();
-              img.onload = () => {
+            // If we have a new media URL
+            if (mediaUrl && mediaUrl !== gen.resultUrl) {
+              // For video, just update directly (no need to load for dimensions)
+              if (gen.mediaType === 'video') {
                 setGenerations(prev => prev.map(g => {
                   if (g.id === gen.id) {
                     return {
                       ...g,
                       status: data.status,
-                      resultUrl: imageUrl,
-                      imageSize: { width: img.naturalWidth, height: img.naturalHeight },
+                      resultUrl: mediaUrl,
                       error: data.error_message,
                     };
                   }
                   return g;
                 }));
-              };
-              img.onerror = () => {
-                setGenerations(prev => prev.map(g => {
-                  if (g.id === gen.id) {
-                    return {
-                      ...g,
-                      status: data.status,
-                      resultUrl: imageUrl,
-                      error: data.error_message,
-                    };
-                  }
-                  return g;
-                }));
-              };
-              img.src = imageUrl;
+              } else {
+                // For images, load to get dimensions
+                const img = new Image();
+                img.onload = () => {
+                  setGenerations(prev => prev.map(g => {
+                    if (g.id === gen.id) {
+                      return {
+                        ...g,
+                        status: data.status,
+                        resultUrl: mediaUrl,
+                        imageSize: { width: img.naturalWidth, height: img.naturalHeight },
+                        error: data.error_message,
+                      };
+                    }
+                    return g;
+                  }));
+                };
+                img.onerror = () => {
+                  setGenerations(prev => prev.map(g => {
+                    if (g.id === gen.id) {
+                      return {
+                        ...g,
+                        status: data.status,
+                        resultUrl: mediaUrl,
+                        error: data.error_message,
+                      };
+                    }
+                    return g;
+                  }));
+                };
+                img.src = mediaUrl;
+              }
             } else {
               setGenerations(prev => prev.map(g => {
                 if (g.id === gen.id) {
                   return {
                     ...g,
                     status: data.status,
-                    resultUrl: imageUrl,
+                    resultUrl: mediaUrl,
                     error: data.error_message,
                   };
                 }
@@ -480,7 +527,7 @@ export default function BrainstormPageClient() {
     
     for (let i = 0; i < selectedModels.length; i++) {
       const modelId = selectedModels[i];
-      const model = CREATE_MODELS_LITE.find(m => m.id === modelId);
+      const model = availableModels.find(m => m.id === modelId);
       
       // Calculate grid position based on total index (existing + new)
       const position = generateGridPosition(existingCount + i);
@@ -493,13 +540,14 @@ export default function BrainstormPageClient() {
         position,
         prompt: prompt.trim(),
         imageSize,
+        mediaType,
       });
     }
     
     setGenerations(prev => [...prev, ...newGenerations]);
     
     // Helper function to create a single generation with retry
-    const createGeneration = async (modelId: string, tempId: string, retryCount = 0): Promise<void> => {
+    const createGeneration = async (modelId: string, tempId: string, currentMediaType: MediaType, retryCount = 0): Promise<void> => {
       const MAX_RETRIES = 3;
       const RETRY_DELAY = 2000; // 2 seconds
       
@@ -520,20 +568,36 @@ export default function BrainstormPageClient() {
           aspect_ratio: selectedAspectRatio,
         };
         
-        // Add model-specific settings ON TOP of defaults
-        if (modelId.includes('recraft')) {
-          defaultSettings.size = '1024x1024';
-          defaultSettings.style = 'any';
-        } else if (modelId.includes('seedream')) {
-          defaultSettings.size = '2K';
-        } else if (modelId === 'nano-banana-pro') {
-          defaultSettings.resolution = '2K';
-        } else if (modelId === 'z-image-turbo') {
-          defaultSettings.width = 1024;
-          defaultSettings.height = 1024;
-          defaultSettings.num_inference_steps = 8;
-        } else if (modelId === 'imagen-4-ultra') {
-          defaultSettings.safety_filter_level = 'block_only_high';
+        // Determine action based on media type
+        const action = currentMediaType === 'video' ? 'video_create' : 'create';
+        
+        // Add model-specific settings based on media type
+        if (currentMediaType === 'video') {
+          // Video-specific settings
+          defaultSettings.duration = '5'; // Default 5 seconds
+          // Some video models need specific settings
+          if (modelId.includes('veo')) {
+            defaultSettings.resolution = '1080p';
+            defaultSettings.generate_audio = true;
+          } else if (modelId.includes('hailuo')) {
+            defaultSettings.resolution = '768p';
+          }
+        } else {
+          // Image-specific settings
+          if (modelId.includes('recraft')) {
+            defaultSettings.size = '1024x1024';
+            defaultSettings.style = 'any';
+          } else if (modelId.includes('seedream')) {
+            defaultSettings.size = '2K';
+          } else if (modelId === 'nano-banana-pro') {
+            defaultSettings.resolution = '2K';
+          } else if (modelId === 'z-image-turbo') {
+            defaultSettings.width = 1024;
+            defaultSettings.height = 1024;
+            defaultSettings.num_inference_steps = 8;
+          } else if (modelId === 'imagen-4-ultra') {
+            defaultSettings.safety_filter_level = 'block_only_high';
+          }
         }
         
         const response = await fetch('/api/generations/create', {
@@ -541,7 +605,7 @@ export default function BrainstormPageClient() {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            action: 'create',
+            action,
             model_id: modelId,
             prompt: prompt.trim(),
             settings: defaultSettings,
@@ -555,6 +619,15 @@ export default function BrainstormPageClient() {
           // Update the temporary generation with real data
           setGenerations(prev => prev.map(g => {
             if (g.id === tempId) {
+              // Handle immediate completion (e.g., Google AI returns result immediately)
+              if (result.status === 'completed' && result.output_urls?.[0]) {
+                return {
+                  ...g,
+                  id: result.id,
+                  status: 'completed' as const,
+                  resultUrl: result.output_urls[0],
+                };
+              }
               return {
                 ...g,
                 id: result.id,
@@ -565,14 +638,15 @@ export default function BrainstormPageClient() {
           }));
           
           // Add to global context for header indicator
-          const model = CREATE_MODELS_LITE.find(m => m.id === modelId);
+          const model = (currentMediaType === 'video' ? VIDEO_CREATE_MODELS_LITE : CREATE_MODELS_LITE).find(m => m.id === modelId);
           addGeneration({
             id: result.id,
             model_name: model?.displayName || modelId,
-            action: 'create',
+            action: currentMediaType === 'video' ? 'video_create' : 'create',
             status: result.status || 'processing',
             created_at: new Date().toISOString(),
             viewed: false,
+            output_urls: result.output_urls,
           });
         } else if (response.status === 429) {
           const errorData = await response.json().catch(() => ({}));
@@ -589,7 +663,7 @@ export default function BrainstormPageClient() {
           if (retryCount < MAX_RETRIES) {
             console.log(`Rate limit hit for ${modelId}, retrying in ${RETRY_DELAY}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
-            return createGeneration(modelId, tempId, retryCount + 1);
+            return createGeneration(modelId, tempId, currentMediaType, retryCount + 1);
           }
           
           // Max retries exceeded
@@ -622,6 +696,7 @@ export default function BrainstormPageClient() {
     
     // Start generations with staggered delays to avoid rate limiting
     const STAGGER_DELAY = 500; // 500ms between each request
+    const currentMediaType = mediaType; // Capture current media type
     
     for (let i = 0; i < selectedModels.length; i++) {
       const modelId = selectedModels[i];
@@ -633,9 +708,9 @@ export default function BrainstormPageClient() {
       }
       
       // Don't await - start in background so UI updates faster
-      createGeneration(modelId, tempId);
+      createGeneration(modelId, tempId, currentMediaType);
     }
-  }, [prompt, selectedModels, generations, addGeneration, selectedWorkspaceId, selectedAspectRatio]);
+  }, [prompt, selectedModels, generations, addGeneration, selectedWorkspaceId, selectedAspectRatio, mediaType, availableModels]);
   
   const handleClear = useCallback(() => {
     setGenerations([]);
@@ -746,54 +821,69 @@ export default function BrainstormPageClient() {
                   top: generation.position.y,
                 }}
               >
-                <p className="font-inter font-normal text-[10px] leading-4 text-white uppercase pointer-events-none">
+                <p className="font-inter font-normal text-[10px] leading-4 text-white uppercase pointer-events-none flex items-center gap-1">
+                  {generation.mediaType === 'video' && <Video className="w-3 h-3" />}
                   {generation.modelName}
                 </p>
-                <div 
-                  className="relative bg-[#1a1a1a] rounded overflow-hidden pointer-events-none"
-                  style={{ width: imageWidth, height: imageHeight }}
-                >
-                  {/* Show image if we have URL, regardless of status */}
-                  {generation.resultUrl ? (
-                    <img
-                      src={generation.resultUrl}
-                      alt={`Generated by ${generation.modelName}`}
-                      className="w-full h-full object-contain"
-                      draggable={false}
-                      onLoad={(e) => {
-                        // Update image size if not set yet
-                        if (!generation.imageSize) {
-                          const img = e.target as HTMLImageElement;
-                          setGenerations(prev => prev.map(g => {
-                            if (g.id === generation.id && !g.imageSize) {
-                              return {
-                                ...g,
-                                imageSize: { width: img.naturalWidth, height: img.naturalHeight },
-                              };
-                            }
-                            return g;
-                          }));
-                        }
-                      }}
-                      onError={(e) => {
-                        console.error('Image load error:', generation.resultUrl);
-                        (e.target as HTMLImageElement).src = '';
-                      }}
-                    />
-                  ) : generation.status === 'pending' || generation.status === 'processing' ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-                    </div>
-                  ) : generation.status === 'failed' ? (
-                    <div className="absolute inset-0 flex items-center justify-center p-2">
-                      <p className="text-red-400 text-xs text-center">{generation.error || 'Ошибка'}</p>
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-                    </div>
-                  )}
-                </div>
+<div 
+                                  className="relative bg-[#1a1a1a] rounded overflow-hidden pointer-events-none"
+                                  style={{ width: imageWidth, height: imageHeight }}
+                                >
+                                  {/* Show media if we have URL, regardless of status */}
+                                  {generation.resultUrl ? (
+                                    generation.mediaType === 'video' ? (
+                                      <video
+                                        src={generation.resultUrl}
+                                        className="w-full h-full object-contain"
+                                        autoPlay
+                                        loop
+                                        muted
+                                        playsInline
+                                        onError={(e) => {
+                                          console.error('Video load error:', generation.resultUrl);
+                                        }}
+                                      />
+                                    ) : (
+                                      <img
+                                        src={generation.resultUrl}
+                                        alt={`Generated by ${generation.modelName}`}
+                                        className="w-full h-full object-contain"
+                                        draggable={false}
+                                        onLoad={(e) => {
+                                          // Update image size if not set yet
+                                          if (!generation.imageSize) {
+                                            const img = e.target as HTMLImageElement;
+                                            setGenerations(prev => prev.map(g => {
+                                              if (g.id === generation.id && !g.imageSize) {
+                                                return {
+                                                  ...g,
+                                                  imageSize: { width: img.naturalWidth, height: img.naturalHeight },
+                                                };
+                                              }
+                                              return g;
+                                            }));
+                                          }
+                                        }}
+                                        onError={(e) => {
+                                          console.error('Image load error:', generation.resultUrl);
+                                          (e.target as HTMLImageElement).src = '';
+                                        }}
+                                      />
+                                    )
+                                  ) : generation.status === 'pending' || generation.status === 'processing' ? (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+                                    </div>
+                                  ) : generation.status === 'failed' ? (
+                                    <div className="absolute inset-0 flex items-center justify-center p-2">
+                                      <p className="text-red-400 text-xs text-center">{generation.error || 'Ошибка'}</p>
+                                    </div>
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+                                    </div>
+                                  )}
+                                </div>
               </div>
             );
           })}
@@ -871,8 +961,34 @@ export default function BrainstormPageClient() {
             
             {/* Actions row */}
             <div className="flex items-center justify-between">
-              {/* Left side - Model selector and Aspect Ratio */}
+              {/* Left side - Media type toggle, Model selector and Aspect Ratio */}
               <div className="flex items-center gap-2">
+                {/* Media type toggle */}
+                <div className="h-9 bg-[#212121] rounded-lg flex items-center p-1">
+                  <button
+                    onClick={() => handleMediaTypeChange('image')}
+                    className={`h-7 px-2 rounded-md flex items-center gap-1 transition-colors ${
+                      mediaType === 'image' 
+                        ? 'bg-[#333] text-white' 
+                        : 'text-[#888] hover:text-[#bbb]'
+                    }`}
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    <span className="font-inter font-medium text-xs hidden sm:inline">Image</span>
+                  </button>
+                  <button
+                    onClick={() => handleMediaTypeChange('video')}
+                    className={`h-7 px-2 rounded-md flex items-center gap-1 transition-colors ${
+                      mediaType === 'video' 
+                        ? 'bg-[#333] text-white' 
+                        : 'text-[#888] hover:text-[#bbb]'
+                    }`}
+                  >
+                    <Video className="w-4 h-4" />
+                    <span className="font-inter font-medium text-xs hidden sm:inline">Video</span>
+                  </button>
+                </div>
+                
                 {/* Models selector */}
                 <div className="relative">
                   <button
@@ -908,7 +1024,7 @@ export default function BrainstormPageClient() {
                         
                         {/* Models list */}
                         <div className="flex flex-col gap-2 overflow-y-auto max-h-[380px]">
-                          {CREATE_MODELS_LITE.map((model) => {
+                          {availableModels.map((model) => {
                             const isSelected = selectedModels.includes(model.id);
                             const isDisabled = !isSelected && selectedModels.length >= MAX_MODELS;
                             return (
@@ -1011,7 +1127,7 @@ export default function BrainstormPageClient() {
           
           {/* Helper text */}
           <p className="font-inter font-medium text-[11px] leading-5 text-[#414141] text-center">
-            Пробная версия генерации в нескольких моделях
+            Генерация {mediaType === 'video' ? 'видео' : 'изображений'} в нескольких моделях одновременно
           </p>
         </div>
       </div>
