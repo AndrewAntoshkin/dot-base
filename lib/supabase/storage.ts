@@ -2,6 +2,18 @@ import { createServiceRoleClient } from './server';
 import sharp from 'sharp';
 import logger from '@/lib/logger';
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const PUBLIC_DOMAIN = process.env.NEXTAUTH_URL || '';
+
+/**
+ * Заменить Supabase Storage URL на проксированный через наш домен
+ * https://xxx.supabase.co/storage/v1/... → https://basecraft.ru/storage/v1/...
+ */
+function proxyUrl(url: string): string {
+  if (!PUBLIC_DOMAIN || !SUPABASE_URL) return url;
+  return url.replace(SUPABASE_URL, PUBLIC_DOMAIN);
+}
+
 /**
  * Выполнить операцию с ретраями
  */
@@ -187,7 +199,7 @@ export async function saveMediaToStorage(
     }
 
     logger.info(`Successfully saved media ${index} for generation ${generationId}`);
-    return { url: publicUrlData.publicUrl, thumbUrl };
+    return { url: proxyUrl(publicUrlData.publicUrl), thumbUrl: thumbUrl ? proxyUrl(thumbUrl) : undefined };
   } catch (error: any) {
     // Логируем URL для отладки (без query params для безопасности)
     const urlForLog = mediaUrl.split('?')[0];

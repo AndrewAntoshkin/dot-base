@@ -14,6 +14,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
+      {
+        protocol: 'https',
+        hostname: 'basecraft.ru',
+      },
       // Разрешаем все поддомены replicate
       {
         protocol: 'https',
