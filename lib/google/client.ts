@@ -6,7 +6,7 @@
 import logger from '@/lib/logger';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_AI_API_KEY;
-const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const BASE_URL = process.env.GOOGLE_AI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
 
 // Model mapping
 export const GOOGLE_MODELS = {
@@ -50,7 +50,7 @@ export class GoogleAIClient {
     // Map model name to Google model
     const googleModel = GOOGLE_MODELS[options.model as keyof typeof GOOGLE_MODELS] || options.model;
     
-    logger.info(`[Google AI] Starting generation with model: ${googleModel}`);
+    logger.info(`[Google AI] Starting generation with model: ${googleModel}, base: ${BASE_URL}`);
     logger.debug('[Google AI] Input:', JSON.stringify(options.input, null, 2));
 
     // Validate prompt
