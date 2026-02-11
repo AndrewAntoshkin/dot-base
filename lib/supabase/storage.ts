@@ -3,15 +3,15 @@ import sharp from 'sharp';
 import logger from '@/lib/logger';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const PUBLIC_DOMAIN = process.env.NEXTAUTH_URL || '';
+const STORAGE_PROXY_URL = process.env.STORAGE_PROXY_URL || '';
 
 /**
  * Заменить Supabase Storage URL на проксированный через наш домен
  * https://xxx.supabase.co/storage/v1/... → https://basecraft.ru/storage/v1/...
  */
 function proxyUrl(url: string): string {
-  if (!PUBLIC_DOMAIN || !SUPABASE_URL) return url;
-  return url.replace(SUPABASE_URL, PUBLIC_DOMAIN);
+  if (!STORAGE_PROXY_URL || !SUPABASE_URL) return url;
+  return url.replace(SUPABASE_URL, STORAGE_PROXY_URL);
 }
 
 /**

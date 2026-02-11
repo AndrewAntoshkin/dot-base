@@ -364,10 +364,9 @@ export async function POST(request: NextRequest) {
               .from('generations')
               .getPublicUrl(filePath);
             
-            const outputUrl = urlData.publicUrl.replace(
-              process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-              process.env.NEXTAUTH_URL || ''
-            );
+            const outputUrl = process.env.STORAGE_PROXY_URL
+              ? urlData.publicUrl.replace(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.STORAGE_PROXY_URL)
+              : urlData.publicUrl;
             
             // Update generation as completed
             await (supabase.from('generations') as any)
