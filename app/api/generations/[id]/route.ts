@@ -187,13 +187,19 @@ export async function GET(
       
       logger.debug(`[GET Generation] ${id}: Checking status, model_id="${generation.model_id}", provider="${provider}", modelConfig found: ${!!modelConfig}`);
 
+      // Check if Google provider fell back to Replicate
+      // If replicate_model is 'google/nano-banana-pro' (Replicate model), treat as Replicate
+      const actualProvider = (provider === 'google' && generation.replicate_model === 'google/nano-banana-pro') 
+        ? 'replicate' 
+        : provider;
+      
       try {
-        if (provider === 'google') {
+        if (actualProvider === 'google') {
           // Google AI is synchronous - generation should already be completed
           // No external status check needed, just return current state from database
           logger.debug(`[GET Generation] ${id}: Google provider - using database status: ${generation.status}`);
           // Nothing to do - generation.status is already set from database
-        } else if (provider === 'fal') {
+        } else if (actualProvider === 'fal') {
           // Fal.ai status check
           const falClient = getFalClient();
           const falModel = generation.replicate_model || modelConfig?.replicateModel || '';
@@ -261,7 +267,7 @@ export async function GET(
             generation.error_message = 'Генерация не удалась';
           }
           // If IN_QUEUE or IN_PROGRESS - do nothing, generation is still processing
-        } else if (provider === 'higgsfield') {
+        } else if (actualProvider === 'higgsfield') {
           // Higgsfield status check
           const higgsfieldClient = getHiggsfieldClient();
           

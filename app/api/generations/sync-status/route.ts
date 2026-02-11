@@ -95,14 +95,20 @@ export async function POST() {
         }
       }
 
+      // Check if Google provider fell back to Replicate
+      // If replicate_model is 'google/nano-banana-pro' (Replicate model), treat as Replicate
+      const actualProvider = (provider === 'google' && gen.replicate_model === 'google/nano-banana-pro') 
+        ? 'replicate' 
+        : provider;
+
       try {
-        if (provider === 'google') {
+        if (actualProvider === 'google') {
           // Google AI is synchronous - skip status check, use database state
           logger.debug(`[Sync] Generation ${gen.id}: Google provider - skipping (synchronous)`);
           continue;
         }
         
-        if (provider === 'fal') {
+        if (actualProvider === 'fal') {
           // Fal.ai sync
           const status = await falClient.getQueueStatus(gen.replicate_model, gen.replicate_prediction_id);
           
@@ -148,7 +154,7 @@ export async function POST() {
           continue;
         }
 
-        if (provider === 'higgsfield') {
+        if (actualProvider === 'higgsfield') {
           // Higgsfield sync
           const higgsfieldClient = getHiggsfieldClient();
           const status = await higgsfieldClient.getStatus(gen.replicate_prediction_id);
