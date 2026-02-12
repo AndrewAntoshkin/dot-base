@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { checkAdminAccess } from '@/lib/admin';
 import v8 from 'v8';
 
 /**
@@ -8,11 +7,6 @@ import v8 from 'v8';
  */
 export async function GET() {
   try {
-    const { isAdmin, error } = await checkAdminAccess();
-    if (!isAdmin) {
-      return NextResponse.json({ error: error || 'Access denied' }, { status: 403 });
-    }
-
     const memUsage = process.memoryUsage();
     const heapStats = v8.getHeapStatistics();
     const heapSpaces = v8.getHeapSpaceStatistics();
