@@ -5,6 +5,30 @@ import logger from '@/lib/logger';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const STORAGE_PROXY_URL = process.env.STORAGE_PROXY_URL || '';
 
+// Семафор: максимум 2 параллельных скачивания медиа чтобы не съесть RAM
+const MAX_CONCURRENT_MEDIA = 2;
+let activeMediaOps = 0;
+const mediaQueue: Array<() => void> = [];
+
+async function acquireMediaSlot(): Promise<void> {
+  if (activeMediaOps < MAX_CONCURRENT_MEDIA) {
+    activeMediaOps++;
+    return;
+  }
+  return new Promise<void>(resolve => {
+    mediaQueue.push(resolve);
+  });
+}
+
+function releaseMediaSlot(): void {
+  activeMediaOps--;
+  const next = mediaQueue.shift();
+  if (next) {
+    activeMediaOps++;
+    next();
+  }
+}
+
 /**
  * Заменить Supabase Storage URL на проксированный через наш домен
  * https://xxx.supabase.co/storage/v1/... → https://basecraft.ru/storage/v1/...
@@ -107,6 +131,7 @@ export async function saveMediaToStorage(
   generationId: string,
   index: number = 0
 ): Promise<{ url: string; thumbUrl?: string } | null> {
+  await acquireMediaSlot();
   try {
     const supabase = createServiceRoleClient();
     
@@ -209,6 +234,8 @@ export async function saveMediaToStorage(
       url: urlForLog,
     });
     return null;
+  } finally {
+    releaseMediaSlot();
   }
 }
 
