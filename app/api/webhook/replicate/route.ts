@@ -108,8 +108,9 @@ async function performAutoRetry(
     };
     delete replicateInput.auto_retry_count;
     
+    const replicateModel = generation.replicate_model || model.fallbackModel || model.replicateModel;
     const { prediction, tokenId } = await replicateClient.run({
-      model: model.replicateModel,
+      model: replicateModel,
       version: model.version,
       input: replicateInput,
       webhook: webhookUrl,
