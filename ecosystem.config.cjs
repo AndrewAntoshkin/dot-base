@@ -31,14 +31,14 @@ const envLocal = parseEnvFile(path.join(__dirname, '.env.local'));
 module.exports = {
   apps: [{
     name: 'basecraft',
-    script: '/opt/fnode/bin/npm',
+    script: './node_modules/.bin/next',
     args: 'start',
     cwd: __dirname,
     interpreter: '/opt/fnode/bin/node',
-    node_args: '--max-old-space-size=4096',
     env: {
       ...envLocal,
       NODE_ENV: 'production',
+      NODE_OPTIONS: '--max-old-space-size=4096',
     },
     // Auto-restart on crash
     autorestart: true,
