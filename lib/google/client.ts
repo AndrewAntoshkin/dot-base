@@ -146,8 +146,24 @@ export class GoogleAIClient {
         }
       );
 
-      const data = await response.json();
       const elapsed = Date.now() - startTime;
+
+      // Проверяем HTTP статус до парсинга JSON — при блокировке/недоступности
+      // API возвращает HTML-страницу, и response.json() падает
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        const isHtml = text.trimStart().startsWith('<');
+        logger.error(`[Google AI] HTTP ${response.status}:`, isHtml ? '(HTML response — API blocked or unavailable)' : text.substring(0, 200));
+        return {
+          success: false,
+          error: response.status === 403
+            ? 'Google API заблокирован. Используется fallback модель'
+            : `Google API недоступен (HTTP ${response.status})`,
+          timeMs: elapsed,
+        };
+      }
+
+      const data = await response.json();
 
       if (data.error) {
         logger.error(`[Google AI] API error:`, data.error);
