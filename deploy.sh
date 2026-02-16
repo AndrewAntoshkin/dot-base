@@ -11,21 +11,19 @@ echo "=== Deploying basecraft ==="
 echo "1. Pulling latest code..."
 git pull
 
-echo "2. Stopping PM2..."
-pm2 delete basecraft 2>/dev/null || true
-
-echo "3. Clearing caches..."
+echo "2. Clearing Next.js cache..."
 rm -rf .next/cache
-pm2 flush
 
-echo "4. Building..."
+echo "3. Building..."
 $NPM run build
 
-echo "5. Starting PM2..."
+echo "4. Restarting PM2..."
+pm2 delete basecraft 2>/dev/null || true
+pm2 flush 2>/dev/null || true
 pm2 start ecosystem.config.cjs --interpreter "$NODE"
 pm2 save
 
-echo "6. Verifying..."
+echo "5. Verifying..."
 sleep 3
 pm2 show basecraft | grep -E "status|name|memory"
 echo ""
