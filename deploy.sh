@@ -11,19 +11,25 @@ echo "=== Deploying basecraft ==="
 echo "1. Pulling latest code..."
 git pull
 
-echo "2. Building..."
+echo "2. Stopping PM2..."
+pm2 delete basecraft 2>/dev/null || true
+
+echo "3. Clearing caches..."
+rm -rf .next/cache
+pm2 flush
+
+echo "4. Building..."
 $NPM run build
 
-echo "3. Restarting PM2..."
-pm2 delete basecraft 2>/dev/null || true
+echo "5. Starting PM2..."
 pm2 start ecosystem.config.cjs --interpreter "$NODE"
 pm2 save
 
-echo "4. Verifying..."
+echo "6. Verifying..."
 sleep 3
-pm2 show basecraft | grep -E "status|name|node.js"
+pm2 show basecraft | grep -E "status|name|memory"
 echo ""
-pm2 env 0 | grep NODE_ENV || echo "WARNING: NODE_ENV not set!"
+pm2 env 0 | grep -E "NODE_ENV|NODE_OPTIONS" || echo "WARNING: env not set!"
 
 echo ""
 echo "=== Deploy complete ==="
