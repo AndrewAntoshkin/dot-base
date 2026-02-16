@@ -25,7 +25,7 @@ async function directSupabaseFetch<T>(
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${endpoint}`,
-      { headers }
+      { headers, cache: 'no-store' }
     );
     
     if (!res.ok) {
