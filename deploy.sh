@@ -18,9 +18,13 @@ echo "3. Building..."
 $NPM run build
 
 echo "4. Restarting PM2..."
-pm2 delete basecraft 2>/dev/null || true
 pm2 flush 2>/dev/null || true
-pm2 start ecosystem.config.cjs --interpreter "$NODE"
+# Если процесс уже запущен — graceful reload, иначе — первый старт
+if pm2 describe basecraft > /dev/null 2>&1; then
+  pm2 reload ecosystem.config.cjs --interpreter "$NODE"
+else
+  pm2 start ecosystem.config.cjs --interpreter "$NODE"
+fi
 pm2 save
 
 echo "5. Verifying..."
