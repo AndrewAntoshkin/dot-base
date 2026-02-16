@@ -38,11 +38,11 @@ module.exports = {
     env: {
       ...envLocal,
       NODE_ENV: 'production',
-      NODE_OPTIONS: '--max-old-space-size=2048',
+      NODE_OPTIONS: '--max-old-space-size=3584',
     },
     // Auto-restart on crash
     autorestart: true,
-    max_memory_restart: '2G',
+    max_memory_restart: '3500M',
     // Logs
     error_file: 'logs/pm2-error.log',
     out_file: 'logs/pm2-out.log',
