@@ -91,12 +91,13 @@ export async function POST(request: Request) {
 
     while (totalDeletedRecords < toDeleteCount) {
       // Загружаем батч самых старых записей (ascending order — самые старые первыми)
-      const { data: batch, error: fetchError } = await supabase
-        .from('generations')
+      const { data: batchData, error: fetchError } = await (supabase
+        .from('generations') as any)
         .select('id, output_urls, input_image_url')
         .order('created_at', { ascending: true })
         .range(0, BATCH_SIZE - 1);
 
+      const batch = batchData as Generation[] | null;
       if (fetchError || !batch || batch.length === 0) break;
 
       // Собираем файлы для удаления из этого батча
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
       }
 
       // Удаляем записи из БД
-      const idsToDelete = batch.map((g: { id: string }) => g.id);
+      const idsToDelete = batch.map(g => g.id);
       const { error: deleteError } = await supabase
         .from('generations')
         .delete()
