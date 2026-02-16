@@ -118,6 +118,7 @@ export function NotificationsButton({ className, onOpenChange }: NotificationsBu
     
     return () => {
       if (channel) {
+        channel.unsubscribe();
         supabase.removeChannel(channel);
       }
     };

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { ReplicateClient } from '@/lib/replicate/client';
+import { ReplicateClient, getReplicateInstance } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
-import Replicate from 'replicate';
 
 interface GenerateRequest {
   nodeId: string;
@@ -351,7 +350,7 @@ async function handleTextGeneration(
       return NextResponse.json({ error: 'No API token available' }, { status: 500 });
     }
 
-    const replicate = new Replicate({ auth: token });
+    const replicate = getReplicateInstance(token);
 
     // Check if we have media to analyze or source text to process
     const hasImages = images && images.length > 0;

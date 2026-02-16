@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import Replicate from 'replicate';
+import { getReplicateInstance } from '@/lib/replicate/client';
 
 // Детальная база знаний о моделях с рекомендациями
 const MODELS_KNOWLEDGE = `
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No API token available' }, { status: 500 });
     }
 
-    const replicate = new Replicate({ auth: token });
+    const replicate = getReplicateInstance(token);
 
     // Build prompt for Gemini
     let prompt = '';

@@ -35,6 +35,7 @@ module.exports = {
     args: 'start',
     cwd: __dirname,
     interpreter: '/opt/fnode/bin/node',
+    node_args: '--max-old-space-size=4096',
     env: {
       ...envLocal,
       NODE_ENV: 'production',

@@ -2,6 +2,23 @@ import Replicate from 'replicate';
 import { ReplicateTokenPool } from './token-pool';
 import logger from '@/lib/logger';
 
+/**
+ * Кэш Replicate SDK инстансов по токену.
+ * Избегаем создания new Replicate() на каждый запрос —
+ * каждый инстанс создаёт HTTP-клиент и event emitters,
+ * которые GC не сразу собирает.
+ */
+const replicateInstanceCache = new Map<string, Replicate>();
+
+export function getReplicateInstance(token: string): Replicate {
+  let instance = replicateInstanceCache.get(token);
+  if (!instance) {
+    instance = new Replicate({ auth: token });
+    replicateInstanceCache.set(token, instance);
+  }
+  return instance;
+}
+
 type WebhookEventType = 'start' | 'output' | 'logs' | 'completed';
 
 export interface ReplicateRunOptions {
@@ -244,7 +261,7 @@ export class ReplicateClient {
       const tokenData = await this.getTokenWithRetry();
 
       lastTokenId = tokenData.id;
-      const replicate = new Replicate({ auth: tokenData.token });
+      const replicate = getReplicateInstance(tokenData.token);
 
       try {
         const createOptions: any = {
@@ -302,7 +319,7 @@ export class ReplicateClient {
       token = tokenData.token;
     }
 
-    const replicate = new Replicate({ auth: token });
+    const replicate = getReplicateInstance(token);
     return await replicate.predictions.get(predictionId) as ReplicatePrediction;
   }
 
@@ -314,7 +331,7 @@ export class ReplicateClient {
       token = tokenData.token;
     }
 
-    const replicate = new Replicate({ auth: token });
+    const replicate = getReplicateInstance(token);
     await replicate.predictions.cancel(predictionId);
   }
 
