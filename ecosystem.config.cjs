@@ -31,7 +31,7 @@ const envLocal = parseEnvFile(path.join(__dirname, '.env.local'));
 module.exports = {
   apps: [{
     name: 'basecraft',
-    script: './node_modules/.bin/next',
+    script: '/opt/fnode/bin/npm',
     args: 'start',
     cwd: __dirname,
     interpreter: '/opt/fnode/bin/node',
