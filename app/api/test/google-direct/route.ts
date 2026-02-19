@@ -7,10 +7,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_AI_API_KEY;
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const prompt = request.nextUrl.searchParams.get('prompt') || 'A beautiful sunset over mountains, cinematic lighting, 4k';
   
   if (!GOOGLE_API_KEY) {
@@ -171,3 +172,5 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(results, { status: 200 });
 }
+
+export const GET = withApiLogging(getHandler, { provider: 'google' });

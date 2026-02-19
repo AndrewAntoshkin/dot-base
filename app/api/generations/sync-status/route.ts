@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
@@ -8,6 +8,7 @@ import { getModelById } from '@/lib/models-config';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,7 @@ interface GenerationRecord {
  * Синхронизирует статусы processing генераций с Replicate
  * Вызывается с фронтенда при показе страницы истории
  */
-export async function POST() {
+async function postHandler(request: NextRequest) {
   try {
     // Get current user
     const cookieStore = await cookies();
@@ -333,13 +334,14 @@ export async function POST() {
       total: generations.length 
     });
   } catch (error: any) {
-    console.error('Sync status error:', error);
     return NextResponse.json(
       { error: 'Ошибка синхронизации' },
       { status: 500 }
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });
 
 
 

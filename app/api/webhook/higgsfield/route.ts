@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 interface GenerationRecord {
   id: string;
@@ -108,7 +109,7 @@ function isMediaUrl(value: string): boolean {
  * - video?: { url: string } (for video generation)
  * - error?: string (for failed status)
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json();
     
@@ -250,7 +251,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    logger.error('[Higgsfield Webhook] Error:', error.message);
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'higgsfield' });

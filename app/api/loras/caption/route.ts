@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 // Generate caption for a single image using AI (LLaVa-13b)
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     // Auth
     const cookieStore = await cookies();
@@ -143,7 +144,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[Caption API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to generate caption' },
       { status: 500 }
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Batch caption generation for multiple images
-export async function PUT(request: NextRequest) {
+async function putHandler(request: NextRequest) {
   try {
     // Auth
     const cookieStore = await cookies();
@@ -289,11 +289,13 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[Caption API] Batch error:', error);
     return NextResponse.json(
       { error: 'Failed to generate captions' },
       { status: 500 }
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });
+export const PUT = withApiLogging(putHandler, { provider: 'replicate' });
 

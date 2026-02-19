@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ interface SegmentRequest {
   image_url: string;
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     // Auth
     const cookieStore = await cookies();
@@ -140,10 +141,11 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    logger.error('[Segment] Error:', error.message);
     return NextResponse.json(
       { error: 'Ошибка сегментации' },
       { status: 500 }
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });

@@ -3,10 +3,11 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { KEYFRAME_MODELS } from '@/lib/keyframes';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -203,7 +204,6 @@ export async function POST(
     return NextResponse.json({ success: true, type: 'completed' });
 
   } catch (error: any) {
-    logger.error('Continue keyframe error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -211,3 +211,4 @@ export async function POST(
   }
 }
 
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });

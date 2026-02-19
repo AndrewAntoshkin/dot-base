@@ -9,6 +9,7 @@ import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,7 @@ const createGenerationSchema = z.object({
 
 const MAX_CONCURRENT_GENERATIONS = 5;
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     // Auth
     const cookieStore = await cookies();
@@ -551,8 +552,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (providerError: any) {
-      logger.error(`${provider} error:`, providerError.message);
-      
       const userFacingError = providerError.message || 'Ошибка при генерации';
       
       await (supabase.from('generations') as any)
@@ -562,10 +561,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: userFacingError }, { status: 500 });
     }
   } catch (error: any) {
-    logger.error('Create generation error:', error.message);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });

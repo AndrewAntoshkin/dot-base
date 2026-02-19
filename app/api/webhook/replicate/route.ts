@@ -6,6 +6,7 @@ import { getModelById } from '@/lib/models-config';
 import { calculateCostUsd } from '@/lib/pricing';
 import { startNextKeyframeSegment } from '@/lib/keyframes';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 interface GenerationRecord {
   id: string;
@@ -219,7 +220,7 @@ function extractTextOutput(output: any): string | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json();
     const { id: predictionId, status, output, error } = body;
@@ -504,7 +505,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    logger.error('Webhook error:', error.message);
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });

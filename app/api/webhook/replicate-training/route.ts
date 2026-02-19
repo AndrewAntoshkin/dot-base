@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
 // Webhook from Replicate for training status updates
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json();
     
@@ -88,13 +89,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, status: newStatus });
   } catch (error) {
-    logger.error('Replicate training webhook error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
 // Also handle GET for webhook verification
-export async function GET() {
+async function getHandler() {
   return NextResponse.json({ status: 'ok', service: 'replicate-training-webhook' });
 }
 
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });
+export const GET = withApiLogging(getHandler, { provider: 'replicate' });
