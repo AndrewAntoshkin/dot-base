@@ -42,30 +42,30 @@ async function withRetry<T>(
 
 function getUserFriendlyErrorMessage(error: string | null | undefined): string {
   const errorLower = (error || '').toLowerCase();
-  
+
   if (errorLower.includes('nsfw') || errorLower.includes('safety')) {
-    return 'Контент заблокирован фильтром безопасности. Попробуйте изменить промпт';
+    return 'Content blocked by safety filter. Try changing your prompt';
   }
   if (errorLower.includes('timeout')) {
-    return 'Превышено время генерации. Попробуйте уменьшить разрешение';
+    return 'Generation timed out. Try reducing resolution';
   }
   if (errorLower.includes('memory') || errorLower.includes('oom')) {
-    return 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
+    return 'Not enough resources. Try reducing resolution';
   }
   if (errorLower.includes('overload') || errorLower.includes('rate limit')) {
-    return 'Сервер перегружен. Попробуйте через несколько минут';
+    return 'Server overloaded. Try again in a few minutes';
   }
   if (errorLower.includes('invalid') || errorLower.includes('validation')) {
-    return 'Некорректные параметры. Проверьте настройки';
+    return 'Invalid parameters. Check your settings';
   }
   if (errorLower.includes('credits') || errorLower.includes('balance')) {
-    return 'Недостаточно кредитов. Пополните баланс Higgsfield';
+    return 'Insufficient credits. Top up Higgsfield balance';
   }
   if (!error || error === '' || error === 'null') {
-    return 'Генерация не удалась. Попробуйте другую модель';
+    return 'Generation failed. Try a different model';
   }
   if (error.length > 150 || error.includes('stack') || error.includes('Error:')) {
-    return 'Произошла ошибка. Попробуйте снова';
+    return 'An error occurred. Please try again';
   }
   return error;
 }
@@ -181,7 +181,7 @@ async function postHandler(request: NextRequest) {
       if (mediaUrls.length === 0) {
         logger.error('[Higgsfield Webhook] No media URLs found in payload:', JSON.stringify(body));
         updateData.status = 'failed';
-        updateData.error_message = 'Не удалось получить результат генерации';
+        updateData.error_message = 'Failed to extract generation output';
       } else {
         logger.info('[Higgsfield Webhook] Generation completed, saving media:', generation.id);
         
@@ -226,12 +226,12 @@ async function postHandler(request: NextRequest) {
       }
     } else if (status === 'failed' || error) {
       updateData.status = 'failed';
-      updateData.error_message = getUserFriendlyErrorMessage(error || 'Генерация не удалась');
+      updateData.error_message = getUserFriendlyErrorMessage(error || 'Generation failed');
       
       logger.error('[Higgsfield Webhook] Generation failed:', generation.id, error);
     } else if (status === 'nsfw') {
       updateData.status = 'failed';
-      updateData.error_message = 'Контент заблокирован фильтром безопасности';
+      updateData.error_message = 'Content blocked by safety filter';
       
       logger.warn('[Higgsfield Webhook] Generation flagged as NSFW:', generation.id);
     }

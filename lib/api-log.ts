@@ -79,13 +79,39 @@ export function classifyError(message: string | null | undefined): string | null
 }
 
 /**
- * Записывает лог в api_logs таблицу (fire-and-forget).
- * Не блокирует основной ответ, не бросает ошибки.
+ * Writes a log entry to api_logs table (fire-and-forget).
+ * Does not block the main response or throw errors.
  */
 export function writeApiLog(entry: ApiLogEntry): void {
-  // Fire-and-forget: запускаем промис без await
-  _writeApiLogAsync(entry).catch(() => {
-    // Молча игнорируем ошибки записи логов
+  _writeApiLogAsync(entry).catch(() => {});
+}
+
+/**
+ * Writes a warning-level entry to api_logs.
+ * Used for events like fallback switches that aren't errors
+ * but should be visible in the admin panel.
+ */
+export function writeWarningLog(opts: {
+  path: string;
+  provider?: string;
+  model_name?: string;
+  generation_id?: string;
+  user_id?: string;
+  message: string;
+  details?: Record<string, unknown>;
+}): void {
+  writeApiLog({
+    method: 'WARN',
+    path: opts.path,
+    status_code: 299,
+    provider: opts.provider,
+    model_name: opts.model_name,
+    generation_id: opts.generation_id,
+    user_id: opts.user_id,
+    error_message: opts.message,
+    error_category: 'warning',
+    response_summary: opts.details ?? null,
+    is_fallback: true,
   });
 }
 

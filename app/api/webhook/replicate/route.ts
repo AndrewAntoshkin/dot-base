@@ -141,27 +141,27 @@ async function performAutoRetry(
 function getUserFriendlyErrorMessage(error: string | null | undefined, body: any): string {
   const errorLower = (error || '').toLowerCase();
   const logs = (body?.logs || '').toLowerCase();
-  
+
   if (errorLower.includes('nsfw') || errorLower.includes('safety') || logs.includes('nsfw')) {
-    return 'Контент заблокирован фильтром безопасности. Попробуйте изменить промпт';
+    return 'Content blocked by safety filter. Try changing your prompt';
   }
   if (errorLower.includes('timeout') || logs.includes('timeout')) {
-    return 'Превышено время генерации. Попробуйте уменьшить разрешение';
+    return 'Generation timed out. Try reducing resolution';
   }
   if (errorLower.includes('memory') || errorLower.includes('oom') || logs.includes('memory')) {
-    return 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
+    return 'Not enough resources. Try reducing resolution';
   }
   if (errorLower.includes('overload') || errorLower.includes('rate limit')) {
-    return 'Сервер перегружен. Попробуйте через несколько минут';
+    return 'Server overloaded. Try again in a few minutes';
   }
   if (errorLower.includes('invalid') || errorLower.includes('validation')) {
-    return 'Некорректные параметры. Проверьте настройки';
+    return 'Invalid parameters. Check your settings';
   }
   if (!error || error === '' || error === 'null') {
-    return 'Генерация не удалась. Попробуйте другую модель';
+    return 'Generation failed. Try a different model';
   }
   if (error.length > 150 || error.includes('stack') || error.includes('Error:')) {
-    return 'Произошла ошибка. Попробуйте снова';
+    return 'An error occurred. Please try again';
   }
   return error;
 }
@@ -269,7 +269,7 @@ async function postHandler(request: NextRequest) {
           updateData.output_urls = [textOutput];
         } else {
           updateData.status = 'failed';
-          updateData.error_message = 'No text output received';
+          updateData.error_message = 'No text output received from model';
         }
       } else {
         let replicateUrls: string[] = [];
@@ -290,7 +290,7 @@ async function postHandler(request: NextRequest) {
         
         if (replicateUrls.length === 0) {
           updateData.status = 'failed';
-          updateData.error_message = 'Не удалось получить результат генерации';
+          updateData.error_message = 'Failed to extract generation output';
         } else {
           // Для keyframe сегментов: сохраняем синхронно (критично для merge)
           // Для остальных: сохраняем асинхронно чтобы не блокировать вебхук
@@ -299,7 +299,7 @@ async function postHandler(request: NextRequest) {
             
             if (savedUrls.length === 0) {
               updateData.status = 'failed';
-              updateData.error_message = 'Не удалось сохранить видео сегмента. Попробуйте снова.';
+              updateData.error_message = 'Failed to save keyframe segment video. Please try again.';
               logger.error('Keyframe segment media save failed:', generation.id);
             } else {
               updateData.status = 'completed';
@@ -374,7 +374,7 @@ async function postHandler(request: NextRequest) {
       updateData.status = 'failed';
       let errorMessage = getUserFriendlyErrorMessage(error, body);
       if (currentRetryCount > 0) {
-        errorMessage = `${errorMessage} (после ${currentRetryCount} попыток)`;
+        errorMessage = `${errorMessage} (after ${currentRetryCount} retries)`;
       }
       updateData.error_message = errorMessage;
       
@@ -490,7 +490,7 @@ async function postHandler(request: NextRequest) {
           await (supabase.from('generations') as any)
             .update({
               status: 'failed',
-              error_message: updateData.error_message || 'Ошибка генерации keyframes',
+              error_message: updateData.error_message || 'Keyframe generation failed',
               completed_at: new Date().toISOString(),
             })
             .eq('user_id', generation.user_id)

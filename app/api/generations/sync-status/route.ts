@@ -199,7 +199,7 @@ async function postHandler(request: NextRequest) {
             await (supabase.from('generations') as any)
               .update({
                 status: 'failed',
-                error_message: 'Контент заблокирован фильтром безопасности',
+                error_message: 'Content blocked by safety filter',
                 replicate_output: status,
                 completed_at: new Date().toISOString(),
               })
@@ -301,13 +301,13 @@ async function postHandler(request: NextRequest) {
             syncedCount++;
           }
         } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
-          let errorMessage = 'Генерация не удалась';
+          let errorMessage = 'Generation failed';
           if (prediction.error) {
             const errorLower = prediction.error.toLowerCase();
             if (errorLower.includes('nsfw') || errorLower.includes('safety')) {
-              errorMessage = 'Контент заблокирован фильтром безопасности';
+              errorMessage = 'Content blocked by safety filter';
             } else if (errorLower.includes('timeout')) {
-              errorMessage = 'Превышено время генерации';
+              errorMessage = 'Generation timed out';
             }
           }
 
@@ -335,7 +335,7 @@ async function postHandler(request: NextRequest) {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: 'Ошибка синхронизации' },
+      { error: 'Sync failed' },
       { status: 500 }
     );
   }

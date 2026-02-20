@@ -132,7 +132,7 @@ export async function GET() {
         });
       } else {
         // Fallback: подсчёт по одному (медленнее, но работает без RPC)
-        console.warn('RPC get_workspaces_generation_counts not available, using fallback');
+        // RPC not available, using per-workspace count fallback
         for (const wsId of workspaceIds) {
           const { count } = await adminClient
             .from('generations')

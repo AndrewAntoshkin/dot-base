@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
+import { writeWarningLog } from '@/lib/api-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,17 +127,17 @@ async function postHandler(request: NextRequest) {
         replicateInput.image = validatedData.settings.image;
       }
       if (!replicateInput.image) {
-        return NextResponse.json({ error: 'Требуется загрузить изображение' }, { status: 400 });
+        return NextResponse.json({ error: 'An image is required' }, { status: 400 });
       }
     }
-    
+
     // Handle inpaint
     if (validatedData.action === 'inpaint') {
       if (!replicateInput.image) {
-        return NextResponse.json({ error: 'Требуется загрузить изображение' }, { status: 400 });
+        return NextResponse.json({ error: 'An image is required' }, { status: 400 });
       }
       if (!replicateInput.mask) {
-        return NextResponse.json({ error: 'Требуется нарисовать маску' }, { status: 400 });
+        return NextResponse.json({ error: 'A mask is required' }, { status: 400 });
       }
       
       // FLUX Fill Pro defaults
@@ -247,7 +248,16 @@ async function postHandler(request: NextRequest) {
           
           if (hasFallback && isRetryableError) {
             logger.warn(`[Fal.ai -> Replicate Fallback] Fal.ai failed (${isCreditsError ? 'credits' : 'error'}), trying Replicate:`, falError.message);
-            
+            writeWarningLog({
+              path: '/api/generations/create',
+              provider: 'fal',
+              model_name: generation.model_name,
+              generation_id: generation.id,
+              user_id: generation.user_id,
+              message: `Fallback: Fal.ai -> Replicate. Reason: ${isCreditsError ? 'credits depleted' : falError.message}`,
+              details: { original_provider: 'fal', fallback_provider: 'replicate', error: falError.message },
+            });
+
             // Fallback to Replicate
             const replicateClient = getReplicateClient();
             const webhookUrl = process.env.NODE_ENV === 'production' 
@@ -392,7 +402,16 @@ async function postHandler(request: NextRequest) {
           }
         } catch (googleError: any) {
           logger.warn(`[Google AI -> Replicate Fallback] Google failed, trying Replicate:`, googleError.message);
-          
+          writeWarningLog({
+            path: '/api/generations/create',
+            provider: 'google',
+            model_name: generation.model_name,
+            generation_id: generation.id,
+            user_id: generation.user_id,
+            message: `Fallback: Google -> Replicate. Reason: ${googleError.message}`,
+            details: { original_provider: 'google', fallback_provider: 'replicate', error: googleError.message },
+          });
+
           // Fallback to Replicate
           if (model.fallbackModel) {
             const replicateClient = getReplicateClient();
@@ -488,7 +507,16 @@ async function postHandler(request: NextRequest) {
           // Try fal.ai fallback for supported models
           if (supportsFalFallback) {
             logger.warn(`[Fallback] Replicate failed for ${validatedData.model_id}, trying fal.ai:`, replicateError.message);
-            
+            writeWarningLog({
+              path: '/api/generations/create',
+              provider: 'replicate',
+              model_name: generation.model_name,
+              generation_id: generation.id,
+              user_id: generation.user_id,
+              message: `Fallback: Replicate -> Fal.ai. Reason: ${replicateError.message}`,
+              details: { original_provider: 'replicate', fallback_provider: 'fal', error: replicateError.message },
+            });
+
             const falClient = getFalClient();
             const falWebhookUrl = process.env.NODE_ENV === 'production' 
               ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
@@ -552,7 +580,7 @@ async function postHandler(request: NextRequest) {
         }
       }
     } catch (providerError: any) {
-      const userFacingError = providerError.message || 'Ошибка при генерации';
+      const userFacingError = providerError.message || 'Generation failed';
       
       await (supabase.from('generations') as any)
         .update({ status: 'failed', error_message: userFacingError })

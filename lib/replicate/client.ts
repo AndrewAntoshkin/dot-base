@@ -167,47 +167,47 @@ export class ReplicateClient {
   }
   
   private sanitizeErrorMessage(error: any): string {
-    let message = error.message || 'Произошла ошибка при генерации';
-    
+    let message = error.message || 'Generation failed';
+
     message = message.replace(/https?:\/\/[^\s]*replicate[^\s]*/gi, '');
     message = message.replace(/api\.replicate\.com[^\s]*/gi, '');
     message = message.replace(/replicate/gi, 'API');
-    message = message.replace(/Request to\s+failed/gi, 'Запрос не выполнен');
-    
+    message = message.replace(/Request to\s+failed/gi, 'Request failed');
+
     const jsonMatch = message.match(/\{.*"detail":\s*"([^"]+)"/);
     if (jsonMatch && jsonMatch[1]) {
       message = jsonMatch[1];
     }
-    
+
     const errorMappings: [RegExp, string][] = [
-      [/start_image is required/i, 'Для этой модели требуется входное изображение'],
-      [/first_frame_image is required/i, 'Для этой модели требуется входное изображение'],
-      [/image is required/i, 'Требуется загрузить изображение'],
-      [/prompt is required/i, 'Требуется ввести описание (prompt)'],
-      [/Invalid type.*Expected: integer.*given: string/i, 'Ошибка параметров. Попробуйте ещё раз'],
-      [/Invalid type.*Expected: number.*given: string/i, 'Ошибка параметров. Попробуйте ещё раз'],
-      [/rate limit/i, 'Слишком много запросов. Подождите немного'],
-      [/timeout/i, 'Превышено время ожидания. Попробуйте ещё раз'],
-      [/model.*not found/i, 'Модель временно недоступна'],
-      [/authentication/i, 'Ошибка авторизации. Обратитесь в поддержку'],
-      [/nsfw|safety|blocked|flagged/i, 'Контент заблокирован фильтром безопасности'],
-      [/422 Unprocessable Entity/i, 'Некорректные параметры запроса'],
-      [/Input validation failed/i, 'Ошибка валидации параметров'],
+      [/start_image is required/i, 'This model requires an input image'],
+      [/first_frame_image is required/i, 'This model requires an input image'],
+      [/image is required/i, 'An image is required'],
+      [/prompt is required/i, 'A prompt is required'],
+      [/Invalid type.*Expected: integer.*given: string/i, 'Parameter error. Please try again'],
+      [/Invalid type.*Expected: number.*given: string/i, 'Parameter error. Please try again'],
+      [/rate limit/i, 'Too many requests. Please wait'],
+      [/timeout/i, 'Request timed out. Please try again'],
+      [/model.*not found/i, 'Model temporarily unavailable'],
+      [/authentication/i, 'Authentication error. Contact support'],
+      [/nsfw|safety|blocked|flagged/i, 'Content blocked by safety filter'],
+      [/422 Unprocessable Entity/i, 'Invalid request parameters'],
+      [/Input validation failed/i, 'Input validation failed'],
     ];
-    
+
     for (const [pattern, replacement] of errorMappings) {
       if (pattern.test(message)) {
         return replacement;
       }
     }
-    
+
     message = message.replace(/\{[^}]+\}/g, '').replace(/\[[^\]]+\]/g, '').trim();
-    
+
     if (message.length > 200 || /status\s*\d+|response|request|http/i.test(message)) {
-      return 'Ошибка при генерации. Попробуйте изменить параметры';
+      return 'Generation error. Try changing parameters';
     }
-    
-    return message.trim() || 'Произошла ошибка при генерации';
+
+    return message.trim() || 'Generation failed';
   }
 
   private isNonRetryableError(error: any): boolean {
