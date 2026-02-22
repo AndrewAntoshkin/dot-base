@@ -556,7 +556,7 @@ export const CREATE_MODELS: Model[] = [
     displayName: 'Nano Banana Pro',
     replicateModel: 'gemini-3-pro-image-preview',  // Google model name
     fallbackModel: 'google/nano-banana-pro',       // Replicate fallback
-    falFallbackModel: 'fal-ai/nano-banana-pro',    // FAL.ai fallback (third level)
+    falFallbackModel: 'fal-ai/gemini-3-pro-image-preview',  // FAL.ai fallback (third level)
     action: 'create',
     provider: 'google',  // Direct Google API
     runs: '4.8M runs',
@@ -1774,7 +1774,7 @@ export const EDIT_MODELS: Model[] = [
     displayName: 'Nano Banana Pro',
     replicateModel: 'gemini-3-pro-image-preview',  // Google model name
     fallbackModel: 'google/nano-banana-pro',       // Replicate fallback
-    falFallbackModel: 'fal-ai/nano-banana-pro',    // FAL.ai fallback (third level)
+    falFallbackModel: 'fal-ai/gemini-3-pro-image-preview',  // FAL.ai fallback (third level)
     action: 'edit',
     provider: 'google',  // Direct Google API
     runs: '4.8M runs',
