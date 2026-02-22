@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFlowStore } from '@/lib/flow/store';
 import { FlowBlockType } from '@/lib/flow/types';
 import { cn } from '@/lib/utils';
-import { FileText, Image, Video, ExternalLink, Search } from 'lucide-react';
+import { FileText, Image as ImageIcon, Video, ImagePlus, ExternalLink, Search } from 'lucide-react';
+import NextImage from 'next/image';
 import Link from 'next/link';
 
 interface BlockOption {
@@ -12,6 +13,14 @@ interface BlockOption {
   label: string;
   description: string;
   icon: React.ReactNode;
+}
+
+interface GenerationItem {
+  id: string;
+  output_urls: string[] | null;
+  output_thumbs: string[] | null;
+  status: string;
+  model_name: string;
 }
 
 const blockOptions: BlockOption[] = [
@@ -25,13 +34,19 @@ const blockOptions: BlockOption[] = [
     type: 'image',
     label: 'Изображение',
     description: 'Генерируйте и обрабатывайте изображения',
-    icon: <Image className="w-4 h-4 text-white" />,
+    icon: <ImageIcon className="w-4 h-4 text-white" />,
   },
   {
     type: 'video',
     label: 'Видео',
     description: 'Создавайте видео из изображений',
     icon: <Video className="w-4 h-4 text-white" />,
+  },
+  {
+    type: 'asset',
+    label: 'Ассет',
+    description: 'Добавьте изображение из генераций',
+    icon: <ImagePlus className="w-4 h-4 text-white" />,
   },
 ];
 
@@ -57,13 +72,41 @@ const videoModels = [
 ];
 
 export function FlowBlockModal() {
-  const { isBlockModalOpen, blockModalPosition, screenPosition, addNode, closeBlockModal } = useFlowStore();
+  const { isBlockModalOpen, blockModalPosition, screenPosition, addNode, closeBlockModal, updateNodeData } = useFlowStore();
   const modalRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState({ x: 0, y: 0 });
   const [isAnimating, setIsAnimating] = useState(false);
   const [hoveredType, setHoveredType] = useState<FlowBlockType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
+  // Asset generations state
+  const [generations, setGenerations] = useState<GenerationItem[]>([]);
+  const [isLoadingGenerations, setIsLoadingGenerations] = useState(false);
+  const generationsCacheRef = useRef<GenerationItem[] | null>(null);
+
+  // Prefetch generations when modal opens
+  useEffect(() => {
+    if (isBlockModalOpen && !generationsCacheRef.current) {
+      setIsLoadingGenerations(true);
+      fetch('/api/generations/list?limit=50&tab=all&action=create')
+        .then((r) => r.json())
+        .then((data) => {
+          const items = (data.generations || []).filter(
+            (g: GenerationItem) =>
+              g.status === 'completed' &&
+              g.output_urls &&
+              g.output_urls.length > 0
+          );
+          generationsCacheRef.current = items;
+          setGenerations(items);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoadingGenerations(false));
+    } else if (isBlockModalOpen && generationsCacheRef.current) {
+      setGenerations(generationsCacheRef.current);
+    }
+  }, [isBlockModalOpen]);
 
   // Get models based on hovered type
   const getModels = () => {
@@ -74,6 +117,17 @@ export function FlowBlockModal() {
 
   const filteredModels = getModels().filter(m => 
     m.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Get all image URLs from generations for asset grid
+  const assetImages = generations.flatMap((g) =>
+    (g.output_thumbs && g.output_thumbs.length > 0 ? g.output_thumbs : g.output_urls || []).map(
+      (thumb, i) => ({
+        thumb,
+        full: g.output_urls?.[i] || thumb,
+        id: `${g.id}-${i}`,
+      })
+    )
   );
 
   // Adjust position to keep modal in viewport and center on click
@@ -122,6 +176,7 @@ export function FlowBlockModal() {
       setHoveredType(null);
       setSearchQuery('');
       setSelectedModel(null);
+      // Don't clear generations cache - keep for next open
     }
   }, [isBlockModalOpen, screenPosition]);
 
@@ -139,11 +194,26 @@ export function FlowBlockModal() {
     }
   }, [hoveredType, handleAddBlock]);
 
+  const handleSelectAssetImage = useCallback((imageUrl: string) => {
+    if (blockModalPosition) {
+      const nodeId = addNode('asset', blockModalPosition);
+      // Set the output URL on the newly created node
+      updateNodeData(nodeId, {
+        outputUrl: imageUrl,
+        outputType: 'image',
+        status: 'completed',
+      });
+      closeBlockModal();
+    }
+  }, [addNode, updateNodeData, blockModalPosition, closeBlockModal]);
+
   if (!isBlockModalOpen || !blockModalPosition || !screenPosition) {
     return null;
   }
 
   const showModelPanel = hoveredType === 'image' || hoveredType === 'video';
+  const showAssetPanel = hoveredType === 'asset';
+  const showRightPanel = showModelPanel || showAssetPanel;
 
   return (
     <>
@@ -174,7 +244,7 @@ export function FlowBlockModal() {
             {blockOptions.map((option) => (
               <button
                 key={option.type}
-                onClick={() => handleAddBlock(option.type)}
+                onClick={() => option.type !== 'asset' && handleAddBlock(option.type)}
                 onMouseEnter={() => setHoveredType(option.type)}
                 className={cn(
                   'flex items-center gap-3 p-2 rounded-[10px]',
@@ -222,7 +292,7 @@ export function FlowBlockModal() {
           </div>
         </div>
 
-        {/* Right panel - Model selector (only for image/video) - positioned absolutely */}
+        {/* Right panel - Model selector (for image/video) */}
         {showModelPanel && (
           <div 
             className={cn(
@@ -263,6 +333,69 @@ export function FlowBlockModal() {
                     </span>
                   </button>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Right panel - Asset picker (for asset type) */}
+        {showAssetPanel && (
+          <div
+            className={cn(
+              'absolute left-full top-0 ml-2 rounded-2xl bg-[#171717] shadow-[0px_8px_24px_0px_rgba(0,0,0,0.9)]',
+              'transition-all duration-200 ease-out',
+              'animate-in slide-in-from-left-2 fade-in'
+            )}
+          >
+            <div className="flex flex-col gap-4 p-5 w-[392px]">
+              {/* Upload drop zone */}
+              <div className="flex items-center gap-3 p-4 rounded-2xl border border-dashed border-[#656565] bg-[#101010]">
+                <ImagePlus className="w-5 h-5 text-white flex-shrink-0" />
+                <span className="text-sm text-[#A2A2A2]">
+                  Перетащите или выберите изображения
+                </span>
+              </div>
+
+              {/* My generations label */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#959595]">
+                  мои генерации
+                </span>
+
+                {/* Grid of generation images */}
+                <div className="relative">
+                  <div className="grid grid-cols-4 gap-2 max-h-[360px] overflow-y-auto pr-0.5">
+                    {isLoadingGenerations ? (
+                      <div className="col-span-4 flex items-center justify-center py-8">
+                        <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      </div>
+                    ) : assetImages.length === 0 ? (
+                      <div className="col-span-4 flex items-center justify-center py-8">
+                        <span className="text-xs text-[#656565]">Нет генераций</span>
+                      </div>
+                    ) : (
+                      assetImages.map((img) => (
+                        <button
+                          key={img.id}
+                          onClick={() => handleSelectAssetImage(img.full)}
+                          className="relative aspect-square rounded-lg overflow-hidden group hover:ring-2 hover:ring-white/40 transition-all"
+                        >
+                          <NextImage
+                            src={img.thumb}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            sizes="82px"
+                            unoptimized
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  {/* Fade overlay at top (scrolls under upload field) */}
+                  <div className="pointer-events-none absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-[#171717] to-transparent" />
+                </div>
               </div>
             </div>
           </div>

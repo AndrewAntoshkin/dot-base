@@ -28,6 +28,9 @@ interface UserContextValue {
   setSelectedWorkspaceId: (id: string | null) => void;
   loadWorkspaces: () => Promise<void>;
   isLoadingWorkspaces: boolean;
+  // Projects
+  selectedProjectId: string | null;
+  setSelectedProjectId: (id: string | null) => void;
   // Profile
   loadProfile: () => Promise<void>;
 }
@@ -47,6 +50,7 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<UserWorkspace[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceIdState] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   
   // Предотвращаем повторную загрузку
@@ -93,11 +97,21 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     }
   }, [isLoadingWorkspaces]);
 
-  // Set selected workspace and save to localStorage
   const setSelectedWorkspaceId = useCallback((id: string | null) => {
     setSelectedWorkspaceIdState(id);
     if (id && typeof window !== 'undefined') {
       localStorage.setItem('selectedWorkspaceId', id);
+    }
+  }, []);
+
+  const setSelectedProjectId = useCallback((id: string | null) => {
+    setSelectedProjectIdState(id);
+    if (typeof window !== 'undefined') {
+      if (id) {
+        localStorage.setItem('selectedProjectId', id);
+      } else {
+        localStorage.removeItem('selectedProjectId');
+      }
     }
   }, []);
 
@@ -130,6 +144,7 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     if (emailChanged) {
       setWorkspaces([]);
       setSelectedWorkspaceIdState(null);
+      setSelectedProjectIdState(null);
       setAvatarUrl(null);
       setDisplayName(null);
       hasLoadedWorkspaces.current = false;
@@ -148,6 +163,7 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     } else if (!email) {
       setWorkspaces([]);
       setSelectedWorkspaceIdState(null);
+      setSelectedProjectIdState(null);
       setAvatarUrl(null);
       setDisplayName(null);
       hasLoadedWorkspaces.current = false;
@@ -171,8 +187,10 @@ export function UserProvider({ initialEmail, initialRole = 'user', children }: U
     setSelectedWorkspaceId,
     loadWorkspaces,
     isLoadingWorkspaces,
+    selectedProjectId,
+    setSelectedProjectId,
     loadProfile,
-  }), [email, role, avatarUrl, displayName, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, loadWorkspaces, isLoadingWorkspaces, loadProfile]);
+  }), [email, role, avatarUrl, displayName, workspaces, selectedWorkspaceId, setSelectedWorkspaceId, loadWorkspaces, isLoadingWorkspaces, selectedProjectId, setSelectedProjectId, loadProfile]);
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

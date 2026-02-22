@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { MaskEditor } from '@/components/mask-editor';
 import { INPAINT_MODELS } from '@/lib/models-config';
 import { INPAINT_MODELS_LITE } from '@/lib/models-lite';
@@ -262,25 +262,13 @@ export default function InpaintPageClient() {
   const canGenerate = uploadedImage && maskDataUrl && (prompt.trim() || selectedModel.id === 'bria-eraser-inpaint');
 
   return (
-    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
-      <Header />
-
-      {/* Desktop Layout - Independent scroll for each column */}
-      <main className="hidden lg:flex flex-1 min-h-0 gap-6">
-        {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0">
-          {/* Scrollable content area */}
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
-            {/* Header */}
-            <div className="mb-6 shrink-0 animate-fade-in-up">
-              <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-                INPUT
-              </h2>
-            </div>
-
-            {/* Form fields - 12px gap between cards */}
+    <AppShell>
+      {/* Desktop Layout */}
+      <main className="hidden lg:flex flex-1 min-h-0 gap-6 pt-2 px-6">
+        {/* LEFT PANEL - Settings (400px fixed) */}
+        <div className="w-[400px] flex flex-col shrink-0">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-6">
             <div className="flex flex-col gap-3">
-              {/* Model selector card */}
               <div className="animate-fade-in-up animate-delay-100 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
                 <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                   <AlignRight className="w-3 h-3" />
@@ -302,7 +290,6 @@ export default function InpaintPageClient() {
                 )}
               </div>
 
-              {/* Upload card - FIRST */}
               <div className="animate-fade-in-up animate-delay-200 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
                 <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
                   <Upload className="w-3 h-3" />
@@ -334,7 +321,6 @@ export default function InpaintPageClient() {
                 )}
               </div>
 
-              {/* Prompt card - SECOND */}
               {selectedModel.id !== 'bria-eraser-inpaint' && (
                 <div className="animate-fade-in-up animate-delay-300 border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
                   <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
@@ -351,7 +337,6 @@ export default function InpaintPageClient() {
                 </div>
               )}
 
-              {/* Eraser info */}
               {selectedModel.id === 'bria-eraser-inpaint' && (
                 <div className="animate-fade-in-up animate-delay-300 border border-[#252525] rounded-[16px] p-4">
                   <p className="font-inter text-[14px] leading-[20px] text-[#959595]">
@@ -360,7 +345,6 @@ export default function InpaintPageClient() {
                 </div>
               )}
 
-              {/* Mask preview */}
               {maskDataUrl && (
                 <div className="animate-fade-in-up border border-[#252525] rounded-[16px] p-4 flex flex-col gap-2">
                   <label className="flex items-center gap-1 font-inter font-medium text-[10px] leading-[14px] text-[#959595] uppercase tracking-[0.15px]">
@@ -378,8 +362,7 @@ export default function InpaintPageClient() {
             </div>
           </div>
 
-          {/* Fixed buttons at bottom (outside scroll area) */}
-          <div className="shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
+          <div className="shrink-0 bg-[#101010] pt-4 pb-6">
             <div className="flex gap-3">
               <button
                 type="button"
@@ -402,89 +385,68 @@ export default function InpaintPageClient() {
                 {isGenerating ? 'Генерация...' : 'Создать'}
               </button>
             </div>
-            <p className="font-inter text-xs text-[#666] text-center mt-3">
-              {!uploadedImage 
-                ? '1. Загрузите изображение' 
-                : !maskDataUrl 
-                ? '2. Нарисуйте маску' 
-                : selectedModel.id !== 'bria-eraser-inpaint' && !prompt.trim()
-                ? '3. Введите prompt'
-                : 'Готово к генерации!'}
-            </p>
           </div>
         </div>
 
-        {/* DIVIDER (64px) */}
-        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
-          <div className="w-px h-full bg-[#2f2f2f]" />
-        </div>
-
-        {/* RIGHT PANEL - OUTPUT (independent scroll) */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pl-0 pr-20">
-          <div className="mb-6 animate-fade-in-up">
-            <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-              OUTPUT
-            </h2>
-          </div>
-
-          <div className="animate-fade-in-up animate-delay-200">
-            {!uploadedImage ? (
-              // Empty state - same as IMAGE page
-              <div className="flex items-center justify-center min-h-[660px] px-20">
-                <div className="flex gap-12 w-full">
-                  <div className="flex-1 flex flex-col py-2">
-                    <img src="/numbers/1.png" alt="1" width={36} height={64} className="mb-0" />
-                    <div className="flex flex-col gap-2 py-6">
-                      <h3 className="font-inter font-semibold text-xl text-white">Загрузить</h3>
-                      <p className="font-inter text-sm text-[#9c9c9c]">Выберите изображение</p>
+        {/* RIGHT PANEL - Result */}
+        <div className="flex-1 min-h-0 flex flex-col pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide bg-[#050505] rounded-2xl p-6">
+            <div className="animate-fade-in-up animate-delay-200">
+              {!uploadedImage ? (
+                <div className="flex items-center justify-center min-h-[660px] px-20">
+                  <div className="flex gap-12 w-full">
+                    <div className="flex-1 flex flex-col py-2">
+                      <img src="/numbers/1.png" alt="1" width={36} height={64} className="mb-0" />
+                      <div className="flex flex-col gap-2 py-6">
+                        <h3 className="font-inter font-semibold text-xl text-white">Загрузить</h3>
+                        <p className="font-inter text-sm text-[#9c9c9c]">Выберите изображение</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 flex flex-col py-2">
-                    <img src="/numbers/2.png" alt="2" width={55} height={64} className="mb-0" />
-                    <div className="flex flex-col gap-2 py-6">
-                      <h3 className="font-inter font-semibold text-xl text-white">Нарисовать маску</h3>
-                      <p className="font-inter text-sm text-[#9c9c9c]">Выделите область для изменения</p>
+                    <div className="flex-1 flex flex-col py-2">
+                      <img src="/numbers/2.png" alt="2" width={55} height={64} className="mb-0" />
+                      <div className="flex flex-col gap-2 py-6">
+                        <h3 className="font-inter font-semibold text-xl text-white">Нарисовать маску</h3>
+                        <p className="font-inter text-sm text-[#9c9c9c]">Выделите область для изменения</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 flex flex-col py-2">
-                    <img src="/numbers/3.png" alt="3" width={53} height={64} className="mb-0" />
-                    <div className="flex flex-col gap-2 py-6">
-                      <h3 className="font-inter font-semibold text-xl text-white">Генерация</h3>
-                      <p className="font-inter text-sm text-[#9c9c9c]">Опишите результат на английском</p>
+                    <div className="flex-1 flex flex-col py-2">
+                      <img src="/numbers/3.png" alt="3" width={53} height={64} className="mb-0" />
+                      <div className="flex flex-col gap-2 py-6">
+                        <h3 className="font-inter font-semibold text-xl text-white">Генерация</h3>
+                        <p className="font-inter text-sm text-[#9c9c9c]">Опишите результат на английском</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              // Mask editor + history
-              <div className="flex flex-col gap-4">
-                <MaskEditor
-                  imageUrl={uploadedImage}
-                  onMaskChange={handleMaskChange}
-                  width={660}
-                  height={660}
-                />
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <MaskEditor
+                    imageUrl={uploadedImage}
+                    onMaskChange={handleMaskChange}
+                    width={660}
+                    height={660}
+                  />
 
-                {/* Generation history - 64x64 previews in a row */}
-                {generationHistory.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto py-2">
-                    {generationHistory.map((gen) => (
-                      <button
-                        key={gen.id}
-                        onClick={() => {
-                          setUploadedImage(gen.resultUrl);
-                          setMaskDataUrl(null);
-                        }}
-                        className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-[#2f2f2f] hover:border-white transition-colors"
-                        title="Кликните чтобы редактировать"
-                      >
-                        <img src={gen.resultUrl} alt={gen.prompt} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                  {generationHistory.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto py-2">
+                      {generationHistory.map((gen) => (
+                        <button
+                          key={gen.id}
+                          onClick={() => {
+                            setUploadedImage(gen.resultUrl);
+                            setMaskDataUrl(null);
+                          }}
+                          className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-[#2f2f2f] hover:border-white transition-colors"
+                          title="Кликните чтобы редактировать"
+                        >
+                          <img src={gen.resultUrl} alt={gen.prompt} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
@@ -564,7 +526,7 @@ export default function InpaintPageClient() {
           </button>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 

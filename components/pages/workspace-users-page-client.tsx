@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo, useCallback, memo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { ChevronRight, Search } from 'lucide-react';
 import { WorkspaceFlowsKanban } from '@/components/workspace-flows-kanban';
+import ProjectsContent from '@/components/projects-content';
 import type { FlowCard, FlowWorkspaceStatus } from '@/lib/flow/types';
 
 interface WorkspaceUser {
@@ -280,8 +281,7 @@ const CardSkeleton = memo(function CardSkeleton() {
 // Количество карточек в одной порции
 const BATCH_SIZE = 8;
 
-// Типы табов
-type TabType = 'participants' | 'flows';
+type TabType = 'projects' | 'participants' | 'flows';
 
 interface WorkspaceMember {
   id: string;
@@ -292,7 +292,8 @@ interface WorkspaceMember {
 export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsersPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'flows' ? 'flows' : 'participants';
+  const tabParam = searchParams.get('tab');
+  const initialTab: TabType = tabParam === 'flows' ? 'flows' : tabParam === 'participants' ? 'participants' : 'projects';
   
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [users, setUsers] = useState<WorkspaceUser[]>([]);
@@ -425,12 +426,11 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
 
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
-    // Обновляем URL без перезагрузки страницы
     const url = new URL(window.location.href);
-    if (tab === 'flows') {
-      url.searchParams.set('tab', 'flows');
-    } else {
+    if (tab === 'projects') {
       url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
     }
     window.history.replaceState({}, '', url.toString());
   }, []);
@@ -472,8 +472,7 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#101010]">
-        <Header />
+      <AppShell>
         <main className="flex-1 px-4 lg:px-[80px] py-6">
           {/* Skeleton header row */}
           <div className="flex items-start justify-between mb-6">
@@ -509,14 +508,12 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
             ))}
           </div>
         </main>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#101010]">
-      <Header />
-
+    <AppShell>
       <main className="flex-1 px-4 lg:px-[80px] py-6">
         {/* Header row: Breadcrumb + Title */}
         <div className="flex flex-col gap-3 mb-5">
@@ -541,6 +538,19 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
         {/* Tabs: Участники / Флоу (с подчёркиванием как в Figma) - Sticky */}
         <div className="sticky top-[56px] z-40 bg-[#101010] -mx-4 lg:-mx-[80px] px-4 lg:px-[80px] pt-2 pb-4 mb-2">
         <div className="flex items-end gap-3 border-b border-[#2e2e2e]">
+          <button
+            onClick={() => handleTabChange('projects')}
+            className={`flex items-center gap-2 px-0 pb-[10px] font-inter text-[14px] transition-colors relative ${
+              activeTab === 'projects'
+                ? 'font-medium text-white'
+                : 'font-normal text-[#959595] hover:text-white'
+            }`}
+          >
+            <span>Проекты</span>
+            {activeTab === 'projects' && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
+            )}
+          </button>
           <button
             onClick={() => handleTabChange('participants')}
             className={`flex items-center gap-2 px-0 pb-[10px] font-inter text-[14px] transition-colors relative ${
@@ -577,7 +587,9 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
         </div>
 
         {/* Контент в зависимости от активного таба */}
-        {activeTab === 'participants' ? (
+        {activeTab === 'projects' ? (
+          <ProjectsContent workspaceId={workspaceId} showHeader={false} />
+        ) : activeTab === 'participants' ? (
           <>
             {/* Поиск для участников */}
             <div className="flex items-center justify-between mb-4">
@@ -637,6 +649,6 @@ export default function WorkspaceUsersPageClient({ workspaceId }: WorkspaceUsers
           )
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }

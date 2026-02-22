@@ -1,17 +1,15 @@
-import { getAuthUser } from '@/lib/supabase/auth-helpers';
+import { getFullAuth } from '@/lib/supabase/auth-helpers';
 import HomePageClient from '@/components/pages/home-page-client';
 import { LandingPage } from '@/components/pages/landing-page';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  // Используем кэшированный auth - результат будет переиспользован из layout.tsx
-  const user = await getAuthUser();
+  const auth = await getFullAuth();
   
-  // Если пользователь не авторизован - показываем лендинг
-  if (!user) {
+  if (!auth.isAuthenticated) {
     return <LandingPage />;
   }
   
-  return <HomePageClient />;
+  return <HomePageClient isAdmin={auth.isAdmin} />;
 }

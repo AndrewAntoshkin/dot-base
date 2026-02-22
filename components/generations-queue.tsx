@@ -53,7 +53,7 @@ export function GenerationsQueue({ isOpen, onClose }: GenerationsQueueProps) {
       />
 
       {/* Dropdown */}
-      <div className="absolute right-0 top-full mt-2 w-[240px] bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-lg z-50 overflow-hidden">
+      <div className="absolute left-0 bottom-full mb-2 w-[240px] bg-[#1a1a1a] border border-[#2f2f2f] rounded-xl shadow-lg z-50 overflow-hidden">
         {unviewedGenerations.length === 0 ? (
           <div className="p-4 text-center">
             <p className="font-inter text-sm text-[#656565]">

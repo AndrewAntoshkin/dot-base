@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { useGenerations } from '@/contexts/generations-context';
 import { useUser } from '@/contexts/user-context';
 import { useLimitToast } from '@/components/limit-toast';
@@ -764,9 +764,7 @@ export default function BrainstormPageClient() {
   ).length;
   
   return (
-    <div className="h-screen flex flex-col bg-[#101010] relative overflow-hidden">
-      <Header />
-      
+    <AppShell>
       {/* Canvas container - full screen below header */}
       <div 
         ref={containerRef}
@@ -1140,6 +1138,6 @@ export default function BrainstormPageClient() {
         onNavigate={handleNavigateToGeneration}
         onScrollToGeneration={handleScrollToGeneration}
       />
-    </div>
+    </AppShell>
   );
 }

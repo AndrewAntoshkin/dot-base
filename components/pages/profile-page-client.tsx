@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { Loader2, Download, Play, Trash2, Type, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, Camera, Pencil, MoreHorizontal } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/contexts/user-context';
@@ -660,9 +660,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
   const initials = getInitials(displayEmail, profile?.display_name || null);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#101010]">
-      <Header />
-
+    <AppShell>
       <main className="flex-1">
         {/* Profile Header Section - with skeleton */}
         {isProfileLoading ? (
@@ -1198,7 +1196,7 @@ export default function ProfilePageClient({ userEmail }: { userEmail: string | n
           onSave={handleProfileUpdate}
         />
       )}
-    </div>
+    </AppShell>
   );
 }
 

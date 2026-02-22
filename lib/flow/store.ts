@@ -76,6 +76,14 @@ interface FlowState {
   // Generation
   runGeneration: (nodeId: string) => Promise<void>;
   
+  // Inline edit actions (upscale, remove_bg, inpaint, outpaint, edit)
+  runEditAction: (nodeId: string, action: string, params: {
+    modelId: string;
+    prompt?: string;
+    settings?: Record<string, any>;
+    maskUrl?: string;
+  }) => Promise<void>;
+  
   // Reset
   reset: () => void;
   
@@ -529,6 +537,160 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
+  runEditAction: async (nodeId, action, params) => {
+    const node = get().nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    const imageUrl = node.data.outputUrl;
+    if (!imageUrl) {
+      console.error('[FlowEdit] No outputUrl on node');
+      return;
+    }
+
+    // Save previous image for undo, set running status
+    get().updateNodeData(nodeId, {
+      previousOutputUrl: imageUrl,
+      status: 'running' as FlowNodeStatus,
+      editMode: null,
+      editMaskDataUrl: undefined,
+      editPrompt: undefined,
+      errorMessage: undefined,
+    });
+
+    try {
+      // Build settings with the image -- set ALL possible field names
+      // so every model gets its expected field:
+      //   reve-edit, inpaint, upscale, remove_bg, expand → "image"
+      //   flux-kontext-max-edit → "input_image"
+      //   nano-banana-pro-edit (Google) → "image_input"
+      const settings: Record<string, any> = {
+        image: imageUrl,
+        input_image: imageUrl,
+        image_input: imageUrl,
+        ...params.settings,
+      };
+
+      // For inpaint, add mask
+      if (action === 'inpaint' && params.maskUrl) {
+        settings.mask = params.maskUrl;
+      }
+
+      // For expand, always include prompt in settings (required by Bria)
+      // The API's `if (validatedData.prompt)` skips empty strings, so we put it in settings directly
+      if (action === 'expand') {
+        settings.prompt = params.prompt || '';
+      }
+
+      console.log('[FlowEdit] Calling API:', { action, model_id: params.modelId, prompt: params.prompt });
+
+      const response = await fetch('/api/generations/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          model_id: params.modelId,
+          prompt: params.prompt ?? '',
+          input_image_url: imageUrl,
+          settings,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Edit action failed');
+      }
+
+      const result = await response.json();
+      console.log('[FlowEdit] API result:', JSON.stringify(result));
+
+      // API returns { id, prediction_id, status } directly
+      // Some providers (Google) return completed immediately with output_urls
+      if (result.status === 'completed' && result.output_urls?.length > 0) {
+        console.log('[FlowEdit] Immediate completion, updating node:', nodeId, result.output_urls[0]);
+        get().updateNodeData(nodeId, {
+          status: 'completed' as FlowNodeStatus,
+          outputUrl: result.output_urls[0],
+          outputType: 'image',
+        });
+        return;
+      }
+
+      const generationId = result.id;
+      if (generationId) {
+        // Store generationId for polling
+        get().updateNodeData(nodeId, {
+          status: 'running' as FlowNodeStatus,
+          generationId,
+        });
+
+        // Polling with recursive setTimeout (avoids concurrent callbacks)
+        let pollCount = 0;
+        const maxPolls = 100; // ~5 minutes at 3s intervals
+
+        const poll = async () => {
+          pollCount++;
+          if (pollCount > maxPolls) {
+            console.log('[FlowEdit] Polling timed out for', generationId);
+            get().updateNodeData(nodeId, {
+              status: 'failed' as FlowNodeStatus,
+              errorMessage: 'Timeout: generation took too long',
+              generationId: undefined,
+            });
+            return;
+          }
+
+          try {
+            console.log(`[FlowEdit] Poll #${pollCount} for ${generationId}`);
+            const statusRes = await fetch(`/api/generations/${generationId}`);
+            if (!statusRes.ok) {
+              console.log('[FlowEdit] Poll response not ok:', statusRes.status);
+              setTimeout(poll, 3000);
+              return;
+            }
+            const statusData = await statusRes.json();
+            console.log(`[FlowEdit] Poll #${pollCount} status=${statusData.status}, output_urls=${JSON.stringify(statusData.output_urls)}`);
+
+            if (statusData.status === 'completed' && statusData.output_urls?.length > 0) {
+              console.log('[FlowEdit] DONE! Updating node', nodeId, 'with', statusData.output_urls[0]);
+              get().updateNodeData(nodeId, {
+                status: 'completed' as FlowNodeStatus,
+                outputUrl: statusData.output_urls[0],
+                outputType: 'image',
+                generationId: undefined,
+              });
+              // DONE - do not schedule next poll
+              return;
+            } else if (statusData.status === 'failed') {
+              console.log('[FlowEdit] FAILED for', generationId);
+              get().updateNodeData(nodeId, {
+                status: 'failed' as FlowNodeStatus,
+                errorMessage: statusData.error_message || 'Edit action failed',
+                generationId: undefined,
+              });
+              // DONE - do not schedule next poll
+              return;
+            }
+
+            // Still processing, schedule next poll
+            setTimeout(poll, 3000);
+          } catch (err) {
+            console.error('[FlowEdit] Poll error:', err);
+            setTimeout(poll, 3000);
+          }
+        };
+
+        // Start first poll after 3s
+        setTimeout(poll, 3000);
+      }
+    } catch (error) {
+      console.error('[FlowEdit] Error:', error);
+      get().updateNodeData(nodeId, {
+        status: 'failed' as FlowNodeStatus,
+        errorMessage: error instanceof Error ? error.message : 'Edit action failed',
+      });
+    }
+  },
+
   reset: () => set(initialState),
   
   // Reset flow - clear all nodes and edges but keep flow metadata
@@ -670,7 +832,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       });
       
       if (!response.ok) {
-        throw new Error('Failed to save flow');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || 'Failed to save flow');
       }
       
       set({ hasUnsavedChanges: false });

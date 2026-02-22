@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, Suspense, useEffect, useCallback } from 'react';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { ImagePlus, Wand2, Plus, RefreshCw, Download, Play, Pause, Trash2, ChevronDown, Film, ArrowLeftRight } from 'lucide-react';
 import Image from 'next/image';
 import { useGenerations } from '@/contexts/generations-context';
@@ -1263,23 +1263,13 @@ function KeyframesContent() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
-      <Header />
+    <AppShell>
 
-      {/* Desktop Layout - Independent scroll for each column */}
-      <main className="hidden lg:flex flex-1 min-h-0 gap-6">
-        {/* LEFT PANEL - INPUT */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0">
-          {/* Scrollable content area */}
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
-            {/* Header */}
-            <div className="mb-4 shrink-0">
-              <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-                INPUT
-              </h2>
-            </div>
-
-            {/* Parts */}
+      {/* Desktop Layout */}
+      <main className="hidden lg:flex flex-1 min-h-0 gap-6 pt-2 px-6">
+        {/* LEFT PANEL - Settings (400px fixed) */}
+        <div className="w-[400px] flex flex-col shrink-0">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-6">
             <div className="flex flex-col gap-3 pb-4">
               {parts.map((part, index) => (
                 <PartCard
@@ -1293,7 +1283,6 @@ function KeyframesContent() {
                 />
               ))}
               
-              {/* Добавить часть */}
               <button
                 onClick={addPart}
                 className="h-11 bg-[#212121] rounded-2xl flex items-center justify-center gap-2 text-[13px] text-white/70 hover:text-white hover:bg-[#2a2a2a] transition-colors"
@@ -1304,8 +1293,7 @@ function KeyframesContent() {
             </div>
           </div>
 
-          {/* Fixed buttons at bottom (outside scroll area) */}
-          <div className="shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
+          <div className="shrink-0 bg-[#101010] pt-4 pb-6">
             <div className="flex gap-3">
               <button
                 type="button"
@@ -1331,42 +1319,32 @@ function KeyframesContent() {
           </div>
         </div>
 
-        {/* DIVIDER */}
-        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
-          <div className="w-px h-full bg-[#2f2f2f]" />
-        </div>
+        {/* RIGHT PANEL - Result */}
+        <div className="flex-1 min-h-0 flex flex-col pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide bg-[#050505] rounded-2xl p-6 flex flex-col gap-6">
+            {generation.finalVideoUrl ? (
+              <VideoPlayer 
+                videoUrls={[generation.finalVideoUrl]}
+                onRegenerate={handleGenerate}
+                onDownload={handleDownload}
+                isGenerating={isGenerating}
+              />
+            ) : generation.status !== 'idle' ? (
+              <GeneratingOutput 
+                status={generation.status}
+                progress={generation.progress}
+                error={generation.error}
+              />
+            ) : (
+              <EmptyOutput />
+            )}
 
-        {/* RIGHT PANEL - OUTPUT (independent scroll) */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pl-0 pr-20 flex flex-col gap-6">
-          {/* Header */}
-          <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-            OUTPUT
-          </h2>
-
-          {/* Output Content */}
-          {generation.finalVideoUrl ? (
-            <VideoPlayer 
-              videoUrls={[generation.finalVideoUrl]}
-              onRegenerate={handleGenerate}
-              onDownload={handleDownload}
-              isGenerating={isGenerating}
+            <VideoTimeline
+              parts={parts}
+              segments={generation.segments}
+              totalDuration={totalDuration}
             />
-          ) : generation.status !== 'idle' ? (
-            <GeneratingOutput 
-              status={generation.status}
-              progress={generation.progress}
-              error={generation.error}
-            />
-          ) : (
-            <EmptyOutput />
-          )}
-
-          {/* Timeline */}
-          <VideoTimeline
-            parts={parts}
-            segments={generation.segments}
-            totalDuration={totalDuration}
-          />
+          </div>
         </div>
       </main>
 
@@ -1376,7 +1354,7 @@ function KeyframesContent() {
           Keyframes доступны только на десктопе
         </p>
       </main>
-    </div>
+    </AppShell>
   );
 }
 

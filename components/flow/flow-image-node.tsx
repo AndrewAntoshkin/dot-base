@@ -6,7 +6,7 @@ import type { NodeProps, Node } from '@xyflow/react';
 import { ReactFlowNodeData, FlowNodeStatus } from '@/lib/flow/types';
 import { useFlowStore } from '@/lib/flow/store';
 import { cn } from '@/lib/utils';
-import { Loader2, ChevronDown, ImagePlus, RefreshCw, Expand, Download, FileImage, Play, Link, X } from 'lucide-react';
+import { Loader2, ChevronDown, ImagePlus, RefreshCw, Expand, Download, FileImage, Play, Link, X, Paintbrush, Maximize2, Pencil } from 'lucide-react';
 import Image from 'next/image';
 import { ImageFullscreenViewer } from '@/components/image-fullscreen-viewer';
 import { NodeAuthorBadge } from './node-author-badge';
@@ -134,7 +134,7 @@ const ASPECT_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'];
 const QUALITY_OPTIONS = ['4K', '2K', '1K'];
 
 function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeType>) {
-  const { selectNode, updateNodeData, runGeneration, flowId } = useFlowStore();
+  const { selectNode, updateNodeData, runGeneration, runEditAction, flowId } = useFlowStore();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -618,6 +618,22 @@ function FlowImageNodeComponent({ id, data, selected }: NodeProps<FlowImageNodeT
               title="Сгенерировать заново"
             >
               <RefreshCw className="w-4 h-4 text-white" />
+            </button>
+            <div className="w-px h-4 bg-[#2F2F2F]" />
+            <button
+              onClick={() => runEditAction(id, 'upscale', { modelId: 'google-upscaler', settings: { upscale_factor: 'x2' } })}
+              className="h-full px-3 hover:bg-[#2a2a2a] transition-colors flex items-center justify-center"
+              title="Улучшить качество"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 10L2 14H6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 6V2H10" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 2L9 7" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 14L7 9" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            <div className="w-px h-4 bg-[#2F2F2F]" />
+            <button
+              onClick={() => runEditAction(id, 'remove_bg', { modelId: 'bria-remove-background' })}
+              className="h-full px-3 hover:bg-[#2a2a2a] transition-colors flex items-center justify-center"
+              title="Удалить фон"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="white" strokeWidth="1.3"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="white" strokeWidth="1.3" strokeDasharray="2 2"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="white" strokeWidth="1.3" strokeDasharray="2 2"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="white" strokeWidth="1.3"/></svg>
             </button>
             <div className="w-px h-4 bg-[#2F2F2F]" />
             <button 

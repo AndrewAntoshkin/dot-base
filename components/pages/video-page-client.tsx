@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType } from '@/lib/models-lite';
@@ -407,25 +407,13 @@ function VideoContent() {
   const showStartScreen = false;
 
   return (
-    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
-      <Header />
-
-      {/* Desktop Layout - Independent scroll for each column */}
-      <main className="hidden lg:flex flex-1 min-h-0 gap-6">
-        {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0">
-          {/* Scrollable content area */}
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
-            {/* Header */}
-            <div className="mb-6 shrink-0 animate-fade-in-up">
-              <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-                INPUT
-              </h2>
-            </div>
-
-            {/* Form fields */}
-            <div className="flex flex-col gap-6">
-              {/* Action Selector - VIDEO MODE */}
+    <AppShell>
+      {/* Desktop Layout */}
+      <main className="hidden lg:flex flex-1 min-h-0 gap-6 pt-2 px-6">
+        {/* LEFT PANEL - Settings (400px fixed) */}
+        <div className="w-[400px] flex flex-col shrink-0">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-6">
+            <div className="flex flex-col gap-3">
               <div className="animate-fade-in-up animate-delay-100">
                 <ActionSelector
                   value={selectedAction}
@@ -437,7 +425,6 @@ function VideoContent() {
                 />
               </div>
 
-              {/* Model Selector */}
               <div className="animate-fade-in-up animate-delay-200">
                 <ModelSelector
                   action={selectedAction}
@@ -446,7 +433,6 @@ function VideoContent() {
                 />
               </div>
 
-              {/* Settings Form - только поля, без кнопок */}
               {selectedModelId && (
                 <div className="animate-fade-in-up animate-delay-300 pb-4">
                   <Suspense fallback={<div className="p-4 text-center text-[#959595]">Загрузка настроек...</div>}>
@@ -466,9 +452,8 @@ function VideoContent() {
             </div>
           </div>
 
-          {/* Fixed buttons at bottom of left panel (outside scroll area) */}
           {selectedModelId && (
-            <div className="shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
+            <div className="shrink-0 bg-[#101010] pt-4 pb-6">
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -484,21 +469,9 @@ function VideoContent() {
                 <button
                   type="button"
                   onClick={async () => {
-                    console.log('[Video Desktop] Click', { formRef: !!formRef.current, isGenerating });
-                    if (!formRef.current) {
-                      console.warn('[Video Desktop] formRef.current is null');
-                      return;
-                    }
-                    if (isGenerating) {
-                      console.warn('[Video Desktop] Already generating, ignoring click');
-                      return;
-                    }
+                    if (!formRef.current || isGenerating) return;
                     setIsGenerating(true);
-                    // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
-                    const safetyTimeout = setTimeout(() => {
-                      console.warn('[Video Desktop] Safety timeout triggered');
-                      setIsGenerating(false);
-                    }, 60000);
+                    const safetyTimeout = setTimeout(() => setIsGenerating(false), 60000);
                     try {
                       await formRef.current.submit();
                     } catch (error) {
@@ -506,7 +479,6 @@ function VideoContent() {
                     } finally {
                       clearTimeout(safetyTimeout);
                       setIsGenerating(false);
-                      console.log('[Video Desktop] Done');
                     }
                   }}
                   disabled={isGenerating}
@@ -519,36 +491,27 @@ function VideoContent() {
           )}
         </div>
 
-        {/* DIVIDER (64px включая отступы) */}
-        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
-          <div className="w-px h-full bg-[#2f2f2f]" />
-        </div>
-
-        {/* RIGHT PANEL - OUTPUT (independent scroll) */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pl-0 pr-20">
-          <div className="mb-6 animate-fade-in-up">
-            <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-              OUTPUT
-            </h2>
-          </div>
-
-          <div className="animate-fade-in-up animate-delay-200">
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center min-h-[400px] text-[#959595]">
-                  Загрузка результатов...
-                </div>
-              }
-            >
-              <OutputPanel
-                generationId={currentGenerationId}
-                onRegenerate={handleRegenerate}
-                sessionGenerations={sessionGenerations}
-                onSelectGeneration={handleSelectSessionGeneration}
-                onGenerationUpdate={updateSessionGeneration}
-                cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
-              />
-            </Suspense>
+        {/* RIGHT PANEL - Result */}
+        <div className="flex-1 min-h-0 flex flex-col pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide bg-[#050505] rounded-2xl p-6">
+            <div className="animate-fade-in-up animate-delay-200">
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center min-h-[400px] text-[#959595]">
+                    Загрузка результатов...
+                  </div>
+                }
+              >
+                <OutputPanel
+                  generationId={currentGenerationId}
+                  onRegenerate={handleRegenerate}
+                  sessionGenerations={sessionGenerations}
+                  onSelectGeneration={handleSelectSessionGeneration}
+                  onGenerationUpdate={updateSessionGeneration}
+                  cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
+                />
+              </Suspense>
+            </div>
           </div>
         </div>
       </main>
@@ -691,7 +654,7 @@ function VideoContent() {
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
 

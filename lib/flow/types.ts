@@ -2,7 +2,7 @@
  * Типы для Flow (визуального конструктора AI-пайплайнов)
  */
 
-export type FlowBlockType = 'text' | 'image' | 'video';
+export type FlowBlockType = 'text' | 'image' | 'video' | 'asset';
 
 export type FlowNodeStatus = 
   | 'idle'        // Ожидает ввода
@@ -48,6 +48,14 @@ export interface FlowNodeData {
   
   // UI state
   isSettingsOpen?: boolean;
+  
+  // Inline edit mode (for asset/image nodes)
+  editMode?: 'inpaint' | 'outpaint' | 'edit' | null;
+  editMaskDataUrl?: string;       // PNG data URL маски для inpaint
+  editPrompt?: string;            // Промпт для edit/inpaint/outpaint
+  editModelId?: string;           // Выбранная модель для действия
+  editAspectRatio?: string;       // Aspect ratio для outpaint
+  previousOutputUrl?: string;     // Для undo — предыдущее изображение
   
   // Автор ноды (для коллаборации)
   createdBy?: string;       // user_id автора

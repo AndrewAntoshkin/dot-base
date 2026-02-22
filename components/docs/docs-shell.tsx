@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { 
   Search, 
   ChevronRight, 
@@ -451,9 +451,7 @@ export function DocsShell({
   };
 
   return (
-    <div className="h-screen bg-[#101010] flex flex-col overflow-hidden">
-      <Header />
-
+    <AppShell>
       {/* Main Content Area — отступы как в хедере */}
       <div className="flex flex-1 min-h-0 px-4 lg:px-20">
         {/* Sidebar - collapsible */}
@@ -609,7 +607,7 @@ export function DocsShell({
         isOpen={feedbackModalOpen} 
         onClose={() => setFeedbackModalOpen(false)} 
       />
-    </div>
+    </AppShell>
   );
 }
 

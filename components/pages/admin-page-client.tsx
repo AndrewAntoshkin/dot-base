@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { 
   ChevronUp,
   ChevronDown,
@@ -686,9 +686,7 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#101010]">
-      <Header />
-      
+    <AppShell>
       <main className="px-4 lg:px-[80px] py-8">
         {/* Title + Create Button */}
         <div className="flex items-center justify-between mb-4">
@@ -1575,6 +1573,6 @@ export default function AdminPageClient({ userEmail }: AdminPageClientProps) {
           }}
         />
       )}
-    </div>
+    </AppShell>
   );
 }

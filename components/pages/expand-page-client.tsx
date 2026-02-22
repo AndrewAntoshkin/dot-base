@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { ModelSelector } from '@/components/model-selector';
 import { AspectRatioSelector } from '@/components/aspect-ratio-selector';
 import { Textarea } from '@/components/ui/textarea';
@@ -726,25 +726,13 @@ export function ExpandPageClient() {
   const handleRight = Math.min(100 - handleMargin, 50 + scaledImageWidth/2 + scaledExpandRight);
 
   return (
-    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
-      <Header />
-      
-      {/* Desktop Layout - Independent scroll for each column */}
-      <main className="hidden lg:flex flex-1 min-h-0 gap-6">
-        {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0">
-          {/* Scrollable content area */}
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
-            {/* Header */}
-            <div className="mb-6 shrink-0 animate-fade-in-up">
-              <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-                INPUT
-              </h2>
-            </div>
-
-            {/* Form fields */}
+    <AppShell>
+      {/* Desktop Layout */}
+      <main className="hidden lg:flex flex-1 min-h-0 gap-6 pt-2 px-6">
+        {/* LEFT PANEL - Settings (400px fixed) */}
+        <div className="w-[400px] flex flex-col shrink-0">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-6">
             <div className="flex flex-col gap-3">
-              {/* Модель */}
               <div className="animate-fade-in-up animate-delay-100">
                 <ModelSelector
                   action="expand"
@@ -753,7 +741,6 @@ export function ExpandPageClient() {
                 />
               </div>
               
-              {/* Изображение */}
               <div className="animate-fade-in-up animate-delay-200 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Изображение" icon={ImageIcon} />
                 <ImageUploadArea 
@@ -762,7 +749,6 @@ export function ExpandPageClient() {
                 />
               </div>
               
-              {/* Prompt */}
               <div className="animate-fade-in-up animate-delay-300 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Prompt" icon={Wand2} />
                 <Textarea
@@ -773,7 +759,6 @@ export function ExpandPageClient() {
                 />
               </div>
               
-              {/* Negative Prompt */}
               <div className="animate-fade-in-up animate-delay-400 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Negative Prompt" icon={Ban} />
                 <Textarea
@@ -784,10 +769,8 @@ export function ExpandPageClient() {
                 />
               </div>
               
-              {/* Настройки Outpainter (только если выбран) */}
               {selectedModel === 'outpainter' && (
                 <div className="animate-fade-in-up animate-delay-500 border border-[#252525] rounded-2xl p-4 flex flex-col gap-4">
-                  {/* Steps */}
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="font-inter font-medium text-[10px] text-[#959595] uppercase tracking-[0.15px]">
@@ -805,7 +788,6 @@ export function ExpandPageClient() {
                       className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
                     />
                   </div>
-                  {/* Guidance */}
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="font-inter font-medium text-[10px] text-[#959595] uppercase tracking-[0.15px]">
@@ -826,7 +808,6 @@ export function ExpandPageClient() {
                 </div>
               )}
               
-              {/* Формат (Aspect Ratio) */}
               <div className="animate-fade-in-up animate-delay-500 border border-[#252525] rounded-2xl p-4 flex flex-col gap-2">
                 <TooltipLabel label="Формат (Aspect Ratio)" />
                 <AspectRatioSelector
@@ -841,8 +822,7 @@ export function ExpandPageClient() {
             </div>
           </div>
 
-          {/* Fixed buttons at bottom (outside scroll area) */}
-          <div className="animate-fade-in-up animate-delay-500 shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
+          <div className="shrink-0 bg-[#101010] pt-4 pb-6">
             <div className="flex gap-3">
               {isCompleted ? (
                 <button
@@ -884,163 +864,130 @@ export function ExpandPageClient() {
           </div>
         </div>
 
-        {/* DIVIDER */}
-        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
-          <div className="w-px h-full bg-[#2f2f2f]" />
-        </div>
-
-        {/* RIGHT PANEL - OUTPUT (independent scroll) */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pl-0 pr-8 flex flex-col">
-          <div className="animate-fade-in-up flex items-center justify-between mb-6">
-            <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-              OUTPUT
-            </h2>
-          </div>
-
-          {/* Show OutputPanel only when generation is completed, show canvas with shimmer during generation */}
-          {isCompleted && currentGenerationId ? (
-            <div className="animate-fade-in-up animate-delay-200 flex-1">
-              <OutputPanel generationId={currentGenerationId} />
-            </div>
-          ) : (
-          /* Canvas Container - fills remaining space with 32px bottom padding */
-          <div className="animate-fade-in-up animate-delay-200 flex-1 pb-8 flex items-start justify-start">
-            {/* Canvas Area - square, max size that fits, with padding for handles */}
-            <div 
-              ref={canvasRef}
-              style={{ 
-                width: 'min(100%, calc(100vh - 200px))', 
-                aspectRatio: '1/1',
-                backgroundImage: image ? 'radial-gradient(circle, #2a2a2a 1px, transparent 1px)' : 'none',
-                backgroundSize: '20px 20px',
-              }}
-              className={`relative rounded-2xl border transition-colors bg-[#101010] overflow-visible ${
-                isDraggingCanvas ? 'border-white/50' : 'border-[#2f2f2f]'
-              }`}
-            onDrop={handleDropCanvas}
-            onDragOver={(e) => { e.preventDefault(); setIsDraggingCanvas(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setIsDraggingCanvas(false); }}
-            onClick={() => !image && fileInputRef.current?.click()}
-          >
-            {!image ? (
-              /* Empty state */
-              <div className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
-                <ImagePlus className="w-12 h-12 text-[#656565] mb-4" strokeWidth={1.5} />
-                <p className="font-inter text-sm text-white text-center mb-2">
-                  Перетащите или выберите на устройстве
-                </p>
-                <p className="font-inter text-xs text-[#959595] text-center">
-                  PNG, JPG, WEBP
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(file);
-                  }}
-                />
+        {/* RIGHT PANEL - Result */}
+        <div className="flex-1 min-h-0 flex flex-col pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide bg-[#050505] rounded-2xl p-6 flex flex-col">
+            {isCompleted && currentGenerationId ? (
+              <div className="animate-fade-in-up animate-delay-200 flex-1">
+                <OutputPanel generationId={currentGenerationId} />
               </div>
             ) : (
-              /* Image loaded - interactive canvas */
-              <>
-                {/* Blue guide lines at expansion boundaries */}
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Vertical lines at left/right handles - extend full height */}
-                  <div className="absolute w-px bg-[#4D7CFC] h-full" style={{ left: `${handleLeft}%` }} />
-                  <div className="absolute w-px bg-[#4D7CFC] h-full" style={{ left: `${handleRight}%` }} />
-                  
-                  {/* Horizontal lines at top/bottom handles - extend full width */}
-                  <div className="absolute h-px bg-[#4D7CFC] w-full" style={{ top: `${handleTop}%` }} />
-                  <div className="absolute h-px bg-[#4D7CFC] w-full" style={{ top: `${handleBottom}%` }} />
-                </div>
-                
-                {/* Expanded area background - single dark rectangle that shows the total generation zone */}
-                {hasExpand && (
-                  <div 
-                    className={`absolute pointer-events-none z-0 overflow-hidden ${
-                      (isCreating || isGenerating) ? 'bg-[#1a1a1a]' : 'bg-[#212121]'
-                    }`}
-                    style={{
-                      top: `${handleTop}%`,
-                      left: `${handleLeft}%`,
-                      right: `${100 - handleRight}%`,
-                      bottom: `${100 - handleBottom}%`,
-                    }}
-                  >
-                    {/* Shimmer effect during generation */}
-                    {(isCreating || isGenerating) && (
-                      <div 
-                        className="absolute inset-0"
-                        style={{
-                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)',
-                          backgroundSize: '200% 100%',
-                          animation: 'shimmer-move 2s ease-in-out infinite',
+              <div className="animate-fade-in-up animate-delay-200 flex-1 flex items-start justify-start">
+                <div 
+                  ref={canvasRef}
+                  style={{ 
+                    width: 'min(100%, calc(100vh - 200px))', 
+                    aspectRatio: '1/1',
+                    backgroundImage: image ? 'radial-gradient(circle, #2a2a2a 1px, transparent 1px)' : 'none',
+                    backgroundSize: '20px 20px',
+                  }}
+                  className={`relative rounded-2xl border transition-colors bg-[#101010] overflow-visible ${
+                    isDraggingCanvas ? 'border-white/50' : 'border-[#2f2f2f]'
+                  }`}
+                  onDrop={handleDropCanvas}
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingCanvas(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); setIsDraggingCanvas(false); }}
+                  onClick={() => !image && fileInputRef.current?.click()}
+                >
+                  {!image ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer">
+                      <ImagePlus className="w-12 h-12 text-[#656565] mb-4" strokeWidth={1.5} />
+                      <p className="font-inter text-sm text-white text-center mb-2">
+                        Перетащите или выберите на устройстве
+                      </p>
+                      <p className="font-inter text-xs text-[#959595] text-center">
+                        PNG, JPG, WEBP
+                      </p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file);
                         }}
                       />
-                    )}
-                  </div>
-                )}
-                
-                {/* Original image - в центре, z-10 чтобы быть ниже handles (z-30) */}
-                <div 
-                  className="absolute flex items-center justify-center z-10 pointer-events-none"
-                  style={{
-                    top: `${50 - scaledImageHeight/2}%`,
-                    left: `${50 - scaledImageWidth/2}%`,
-                    width: `${scaledImageWidth}%`,
-                    height: `${scaledImageHeight}%`,
-                  }}
-                >
-                  <img
-                    src={image}
-                    alt="Original"
-                    className="w-full h-full object-cover"
-                  />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute w-px bg-[#4D7CFC] h-full" style={{ left: `${handleLeft}%` }} />
+                        <div className="absolute w-px bg-[#4D7CFC] h-full" style={{ left: `${handleRight}%` }} />
+                        <div className="absolute h-px bg-[#4D7CFC] w-full" style={{ top: `${handleTop}%` }} />
+                        <div className="absolute h-px bg-[#4D7CFC] w-full" style={{ top: `${handleBottom}%` }} />
+                      </div>
+                      
+                      {hasExpand && (
+                        <div 
+                          className={`absolute pointer-events-none z-0 overflow-hidden ${
+                            (isCreating || isGenerating) ? 'bg-[#1a1a1a]' : 'bg-[#212121]'
+                          }`}
+                          style={{
+                            top: `${handleTop}%`,
+                            left: `${handleLeft}%`,
+                            right: `${100 - handleRight}%`,
+                            bottom: `${100 - handleBottom}%`,
+                          }}
+                        >
+                          {(isCreating || isGenerating) && (
+                            <div 
+                              className="absolute inset-0"
+                              style={{
+                                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmer-move 2s ease-in-out infinite',
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
+                      
+                      <div 
+                        className="absolute flex items-center justify-center z-10 pointer-events-none"
+                        style={{
+                          top: `${50 - scaledImageHeight/2}%`,
+                          left: `${50 - scaledImageWidth/2}%`,
+                          width: `${scaledImageWidth}%`,
+                          height: `${scaledImageHeight}%`,
+                        }}
+                      >
+                        <img src={image} alt="Original" className="w-full h-full object-cover" />
+                      </div>
+                      
+                      <div
+                        onMouseDown={(e) => handleMouseDown('top-left', e)}
+                        className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nwse-resize z-50 hover:scale-125 transition-transform"
+                        style={{ top: `${handleTop}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
+                      />
+                      <div
+                        onMouseDown={(e) => handleMouseDown('top-right', e)}
+                        className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nesw-resize z-50 hover:scale-125 transition-transform"
+                        style={{ top: `${handleTop}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
+                      />
+                      <div
+                        onMouseDown={(e) => handleMouseDown('bottom-left', e)}
+                        className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nesw-resize z-50 hover:scale-125 transition-transform"
+                        style={{ top: `${handleBottom}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
+                      />
+                      <div
+                        onMouseDown={(e) => handleMouseDown('bottom-right', e)}
+                        className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nwse-resize z-50 hover:scale-125 transition-transform"
+                        style={{ top: `${handleBottom}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
+                      />
+                      
+                      <button
+                        onClick={handleRemoveImage}
+                        className="absolute top-4 right-4 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-lg flex items-center justify-center z-40 transition-colors"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </>
+                  )}
                 </div>
-                
-                {/* Corner handles only - square with blue border like Figma */}
-                <>
-                    {/* Top-Left corner */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('top-left', e)}
-                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nwse-resize z-50 hover:scale-125 transition-transform"
-                      style={{ top: `${handleTop}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                    {/* Top-Right corner */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('top-right', e)}
-                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nesw-resize z-50 hover:scale-125 transition-transform"
-                      style={{ top: `${handleTop}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                    {/* Bottom-Left corner */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('bottom-left', e)}
-                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nesw-resize z-50 hover:scale-125 transition-transform"
-                      style={{ top: `${handleBottom}%`, left: `${handleLeft}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                    {/* Bottom-Right corner */}
-                    <div
-                      onMouseDown={(e) => handleMouseDown('bottom-right', e)}
-                      className="absolute w-3 h-3 bg-white border border-[#4D7CFC] rounded-sm cursor-nwse-resize z-50 hover:scale-125 transition-transform"
-                      style={{ top: `${handleBottom}%`, left: `${handleRight}%`, transform: 'translate(-50%, -50%)' }}
-                    />
-                  </>
-                
-                {/* Remove image button */}
-                <button
-                  onClick={handleRemoveImage}
-                  className="absolute top-4 right-4 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-lg flex items-center justify-center z-40 transition-colors"
-                >
-                  <X className="w-4 h-4 text-white" />
-                </button>
-              </>
+              </div>
             )}
-            </div>
           </div>
-          )}
         </div>
       </main>
 
@@ -1048,6 +995,6 @@ export function ExpandPageClient() {
       <main className="flex lg:hidden flex-1 flex-col p-4">
         <p className="text-white text-center py-20">Используйте десктоп для работы с Expand</p>
       </main>
-    </div>
+    </AppShell>
   );
 }

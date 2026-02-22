@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { Loader2, Download, Play, Trash2, Type, RefreshCw, Heart, LinkIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, Check } from 'lucide-react';
 import { OnlyMineToggle } from '@/components/only-mine-toggle';
 
@@ -653,9 +653,7 @@ export default function HistoryPageClient() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#101010]">
-      <Header />
-
+    <AppShell>
       <main className="flex-1 px-4 lg:px-[80px] py-6">
         {/* Заголовок с workspace */}
         <div className="flex flex-col gap-1 mb-4">
@@ -1104,6 +1102,6 @@ export default function HistoryPageClient() {
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }

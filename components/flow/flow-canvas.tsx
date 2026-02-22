@@ -15,6 +15,7 @@ import { useFlowStore } from '@/lib/flow/store';
 import { FlowTextNode } from './flow-text-node';
 import { FlowImageNode } from './flow-image-node';
 import { FlowVideoNode } from './flow-video-node';
+import { FlowAssetNode } from './flow-asset-node';
 import { FlowEdge } from './flow-edge';
 import { FlowBlockModal } from './flow-block-modal';
 import { FlowSaveModal } from './flow-save-modal';
@@ -43,6 +44,7 @@ const nodeTypes = {
   'flow-text': FlowTextNode,
   'flow-image': FlowImageNode,
   'flow-video': FlowVideoNode,
+  'flow-asset': FlowAssetNode,
 } as const;
 
 // Регистрация типов связей
@@ -119,12 +121,17 @@ function FlowCanvasInner() {
     setStoreViewport(newViewport);
   }, [getViewport, setStoreViewport]);
 
-  // Восстановление viewport при загрузке
+  // Fit all nodes into view when a flow is loaded
   useEffect(() => {
-    if (viewport.x !== 0 || viewport.y !== 0 || viewport.zoom !== 1) {
-      setViewport(viewport);
+    if (flowId && nodes.length > 0) {
+      // Small delay to ensure React Flow has rendered nodes
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.2, duration: 300 });
+      }, 150);
+      return () => clearTimeout(timer);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowId]);
 
   // Polling для обновления статуса нодов с активными генерациями
   useEffect(() => {

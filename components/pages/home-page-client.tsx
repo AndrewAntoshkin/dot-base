@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense, lazy, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType } from '@/lib/models-lite';
@@ -13,6 +13,8 @@ import { useUser } from '@/contexts/user-context';
 import { fetchWithTimeout, isSlowConnection } from '@/lib/network-utils';
 import type { SettingsFormRef } from '@/components/settings-form';
 import type { SessionGeneration } from '@/components/recent-generations';
+import WorkspacesContent from '@/components/workspaces-content';
+import ProjectsContent from '@/components/projects-content';
 
 // Ленивая загрузка тяжёлых компонентов
 const SettingsForm = lazy(() =>
@@ -27,7 +29,7 @@ const isVideoAction = (action: string): boolean => {
   return action.startsWith('video_');
 };
 
-function HomeContent() {
+function HomeContent({ isAdmin: isAdminProp }: { isAdmin?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const generationIdParam = searchParams.get('generationId');
@@ -389,23 +391,13 @@ function HomeContent() {
   const showStartScreen = false;
 
   return (
-    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
-      <Header />
-
+    <AppShell>
       {/* Desktop Layout */}
-      <main className="hidden lg:flex flex-1 min-h-0 gap-6">
-        {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0">
+      <main className="hidden lg:flex flex-1 min-h-0 gap-6 pt-2 px-6">
+        {/* LEFT PANEL - Settings (400px fixed) */}
+        <div className="w-[400px] flex flex-col shrink-0">
           {/* Scrollable content area */}
-          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
-            {/* Header */}
-            <div className="mb-6 shrink-0 animate-fade-in-up">
-              <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-                INPUT
-              </h2>
-            </div>
-
-            {/* Form fields */}
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-6">
             <div className="flex flex-col gap-3">
               <div className="animate-fade-in-up animate-delay-100">
                 <ActionSelector
@@ -446,7 +438,7 @@ function HomeContent() {
 
           {/* Fixed buttons at bottom */}
           {selectedModelId && (
-            <div className="shrink-0 bg-[#101010] pt-4 pb-8 border-t border-[#1f1f1f] pr-4">
+            <div className="shrink-0 bg-[#101010] pt-4 pb-6">
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -472,7 +464,6 @@ function HomeContent() {
                       return;
                     }
                     setIsGenerating(true);
-                    // Safety timeout - сбрасываем через 60 сек если что-то пошло не так
                     const safetyTimeout = setTimeout(() => {
                       console.warn('[Generate Desktop] Safety timeout triggered');
                       setIsGenerating(false);
@@ -495,36 +486,27 @@ function HomeContent() {
           )}
         </div>
 
-        {/* DIVIDER */}
-        <div className="flex items-center justify-center shrink-0" style={{ width: '64px' }}>
-          <div className="w-px h-full bg-[#2f2f2f]" />
-        </div>
-
-        {/* RIGHT PANEL - OUTPUT */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pl-0 pr-20">
-          <div className="mb-6 animate-fade-in-up">
-            <h2 className="font-inter font-medium text-sm text-[#959595] uppercase tracking-wide">
-              OUTPUT
-            </h2>
-          </div>
-
-          <div className="animate-fade-in-up animate-delay-200">
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center min-h-[400px] text-[#959595]">
-                  Загрузка результатов...
-                </div>
-              }
-            >
-              <OutputPanel
-                generationId={currentGenerationId}
-                onRegenerate={handleRegenerate}
-                sessionGenerations={sessionGenerations}
-                onSelectGeneration={handleSelectSessionGeneration}
-                onGenerationUpdate={updateSessionGeneration}
-                cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
-              />
-            </Suspense>
+        {/* RIGHT PANEL - Result */}
+        <div className="flex-1 min-h-0 flex flex-col pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide bg-[#050505] rounded-2xl p-6">
+            <div className="animate-fade-in-up animate-delay-200">
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center min-h-[400px] text-[#959595]">
+                    Загрузка результатов...
+                  </div>
+                }
+              >
+                <OutputPanel
+                  generationId={currentGenerationId}
+                  onRegenerate={handleRegenerate}
+                  sessionGenerations={sessionGenerations}
+                  onSelectGeneration={handleSelectSessionGeneration}
+                  onGenerationUpdate={updateSessionGeneration}
+                  cachedGeneration={sessionGenerations.find(g => g.id === currentGenerationId) || null}
+                />
+              </Suspense>
+            </div>
           </div>
         </div>
       </main>
@@ -654,14 +636,29 @@ function HomeContent() {
           </div>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
 
-export default function HomePage() {
+export default function HomePage({ isAdmin: isAdminProp }: { isAdmin?: boolean }) {
+  const { isAdmin: isAdminContext } = useUser();
+  const isAdmin = isAdminProp ?? isAdminContext;
+
+  if (isAdmin) {
+    return (
+      <AppShell>
+        <main className="flex-1 px-4 lg:px-[80px] py-6">
+          <WorkspacesContent showHeader={true} />
+        </main>
+      </AppShell>
+    );
+  }
+
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#101010] text-white">Загрузка...</div>}>
-      <HomeContent />
-    </Suspense>
+    <AppShell>
+      <main className="flex-1 px-4 lg:px-[80px] py-6">
+        <ProjectsContent />
+      </main>
+    </AppShell>
   );
 }

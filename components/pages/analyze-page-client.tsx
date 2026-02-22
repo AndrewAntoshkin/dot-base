@@ -4,7 +4,7 @@ import { useState, useRef, Suspense, useEffect, lazy } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ActionSelector } from '@/components/action-selector';
 import { ModelSelector } from '@/components/model-selector';
-import { Header } from '@/components/header';
+import { AppShell } from '@/components/app-shell';
 import { MobileTabSwitcher } from '@/components/mobile-tab-switcher';
 import { MobileStartScreen } from '@/components/mobile-start-screen';
 import { ActionType } from '@/lib/models-lite';
@@ -160,13 +160,11 @@ function AnalyzeContent() {
   const showStartScreen = false;
 
   return (
-    <div className="h-screen flex flex-col bg-[#101010] overflow-hidden">
-      <Header />
-
+    <AppShell>
       {/* Desktop Layout - Independent scroll for each column */}
       <main className="hidden lg:flex flex-1 min-h-0 gap-6">
         {/* LEFT PANEL - INPUT (480px fixed) */}
-        <div className="w-[480px] flex flex-col pl-20 pr-0">
+        <div className="w-[480px] flex flex-col pl-6 pr-0">
           {/* Scrollable content area */}
           <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide py-8 pr-4">
             {/* Header */}
@@ -425,7 +423,7 @@ function AnalyzeContent() {
           </>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
 
