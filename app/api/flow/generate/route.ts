@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { ReplicateClient } from '@/lib/replicate/client';
+import { ReplicateClient, getReplicateInstance } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
-import Replicate from 'replicate';
 
 interface GenerateRequest {
   nodeId: string;
@@ -312,7 +311,7 @@ export async function POST(request: NextRequest) {
           .from('flow_nodes')
           .update({ 
             status: 'failed',
-            error_message: 'Ошибка генерации',
+            error_message: 'Generation failed',
           })
           .eq('id', nodeId);
       }
@@ -351,7 +350,7 @@ async function handleTextGeneration(
       return NextResponse.json({ error: 'No API token available' }, { status: 500 });
     }
 
-    const replicate = new Replicate({ auth: token });
+    const replicate = getReplicateInstance(token);
 
     // Check if we have media to analyze or source text to process
     const hasImages = images && images.length > 0;
@@ -431,16 +430,16 @@ async function handleTextGeneration(
     console.error('Text generation error:', error);
     
     // Более понятные сообщения об ошибках
-    let errorMessage = 'Ошибка генерации текста';
+    let errorMessage = 'Text generation failed';
     if (error?.message) {
       if (error.message.includes('E001') || error.message.includes('Prediction failed')) {
-        errorMessage = 'Сервис временно недоступен. Попробуйте через несколько секунд';
+        errorMessage = 'Service temporarily unavailable. Try again in a few seconds';
       } else if (error.message.includes('timeout')) {
-        errorMessage = 'Превышено время ожидания. Попробуйте ещё раз';
+        errorMessage = 'Request timed out. Please try again';
       } else if (error.message.includes('rate limit') || error.message.includes('429')) {
-        errorMessage = 'Слишком много запросов. Подождите немного';
+        errorMessage = 'Too many requests. Please wait';
       } else if (error.message.includes('invalid') || error.message.includes('validation')) {
-        errorMessage = 'Некорректные параметры запроса';
+        errorMessage = 'Invalid request parameters';
       }
     }
     

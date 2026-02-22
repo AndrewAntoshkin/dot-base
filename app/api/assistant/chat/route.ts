@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import Replicate from 'replicate';
+import { getReplicateInstance } from '@/lib/replicate/client';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 // Детальная база знаний о моделях с рекомендациями
 const MODELS_KNOWLEDGE = `
@@ -203,7 +204,7 @@ ${MODELS_KNOWLEDGE}
 - Будь конкретным и практичным
 - Если пользователь хочет текст на картинке - ВСЕГДА рекомендуй Ideogram v3`;
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     console.log('[Assistant] Starting request...');
     
@@ -243,7 +244,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No API token available' }, { status: 500 });
     }
 
-    const replicate = new Replicate({ auth: token });
+    const replicate = getReplicateInstance(token);
 
     // Build prompt for Gemini
     let prompt = '';
@@ -339,7 +340,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Assistant chat error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       { error: 'Ошибка при обработке запроса', details: errorMessage },
@@ -347,3 +347,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'google' });

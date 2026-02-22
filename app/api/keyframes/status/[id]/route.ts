@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,7 +85,7 @@ async function checkAndSyncReplicateStatus(
   return generation;
 }
 
-export async function GET(
+async function getHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -282,7 +283,6 @@ export async function GET(
     });
 
   } catch (error: any) {
-    logger.error('Keyframes status error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -290,8 +290,6 @@ export async function GET(
   }
 }
 
-
-
-
+export const GET = withApiLogging(getHandler);
 
 

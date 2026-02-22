@@ -75,7 +75,7 @@ export async function POST() {
             await (supabase.from('generations') as any)
               .update({
                 status: 'failed',
-                error_message: 'Превышено время ожидания. Попробуйте снова.',
+                error_message: 'Generation timed out. Please try again.',
                 completed_at: new Date().toISOString(),
               })
               .eq('id', gen.id);
@@ -86,7 +86,7 @@ export async function POST() {
           await (supabase.from('generations') as any)
             .update({
               status: 'failed',
-              error_message: 'Генерация не была запущена. Попробуйте снова.',
+              error_message: 'Generation was not started. Please try again.',
               completed_at: new Date().toISOString(),
             })
             .eq('id', gen.id);
@@ -97,7 +97,7 @@ export async function POST() {
         await (supabase.from('generations') as any)
           .update({
             status: 'failed',
-            error_message: 'Ошибка синхронизации. Попробуйте снова.',
+            error_message: 'Sync error. Please try again.',
             completed_at: new Date().toISOString(),
           })
           .eq('id', gen.id);

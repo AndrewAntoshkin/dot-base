@@ -1,6 +1,7 @@
 /**
- * Простой logger с поддержкой уровней логирования
- * В production показывает только warn и error
+ * Logger with level support.
+ * In production only warn and error go to console.
+ * All levels are available but debug/info are suppressed in prod.
  */
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -11,24 +12,28 @@ export const logger = {
       console.log('[DEBUG]', ...args);
     }
   },
-  
+
   info: (...args: any[]) => {
     if (isDev) {
       console.log('[INFO]', ...args);
     }
   },
-  
+
   warn: (...args: any[]) => {
-    console.warn('[WARN]', ...args);
+    if (isDev) {
+      console.warn('[WARN]', ...args);
+    }
   },
-  
+
   error: (...args: any[]) => {
-    console.error('[ERROR]', ...args);
+    if (isDev) {
+      console.error('[ERROR]', ...args);
+    }
   },
-  
-  // Для важных событий которые нужны и в production
-  log: (...args: any[]) => {
-    console.log(...args);
+
+  /** For critical messages that must always appear in PM2 logs */
+  critical: (...args: any[]) => {
+    console.error('[CRITICAL]', ...args);
   },
 };
 

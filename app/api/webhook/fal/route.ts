@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 interface GenerationRecord {
   id: string;
@@ -41,27 +42,27 @@ async function withRetry<T>(
 
 function getUserFriendlyErrorMessage(error: string | null | undefined): string {
   const errorLower = (error || '').toLowerCase();
-  
+
   if (errorLower.includes('nsfw') || errorLower.includes('safety')) {
-    return 'Контент заблокирован фильтром безопасности. Попробуйте изменить промпт';
+    return 'Content blocked by safety filter. Try changing your prompt';
   }
   if (errorLower.includes('timeout')) {
-    return 'Превышено время генерации. Попробуйте уменьшить разрешение';
+    return 'Generation timed out. Try reducing resolution';
   }
   if (errorLower.includes('memory') || errorLower.includes('oom')) {
-    return 'Недостаточно ресурсов. Попробуйте уменьшить разрешение';
+    return 'Not enough resources. Try reducing resolution';
   }
   if (errorLower.includes('overload') || errorLower.includes('rate limit')) {
-    return 'Сервер перегружен. Попробуйте через несколько минут';
+    return 'Server overloaded. Try again in a few minutes';
   }
   if (errorLower.includes('invalid') || errorLower.includes('validation')) {
-    return 'Некорректные параметры. Проверьте настройки';
+    return 'Invalid parameters. Check your settings';
   }
   if (!error || error === '' || error === 'null') {
-    return 'Генерация не удалась. Попробуйте другую модель';
+    return 'Generation failed. Try a different model';
   }
   if (error.length > 150 || error.includes('stack') || error.includes('Error:')) {
-    return 'Произошла ошибка. Попробуйте снова';
+    return 'An error occurred. Please try again';
   }
   return error;
 }
@@ -97,10 +98,10 @@ function isMediaUrl(value: string): boolean {
  * Fal.ai Webhook Handler
  * Handles completion callbacks from fal.ai
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Fal.ai webhook payload structure
     const { request_id: requestId, status, payload, error } = body;
 
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
       if (mediaUrls.length === 0) {
         logger.error('[Fal Webhook] No media URLs found in payload:', JSON.stringify(payload));
         updateData.status = 'failed';
-        updateData.error_message = 'Не удалось получить результат генерации';
+        updateData.error_message = 'Failed to extract generation output';
       } else {
         logger.info('[Fal Webhook] Generation completed, saving media:', generation.id);
         
@@ -223,7 +224,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (status === 'FAILED' || error) {
       updateData.status = 'failed';
-      updateData.error_message = getUserFriendlyErrorMessage(error || 'Генерация не удалась');
+      updateData.error_message = getUserFriendlyErrorMessage(error || 'Generation failed');
       
       logger.error('[Fal Webhook] Generation failed:', generation.id, error);
     }
@@ -243,8 +244,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    logger.error('[Fal Webhook] Error:', error.message);
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
 
+export const POST = withApiLogging(postHandler, { provider: 'fal' });

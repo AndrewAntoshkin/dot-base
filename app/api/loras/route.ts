@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 import archiver from 'archiver';
 import { getTrainerById, getRecommendedTrainer, getLoraTypeById } from '@/lib/lora-trainers-config';
 
@@ -117,7 +118,7 @@ async function createZipFromImages(
 }
 
 // GET /api/loras - Get user's LoRA models
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -173,13 +174,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ loras: lorasWithImages || [] });
   } catch (error) {
-    logger.error('GET /api/loras error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
 
 // POST /api/loras - Create new LoRA and start training
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -574,8 +574,10 @@ export async function POST(request: NextRequest) {
       message: 'LoRA создана и обучение запущено',
     });
   } catch (error) {
-    logger.error('POST /api/loras error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
+
+export const GET = withApiLogging(getHandler, { provider: 'replicate' });
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });
 

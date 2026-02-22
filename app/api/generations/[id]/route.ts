@@ -332,14 +332,14 @@ export async function GET(
             await (supabase.from('generations') as any)
               .update({
                 status: 'failed',
-                error_message: 'Контент заблокирован фильтром безопасности',
+                error_message: 'Content blocked by safety filter',
                 replicate_output: status,
                 completed_at: new Date().toISOString(),
               })
               .eq('id', id);
 
             generation.status = 'failed';
-            generation.error_message = 'Контент заблокирован фильтром безопасности';
+            generation.error_message = 'Content blocked by safety filter';
           }
           // If queued or in_progress - do nothing, generation is still processing
         } else {
@@ -436,20 +436,13 @@ export async function GET(
               (generation as any).output_thumbs = outputThumbs;
             }
           } else if (prediction.status === 'failed') {
-            // Логируем оригинальную ошибку для отладки
-            console.error('=== REPLICATE PREDICTION FAILED ===');
-            console.error('Prediction ID:', generation.replicate_prediction_id);
-            console.error('Error:', prediction.error);
-            console.error('Full prediction:', JSON.stringify(prediction, null, 2));
-            
-            // Очищаем ошибку от технических деталей
-            let cleanError = 'Генерация не удалась. Попробуйте изменить параметры';
+            let cleanError = 'Generation failed. Try changing parameters';
             if (prediction.error) {
               const errorLower = prediction.error.toLowerCase();
               if (errorLower.includes('nsfw') || errorLower.includes('safety') || errorLower.includes('blocked')) {
-                cleanError = 'Контент заблокирован фильтром безопасности';
+                cleanError = 'Content blocked by safety filter';
               } else if (errorLower.includes('timeout')) {
-                cleanError = 'Превышено время генерации';
+                cleanError = 'Generation timed out';
               }
             }
             
@@ -479,7 +472,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Get generation error:', error);
     return NextResponse.json(
-      { error: 'Ошибка при получении данных' },
+      { error: 'Failed to fetch data' },
       { status: 500 }
     );
   }

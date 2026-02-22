@@ -43,115 +43,110 @@ export async function POST(request: Request) {
     const dryRun = body.dryRun || false;
     
     const supabase = createServiceRoleClient();
+    const BATCH_SIZE = 1000;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 
-    // 1. Получить ВСЕ генерации
-    const { data: allGenerations, error: fetchError } = await supabase
+    // 1. Сначала узнаём общее количество
+    const { count: totalCount, error: countError } = await supabase
       .from('generations')
-      .select('id, model_name, created_at, output_urls, input_image_url')
-      .order('created_at', { ascending: false });
+      .select('id', { count: 'exact', head: true });
 
-    if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    if (countError) {
+      return NextResponse.json({ error: countError.message }, { status: 500 });
     }
 
-    if (!allGenerations || allGenerations.length === 0) {
-      return NextResponse.json({ 
+    if (!totalCount || totalCount === 0) {
+      return NextResponse.json({
         message: 'No generations to cleanup',
         deleted: { records: 0, files: 0 },
         remaining: 0
       });
     }
 
-    // 2. Определяем что удалять
-    const toKeep: Generation[] = allGenerations.slice(0, keepLatest);
-    const toDelete: Generation[] = allGenerations.slice(keepLatest);
-
-    if (toDelete.length === 0) {
-      return NextResponse.json({ 
+    if (totalCount <= keepLatest) {
+      return NextResponse.json({
         message: 'No generations to delete',
         deleted: { records: 0, files: 0 },
-        remaining: allGenerations.length
+        remaining: totalCount
       });
     }
 
-    // 3. Собираем файлы для удаления
-    const filesToDelete: string[] = [];
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    
-    for (const gen of toDelete) {
-      if (gen.output_urls && Array.isArray(gen.output_urls)) {
-        for (const url of gen.output_urls) {
-          const fileName = extractFileName(url);
-          if (fileName) {
-            filesToDelete.push(fileName);
-          }
-        }
-      }
-      
-      if (gen.input_image_url && gen.input_image_url.includes(supabaseUrl)) {
-        const fileName = extractFileName(gen.input_image_url);
-        if (fileName) {
-          filesToDelete.push(fileName);
-        }
-      }
-    }
+    // Dry run — считаем сколько будет удалено без загрузки всех данных
+    const toDeleteCount = totalCount - keepLatest;
 
-    // Dry run - только показываем что будет удалено
     if (dryRun) {
       return NextResponse.json({
         dryRun: true,
         message: 'Dry run - nothing deleted',
         wouldDelete: {
-          records: toDelete.length,
-          files: filesToDelete.length
+          records: toDeleteCount,
         },
-        remaining: toKeep.length,
-        toDeleteIds: toDelete.slice(0, 10).map(g => g.id), // первые 10 ID для проверки
+        remaining: keepLatest,
       });
     }
 
-    // 4. Удаляем файлы из Storage
-    let deletedFiles = 0;
-    if (filesToDelete.length > 0) {
-      const batchSize = 100;
-      
-      for (let i = 0; i < filesToDelete.length; i += batchSize) {
-        const batch = filesToDelete.slice(i, i + batchSize);
-        
-        const { error: storageError } = await supabase.storage
-          .from('generations')
-          .remove(batch);
-        
-        if (!storageError) {
-          deletedFiles += batch.length;
+    // 2. Обрабатываем батчами: загружаем по BATCH_SIZE старых записей и удаляем
+    let totalDeletedRecords = 0;
+    let totalDeletedFiles = 0;
+
+    while (totalDeletedRecords < toDeleteCount) {
+      // Загружаем батч самых старых записей (ascending order — самые старые первыми)
+      const { data: batchData, error: fetchError } = await (supabase
+        .from('generations') as any)
+        .select('id, output_urls, input_image_url')
+        .order('created_at', { ascending: true })
+        .range(0, BATCH_SIZE - 1);
+
+      const batch = batchData as Generation[] | null;
+      if (fetchError || !batch || batch.length === 0) break;
+
+      // Собираем файлы для удаления из этого батча
+      const filesToDelete: string[] = [];
+      for (const gen of batch) {
+        if (gen.output_urls && Array.isArray(gen.output_urls)) {
+          for (const url of gen.output_urls) {
+            const fileName = extractFileName(url);
+            if (fileName) filesToDelete.push(fileName);
+          }
+        }
+        if (gen.input_image_url && gen.input_image_url.includes(supabaseUrl)) {
+          const fileName = extractFileName(gen.input_image_url);
+          if (fileName) filesToDelete.push(fileName);
         }
       }
-    }
 
-    // 5. Удаляем записи из БД
-    const idsToDelete = toDelete.map(g => g.id);
-    
-    const { error: deleteError } = await supabase
-      .from('generations')
-      .delete()
-      .in('id', idsToDelete);
+      // Удаляем файлы из Storage батчами по 100
+      for (let i = 0; i < filesToDelete.length; i += 100) {
+        const storageBatch = filesToDelete.slice(i, i + 100);
+        const { error: storageError } = await supabase.storage
+          .from('generations')
+          .remove(storageBatch);
+        if (!storageError) totalDeletedFiles += storageBatch.length;
+      }
 
-    if (deleteError) {
-      return NextResponse.json({ 
-        error: 'Failed to delete records',
-        details: deleteError.message,
-        filesDeleted: deletedFiles
-      }, { status: 500 });
+      // Удаляем записи из БД
+      const idsToDelete = batch.map(g => g.id);
+      const { error: deleteError } = await supabase
+        .from('generations')
+        .delete()
+        .in('id', idsToDelete);
+
+      if (deleteError) break;
+
+      totalDeletedRecords += batch.length;
+
+      // Проверка: не удаляем больше, чем нужно
+      if (totalDeletedRecords >= toDeleteCount) break;
     }
 
     return NextResponse.json({
       success: true,
       message: `Cleanup completed`,
       deleted: {
-        records: toDelete.length,
-        files: deletedFiles
+        records: totalDeletedRecords,
+        files: totalDeletedFiles
       },
-      remaining: toKeep.length
+      remaining: totalCount - totalDeletedRecords
     });
 
   } catch (error) {
@@ -180,46 +175,40 @@ export async function GET() {
 
     const supabase = createServiceRoleClient();
 
-    // Получить все генерации
-    const { data: generationsData, error: generationsError } = await supabase
+    // Считаем общее количество через count (не загружаем все записи)
+    const { count: totalGenerations, error: countError } = await supabase
       .from('generations')
-      .select('id, created_at, output_urls')
-      .order('created_at', { ascending: false });
+      .select('id', { count: 'exact', head: true });
 
-    if (generationsError) {
-      return NextResponse.json({ error: generationsError.message }, { status: 500 });
+    if (countError) {
+      return NextResponse.json({ error: countError.message }, { status: 500 });
     }
-
-    const generations: GenerationStats[] = generationsData || [];
 
     // Получить список файлов в Storage
     const { data: storageFiles, error: storageError } = await supabase.storage
       .from('generations')
       .list('', { limit: 1000 });
 
-    // Посчитать статистику
-    let totalOutputUrls = 0;
-    generations.forEach(gen => {
-      if (gen.output_urls && Array.isArray(gen.output_urls)) {
-        totalOutputUrls += gen.output_urls.length;
-      }
-    });
+    // Группировка по дням — берём только последние 500 записей для статистики
+    const { data: recentGenerations } = await supabase
+      .from('generations')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(500);
 
-    // Группировка по дням
     const byDay: Record<string, number> = {};
-    generations.forEach(gen => {
+    (recentGenerations || []).forEach((gen: { created_at: string }) => {
       const day = new Date(gen.created_at).toISOString().split('T')[0];
       byDay[day] = (byDay[day] || 0) + 1;
     });
 
     return NextResponse.json({
-      totalGenerations: generations.length,
-      totalOutputUrls,
+      totalGenerations: totalGenerations || 0,
       storageFiles: storageFiles?.length || 0,
       storageError: storageError?.message,
       byDay: Object.entries(byDay)
         .sort((a, b) => b[0].localeCompare(a[0]))
-        .slice(0, 10) // последние 10 дней
+        .slice(0, 10)
     });
 
   } catch (error) {

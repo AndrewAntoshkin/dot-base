@@ -6,6 +6,7 @@ import { KEYFRAME_MODELS } from '@/lib/keyframes';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ const requestSchema = z.object({
   workspace_id: z.string().nullish(),
 });
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     logger.info('=== KEYFRAMES GENERATE START ===');
     
@@ -249,7 +250,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    logger.error('Keyframes generate error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -257,5 +257,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
-
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });

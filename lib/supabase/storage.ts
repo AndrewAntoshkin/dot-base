@@ -2,6 +2,12 @@ import { createServiceRoleClient } from './server';
 import sharp from 'sharp';
 import logger from '@/lib/logger';
 
+// Отключаем кэш libvips — он держит нативную память (не видна в V8 heap, но видна в RSS)
+// При 400+ генераций в день кэш sharp может занимать сотни MB
+sharp.cache(false);
+// Ограничиваем concurrency sharp (по умолчанию = кол-во ядер)
+sharp.concurrency(1);
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const STORAGE_PROXY_URL = process.env.STORAGE_PROXY_URL || '';
 
@@ -174,24 +180,24 @@ export async function saveMediaToStorage(
     
     const blob = await response.blob();
     const fileName = `${generationId}-${index}.${mediaInfo.extension}`;
-    const buf = Buffer.from(await blob.arrayBuffer());
+    let buf: Buffer | null = Buffer.from(await blob.arrayBuffer());
 
     // Загрузить в Supabase Storage с ретраями
     const uploadToStorage = async () => {
       const { data, error } = await supabase.storage
         .from('generations')
-        .upload(fileName, buf, {
+        .upload(fileName, buf!, {
           contentType: mediaInfo.mimeType,
           cacheControl: '31536000',
           upsert: true,
         });
-      
+
       if (error) {
         throw new Error(`Storage upload: ${error.message}`);
       }
       return data;
     };
-    
+
     await withRetry(uploadToStorage, 3, 1000, `Upload ${fileName}`);
 
     // Получить публичный URL
@@ -202,7 +208,11 @@ export async function saveMediaToStorage(
     let thumbUrl: string | undefined;
     if (!mediaInfo.isVideo) {
       try {
-        const thumbBuffer = await createThumbnailWebp(buf);
+        // Создаём thumbnail ДО обнуления буфера
+        const thumbBuffer = await createThumbnailWebp(buf!);
+        // Оригинальный буфер больше не нужен — освобождаем RAM
+        buf = null;
+
         const thumbFileName = `${generationId}-${index}-thumb.webp`;
 
         const uploadThumb = async () => {
@@ -221,6 +231,9 @@ export async function saveMediaToStorage(
       } catch (e: any) {
         logger.warn('Thumbnail generation failed:', generationId, index, e?.message);
       }
+    } else {
+      // Для видео — сразу освобождаем буфер после загрузки
+      buf = null;
     }
 
     logger.info(`Successfully saved media ${index} for generation ${generationId}`);
@@ -259,14 +272,15 @@ export async function saveGenerationMedia(
   mediaUrls: string[],
   generationId: string
 ): Promise<{ urls: string[]; thumbs: string[] }> {
-  const saved = await Promise.all(
-    mediaUrls.map((url, index) => saveMediaToStorage(url, generationId, index))
-  );
-
   const urls: string[] = [];
   const thumbs: string[] = [];
 
-  for (const item of saved) {
+  // Sequential processing: не создаём все замыкания сразу через Promise.all,
+  // каждый буфер полностью освобождается до начала следующего скачивания.
+  // Семафор всё равно ограничивает до 2, но при Promise.all все N замыканий
+  // с контекстом уже существуют в памяти и держат GC от сборки.
+  for (let index = 0; index < mediaUrls.length; index++) {
+    const item = await saveMediaToStorage(mediaUrls[index], generationId, index);
     if (!item) continue;
     urls.push(item.url);
     if (item.thumbUrl) thumbs.push(item.thumbUrl);

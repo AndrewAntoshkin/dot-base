@@ -1,6 +1,26 @@
 import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
+
+// Singleton Service Role Client для middleware
+// Избегаем создания нового клиента на каждый admin-запрос
+let middlewareServiceClient: SupabaseClient | null = null;
+
+function getServiceClient(): SupabaseClient {
+  if (!middlewareServiceClient) {
+    middlewareServiceClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+  }
+  return middlewareServiceClient;
+}
 
 // Имя cookie для кэширования сессии
 const SESSION_CHECK_COOKIE = 'session_checked';
@@ -44,19 +64,10 @@ async function getUserRole(
     }
   }
   
-  // Запрашиваем из БД
+  // Запрашиваем из БД (singleton клиент, не создаём новый на каждый запрос)
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
-    
+    const supabase = getServiceClient();
+
     const { data } = await supabase
       .from('users')
       .select('role')

@@ -103,13 +103,13 @@ export class ReplicateTokenPool {
     }
   }
 
-  private updateTokenStatsAsync(tokenId: number): void {
-    setImmediate(async () => {
-      try {
-        const supabase = createServiceRoleClient();
-        await supabase.rpc('get_next_replicate_token');
-      } catch {}
-    });
+  // Убран setImmediate + RPC на каждый запрос токена.
+  // Раньше вызывал supabase.rpc('get_next_replicate_token') на каждую генерацию,
+  // но результат не использовался. Это создавало сотни pending промисов в день
+  // и нагружало БД бесполезными запросами.
+  // Статистика обновляется при reportTokenError() и refreshTokensFromDb().
+  private updateTokenStatsAsync(_tokenId: number): void {
+    // no-op: stats are updated on refresh and error reporting
   }
 
   async reportTokenError(tokenId: number, errorMessage: string): Promise<void> {

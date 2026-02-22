@@ -3,11 +3,12 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/loras/[id] - Get single LoRA details
-export async function GET(
+async function getHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -70,13 +71,12 @@ export async function GET(
       }
     });
   } catch (error) {
-    logger.error('GET /api/loras/[id] error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
 
 // PATCH /api/loras/[id] - Update LoRA (sync status from Replicate)
-export async function PATCH(
+async function patchHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -206,13 +206,12 @@ export async function PATCH(
 
     return NextResponse.json({ lora: loraData, synced: false });
   } catch (error) {
-    logger.error('PATCH /api/loras/[id] error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
 
 // PUT /api/loras/[id] - Update LoRA fields (name, description)
-export async function PUT(
+async function putHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -290,13 +289,12 @@ export async function PUT(
     logger.info(`LoRA ${id} updated:`, updateData);
     return NextResponse.json({ lora: updatedLora });
   } catch (error) {
-    logger.error('PUT /api/loras/[id] error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
 
 // DELETE /api/loras/[id] - Hard delete LoRA (полное удаление)
-export async function DELETE(
+async function deleteHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -397,8 +395,11 @@ export async function DELETE(
     logger.info(`LoRA ${id} completely deleted (hard delete)`);
     return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error('DELETE /api/loras/[id] error:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }
 
+export const GET = withApiLogging(getHandler);
+export const PATCH = withApiLogging(patchHandler, { provider: 'replicate' });
+export const PUT = withApiLogging(putHandler);
+export const DELETE = withApiLogging(deleteHandler);

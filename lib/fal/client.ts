@@ -110,36 +110,36 @@ export class FalClient {
   }
 
   private sanitizeErrorMessage(error: any): string {
-    let message = error.message || 'Произошла ошибка при генерации';
-    
+    let message = error.message || 'Generation failed';
+
     // Remove technical details
     message = message.replace(/https?:\/\/[^\s]*fal[^\s]*/gi, '');
     message = message.replace(/fal\.ai[^\s]*/gi, '');
     message = message.replace(/fal-ai[^\s]*/gi, '');
-    
+
     const errorMappings: [RegExp, string][] = [
-      [/insufficient|balance|credits|quota|payment required/i, 'Недостаточно кредитов на Fal.ai аккаунте'],
-      [/image_url is required/i, 'Для этой модели требуется входное изображение'],
-      [/prompt is required/i, 'Требуется ввести описание (prompt)'],
-      [/rate limit/i, 'Слишком много запросов. Подождите немного'],
-      [/timeout/i, 'Превышено время ожидания. Попробуйте ещё раз'],
-      [/model.*not found/i, 'Модель временно недоступна'],
-      [/authentication/i, 'Ошибка авторизации. Обратитесь в поддержку'],
-      [/nsfw|safety|blocked|flagged/i, 'Контент заблокирован фильтром безопасности'],
-      [/validation failed/i, 'Ошибка валидации параметров'],
+      [/insufficient|balance|credits|quota|payment required/i, 'Insufficient credits on Fal.ai account'],
+      [/image_url is required/i, 'This model requires an input image'],
+      [/prompt is required/i, 'A prompt is required'],
+      [/rate limit/i, 'Too many requests. Please wait'],
+      [/timeout/i, 'Request timed out. Please try again'],
+      [/model.*not found/i, 'Model temporarily unavailable'],
+      [/authentication/i, 'Authentication error. Contact support'],
+      [/nsfw|safety|blocked|flagged/i, 'Content blocked by safety filter'],
+      [/validation failed/i, 'Input validation failed'],
     ];
-    
+
     for (const [pattern, replacement] of errorMappings) {
       if (pattern.test(message)) {
         return replacement;
       }
     }
-    
+
     if (message.length > 200 || /status\s*\d+|response|request|http/i.test(message)) {
-      return 'Ошибка при генерации. Попробуйте изменить параметры';
+      return 'Generation error. Try changing parameters';
     }
-    
-    return message.trim() || 'Произошла ошибка при генерации';
+
+    return message.trim() || 'Generation failed';
   }
 
   /**
@@ -274,13 +274,13 @@ export class FalClient {
       }
       
       if (status.status === 'FAILED') {
-        throw new Error('Генерация не удалась');
+        throw new Error('Generation failed');
       }
 
       await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
-    throw new Error('Превышено время ожидания генерации');
+    throw new Error('Generation timed out');
   }
 }
 

@@ -58,7 +58,7 @@ export class GoogleAIClient {
     if (!prompt || typeof prompt !== 'string') {
       return {
         success: false,
-        error: 'Требуется ввести описание (prompt)',
+        error: 'A prompt is required',
         timeMs: 0,
       };
     }
@@ -146,8 +146,24 @@ export class GoogleAIClient {
         }
       );
 
-      const data = await response.json();
       const elapsed = Date.now() - startTime;
+
+      // Проверяем HTTP статус до парсинга JSON — при блокировке/недоступности
+      // API возвращает HTML-страницу, и response.json() падает
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        const isHtml = text.trimStart().startsWith('<');
+        logger.error(`[Google AI] HTTP ${response.status}:`, isHtml ? '(HTML response — API blocked or unavailable)' : text.substring(0, 200));
+        return {
+          success: false,
+          error: response.status === 403
+            ? 'Google API blocked. Using fallback model'
+            : `Google API unavailable (HTTP ${response.status})`,
+          timeMs: elapsed,
+        };
+      }
+
+      const data = await response.json();
 
       if (data.error) {
         logger.error(`[Google AI] API error:`, data.error);
@@ -198,12 +214,12 @@ export class GoogleAIClient {
    */
   private sanitizeError(message: string): string {
     const errorMappings: [RegExp, string][] = [
-      [/quota|limit|exceeded/i, 'Превышен лимит запросов. Попробуйте позже'],
-      [/invalid.*key|authentication|unauthorized/i, 'Ошибка авторизации Google API'],
-      [/safety|blocked|harmful|nsfw/i, 'Контент заблокирован фильтром безопасности'],
-      [/timeout/i, 'Превышено время ожидания'],
-      [/not found|unavailable/i, 'Модель временно недоступна'],
-      [/rate limit/i, 'Слишком много запросов. Подождите немного'],
+      [/quota|limit|exceeded/i, 'Rate limit exceeded. Try again later'],
+      [/invalid.*key|authentication|unauthorized/i, 'Google API authentication error'],
+      [/safety|blocked|harmful|nsfw/i, 'Content blocked by safety filter'],
+      [/timeout/i, 'Request timed out'],
+      [/not found|unavailable/i, 'Model temporarily unavailable'],
+      [/rate limit/i, 'Too many requests. Please wait'],
     ];
 
     for (const [pattern, replacement] of errorMappings) {
@@ -214,7 +230,7 @@ export class GoogleAIClient {
 
     // Remove technical details
     if (message.length > 150 || /http|api|key|token/i.test(message)) {
-      return 'Ошибка при генерации. Попробуйте изменить промпт';
+      return 'Generation error. Try changing your prompt';
     }
 
     return message;

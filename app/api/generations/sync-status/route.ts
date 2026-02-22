@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
@@ -8,6 +8,7 @@ import { getModelById } from '@/lib/models-config';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,7 @@ interface GenerationRecord {
  * Синхронизирует статусы processing генераций с Replicate
  * Вызывается с фронтенда при показе страницы истории
  */
-export async function POST() {
+async function postHandler(request: NextRequest) {
   try {
     // Get current user
     const cookieStore = await cookies();
@@ -204,7 +205,7 @@ export async function POST() {
             await (supabase.from('generations') as any)
               .update({
                 status: 'failed',
-                error_message: 'Контент заблокирован фильтром безопасности',
+                error_message: 'Content blocked by safety filter',
                 replicate_output: status,
                 completed_at: new Date().toISOString(),
               })
@@ -306,13 +307,13 @@ export async function POST() {
             syncedCount++;
           }
         } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
-          let errorMessage = 'Генерация не удалась';
+          let errorMessage = 'Generation failed';
           if (prediction.error) {
             const errorLower = prediction.error.toLowerCase();
             if (errorLower.includes('nsfw') || errorLower.includes('safety')) {
-              errorMessage = 'Контент заблокирован фильтром безопасности';
+              errorMessage = 'Content blocked by safety filter';
             } else if (errorLower.includes('timeout')) {
-              errorMessage = 'Превышено время генерации';
+              errorMessage = 'Generation timed out';
             }
           }
 
@@ -339,13 +340,14 @@ export async function POST() {
       total: generations.length 
     });
   } catch (error: any) {
-    console.error('Sync status error:', error);
     return NextResponse.json(
-      { error: 'Ошибка синхронизации' },
+      { error: 'Sync failed' },
       { status: 500 }
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });
 
 
 

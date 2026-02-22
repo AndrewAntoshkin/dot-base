@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       try {
         let updateData: any = {
           status: 'failed',
-          error_message: 'Превышено время ожидания',
+          error_message: 'Generation timed out',
           completed_at: new Date().toISOString(),
         };
         

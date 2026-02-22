@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getModelById } from '@/lib/models-config';
 import { cookies } from 'next/headers';
+import { withApiLogging } from '@/lib/with-api-logging';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ interface GenerationRecord {
   [key: string]: any;
 }
 
-export async function POST(
+async function postHandler(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -139,13 +140,14 @@ export async function POST(
       prediction_id: prediction.id,
     });
   } catch (error: any) {
-    console.error('Retry generation error:', error);
     return NextResponse.json(
       { error: 'Не удалось повторить генерацию' },
       { status: 500 }
     );
   }
 }
+
+export const POST = withApiLogging(postHandler, { provider: 'replicate' });
 
 
 
