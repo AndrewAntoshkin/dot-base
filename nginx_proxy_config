@@ -1,0 +1,57 @@
+server {
+    server_name basecraft.wdda.pro;
+    listen 185.4.73.14:443 ssl;
+    http2 on;
+
+    ssl_certificate "/var/www/httpd-cert/basecraft.wdda.pro_2026-02-11-11-51_09.crt";
+    ssl_certificate_key "/var/www/httpd-cert/basecraft.wdda.pro_2026-02-11-11-51_09.key";
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    charset utf-8;
+
+    # Webhook endpoints — проксируем на приложение (upstream managed by deploy.sh)
+    location /api/webhook/ {
+        proxy_pass http://basecraft;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
+
+    # Всё остальное — 404
+    location / {
+        return 404;
+    }
+
+    include "/etc/nginx/fastpanel2-sites/basecraft/basecraft.wdda.pro.includes";
+    include /etc/nginx/fastpanel2-includes/*.conf;
+
+    error_log /var/www/basecraft/data/logs/basecraft.wdda.pro-frontend.error.log;
+    access_log /var/www/basecraft/data/logs/basecraft.wdda.pro-frontend.access.log;
+}
+server {
+    server_name basecraft.wdda.pro;
+
+    listen 185.4.73.14:80;
+    return 301 https://$host$request_uri;
+
+    error_log /var/www/basecraft/data/logs/basecraft.wdda.pro-frontend.error.log;
+    access_log /var/www/basecraft/data/logs/basecraft.wdda.pro-frontend.access.log;
+}
+
+server {
+    server_name www.basecraft.wdda.pro  ;
+
+    listen 185.4.73.14:80;
+    listen 185.4.73.14:443 ssl;
+
+    ssl_certificate "/var/www/httpd-cert/basecraft.wdda.pro_2026-02-11-11-51_09.crt";
+    ssl_certificate_key "/var/www/httpd-cert/basecraft.wdda.pro_2026-02-11-11-51_09.key";
+
+    return 301 https://basecraft.wdda.pro$request_uri;
+
+    error_log /var/www/basecraft/data/logs/basecraft.wdda.pro-frontend.error.log;
+    access_log /var/www/basecraft/data/logs/basecraft.wdda.pro-frontend.access.log;
+}

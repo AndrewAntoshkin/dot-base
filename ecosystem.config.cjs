@@ -28,25 +28,44 @@ function parseEnvFile(filePath) {
 
 const envLocal = parseEnvFile(path.join(__dirname, '.env.local'));
 
+// Shared config for both blue/green slots
+const sharedConfig = {
+  script: 'node_modules/.bin/next',
+  args: 'start',
+  cwd: __dirname,
+  interpreter: '/opt/fnode/bin/node',
+  autorestart: true,
+  max_memory_restart: '3500M',
+  kill_timeout: 5000,
+  merge_logs: true,
+  log_date_format: 'YYYY-MM-DD HH:mm:ss',
+};
+
 module.exports = {
-  apps: [{
-    name: 'basecraft',
-    script: '/opt/fnode/bin/npm',
-    args: 'start',
-    cwd: __dirname,
-    interpreter: '/opt/fnode/bin/node',
-    env: {
-      ...envLocal,
-      NODE_ENV: 'production',
-      NODE_OPTIONS: '--max-old-space-size=3584',
+  apps: [
+    {
+      ...sharedConfig,
+      name: 'basecraft-blue',
+      env: {
+        ...envLocal,
+        NODE_ENV: 'production',
+        NODE_OPTIONS: '--max-old-space-size=3584',
+        PORT: 3000,
+      },
+      error_file: 'logs/pm2-blue-error.log',
+      out_file: 'logs/pm2-blue-out.log',
     },
-    // Auto-restart on crash
-    autorestart: true,
-    max_memory_restart: '3500M',
-    // Logs
-    error_file: 'logs/pm2-error.log',
-    out_file: 'logs/pm2-out.log',
-    merge_logs: true,
-    log_date_format: 'YYYY-MM-DD HH:mm:ss',
-  }],
+    {
+      ...sharedConfig,
+      name: 'basecraft-green',
+      env: {
+        ...envLocal,
+        NODE_ENV: 'production',
+        NODE_OPTIONS: '--max-old-space-size=3584',
+        PORT: 3001,
+      },
+      error_file: 'logs/pm2-green-error.log',
+      out_file: 'logs/pm2-green-out.log',
+    },
+  ],
 };
