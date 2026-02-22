@@ -221,7 +221,7 @@ async function postHandler(request: NextRequest) {
         // Fal.ai provider with fallback to Replicate
         const falClient = getFalClient();
         
-        const falWebhookUrl = process.env.NODE_ENV === 'production' 
+        const falWebhookUrl = process.env.NEXTAUTH_URL
           ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
           : undefined;
         
@@ -270,7 +270,7 @@ async function postHandler(request: NextRequest) {
 
             // Fallback to Replicate
             const replicateClient = getReplicateClient();
-            const webhookUrl = process.env.NODE_ENV === 'production' 
+            const webhookUrl = process.env.NEXTAUTH_URL
               ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
               : undefined;
             
@@ -320,7 +320,7 @@ async function postHandler(request: NextRequest) {
         // Higgsfield provider
         const higgsfieldClient = getHiggsfieldClient();
         
-        const higgsfieldWebhookUrl = process.env.NODE_ENV === 'production' 
+        const higgsfieldWebhookUrl = process.env.NEXTAUTH_URL
           ? `${process.env.NEXTAUTH_URL}/api/webhook/higgsfield`
           : undefined;
         
@@ -432,7 +432,7 @@ async function postHandler(request: NextRequest) {
 
           try {
             const replicateClient = getReplicateClient();
-            const webhookUrl = process.env.NODE_ENV === 'production'
+            const webhookUrl = process.env.NEXTAUTH_URL
               ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
               : undefined;
 
@@ -559,7 +559,7 @@ async function postHandler(request: NextRequest) {
         // Replicate provider (default)
         const replicateClient = getReplicateClient();
         
-        const webhookUrl = process.env.NODE_ENV === 'production' 
+        const webhookUrl = process.env.NEXTAUTH_URL
           ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
           : undefined;
         
@@ -612,7 +612,7 @@ async function postHandler(request: NextRequest) {
             });
 
             const falClient = getFalClient();
-            const falWebhookUrl = process.env.NODE_ENV === 'production' 
+            const falWebhookUrl = process.env.NEXTAUTH_URL
               ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
               : undefined;
             
