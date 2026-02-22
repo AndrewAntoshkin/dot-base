@@ -467,16 +467,18 @@ async function postHandler(request: NextRequest) {
 
         // --- Level 3: FAL.ai fallback ---
         if (model.falFallbackModel) {
+          const lastErr = errors[errors.length - 1]?.error || 'FAL_ONLY mode';
           writeWarningLog({
             path: '/api/generations/create',
-            provider: 'replicate',
+            provider: falOnly ? 'google' : 'replicate',
             model_name: generation.model_name,
             generation_id: generation.id,
             user_id: generation.user_id,
-            message: `Fallback: Replicate -> FAL. Reason: ${errors[errors.length - 1].error}`,
+            message: falOnly ? `FAL_ONLY: direct FAL.ai` : `Fallback: Replicate -> FAL. Reason: ${lastErr}`,
             details: {
               original_provider: 'google',
               fallback_provider: 'fal',
+              fal_only: falOnly,
               errors: errors.map(e => `${e.provider}: ${e.error}`),
             },
           });
