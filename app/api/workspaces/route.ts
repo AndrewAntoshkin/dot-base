@@ -114,34 +114,20 @@ export async function GET() {
       }
     }
 
-    // Загружаем количество генераций для каждого workspace через RPC
-    const generationsCountMap: Record<string, number> = {};
+    // Загружаем количество проектов для каждого workspace
+    const projectsCountMap: Record<string, number> = {};
     
     if (workspaceIds.length > 0) {
-      // Используем RPC функцию для подсчёта (обходит лимит 1000 строк)
-      type WorkspaceGenCount = { workspace_id: string; generations_count: number };
+      const { data: projectCounts } = await adminClient
+        .from('projects')
+        .select('workspace_id')
+        .in('workspace_id', workspaceIds)
+        .eq('is_active', true) as { data: { workspace_id: string }[] | null };
       
-      const { data: genCounts, error: rpcError } = await (adminClient.rpc as any)(
-        'get_workspaces_generation_counts',
-        { p_workspace_ids: workspaceIds }
-      ) as { data: WorkspaceGenCount[] | null; error: Error | null };
-      
-      if (!rpcError && genCounts) {
-        genCounts.forEach((g) => {
-          generationsCountMap[g.workspace_id] = g.generations_count || 0;
+      if (projectCounts) {
+        projectCounts.forEach((p) => {
+          projectsCountMap[p.workspace_id] = (projectsCountMap[p.workspace_id] || 0) + 1;
         });
-      } else {
-        // Fallback: подсчёт по одному (медленнее, но работает без RPC)
-        // RPC not available, using per-workspace count fallback
-        for (const wsId of workspaceIds) {
-          const { count } = await adminClient
-            .from('generations')
-            .select('id', { count: 'exact', head: true })
-            .eq('workspace_id', wsId)
-            .neq('is_keyframe_segment', true);
-          
-          generationsCountMap[wsId] = count || 0;
-        }
       }
     }
 
@@ -158,7 +144,7 @@ export async function GET() {
         created_at: ws.created_at,
         member_role: memberInfo?.role || (dbUser.role === 'super_admin' ? 'owner' : 'member'),
         member_count: wsMembers.length || ws.workspace_members?.length || 0,
-        generations_count: generationsCountMap[ws.id] || 0,
+        projects_count: projectsCountMap[ws.id] || 0,
         members: wsMembers.slice(0, 4), // Первые 4 для avatar group
       };
     }) || [];

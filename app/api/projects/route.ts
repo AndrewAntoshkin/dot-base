@@ -38,23 +38,32 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const workspaceId = searchParams.get('workspace_id');
+    const statusFilter = searchParams.get('status'); // 'active' | 'in_progress' | 'archived'
 
     let projects: any[] = [];
 
-    if (dbUser.role === 'super_admin') {
+    const buildQuery = () => {
       let query = adminClient
         .from('projects')
         .select(`
-          id, name, slug, description, cover_url, workspace_id, created_at, created_by,
+          id, name, slug, description, cover_url, workspace_id, created_at, created_by, status, is_pinned,
           workspaces!inner ( id, name, slug )
         `)
         .eq('is_active', true)
+        .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false });
 
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+      return query;
+    };
+
+    if (dbUser.role === 'super_admin') {
+      let query = buildQuery();
       if (workspaceId) {
         query = query.eq('workspace_id', workspaceId);
       }
-
       const { data, error } = await query;
       if (error) {
         logger.error('Error fetching projects:', error);
@@ -62,7 +71,6 @@ export async function GET(request: Request) {
       }
       projects = data || [];
     } else {
-      // Get workspace IDs user belongs to
       const { data: memberships } = await adminClient
         .from('workspace_members')
         .select('workspace_id')
@@ -73,15 +81,8 @@ export async function GET(request: Request) {
         return NextResponse.json({ projects: [], user_role: dbUser.role });
       }
 
-      let query = adminClient
-        .from('projects')
-        .select(`
-          id, name, slug, description, cover_url, workspace_id, created_at, created_by,
-          workspaces!inner ( id, name, slug )
-        `)
-        .eq('is_active', true)
-        .in('workspace_id', workspaceId ? [workspaceId] : userWorkspaceIds)
-        .order('created_at', { ascending: false });
+      let query = buildQuery()
+        .in('workspace_id', workspaceId ? [workspaceId] : userWorkspaceIds);
 
       const { data, error } = await query;
       if (error) {
@@ -89,6 +90,38 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
       }
       projects = data || [];
+    }
+
+    // Counts per status for tabs
+    let statusCounts = { all: 0, active: 0, in_progress: 0, archived: 0 };
+    {
+      const wsFilter = workspaceId || null;
+      let countQuery = adminClient
+        .from('projects')
+        .select('id, status')
+        .eq('is_active', true);
+
+      if (wsFilter) {
+        countQuery = countQuery.eq('workspace_id', wsFilter);
+      } else if (dbUser.role !== 'super_admin') {
+        const { data: memberships2 } = await adminClient
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', dbUser.id) as { data: { workspace_id: string }[] | null };
+        const wsIds = memberships2?.map(m => m.workspace_id) || [];
+        if (wsIds.length > 0) {
+          countQuery = countQuery.in('workspace_id', wsIds);
+        }
+      }
+      const { data: allProjects } = await countQuery;
+      if (allProjects) {
+        statusCounts.all = allProjects.length;
+        allProjects.forEach((p: any) => {
+          if (p.status === 'active') statusCounts.active++;
+          else if (p.status === 'in_progress') statusCounts.in_progress++;
+          else if (p.status === 'archived') statusCounts.archived++;
+        });
+      }
     }
 
     // Fetch member counts and content counts
@@ -161,24 +194,53 @@ export async function GET(request: Request) {
       }
     }
 
-    const formatted = projects.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      cover_url: p.cover_url,
-      workspace_id: p.workspace_id,
-      workspace_name: (p.workspaces as any)?.name || '',
-      workspace_slug: (p.workspaces as any)?.slug || '',
-      created_at: p.created_at,
-      member_count: memberCountMap[p.id] || 0,
-      images_count: contentCountMap[p.id]?.images || 0,
-      videos_count: contentCountMap[p.id]?.videos || 0,
-      flows_count: contentCountMap[p.id]?.flows || 0,
-      members: p._members || [],
-    }));
+    // Fetch preview images (last 4 generations) for each project
+    let previewsMap: Record<string, string[]> = {};
+    if (projectIds.length > 0) {
+      const { data: previews } = await adminClient
+        .from('generations')
+        .select('project_id, output_urls')
+        .in('project_id', projectIds)
+        .eq('status', 'completed')
+        .not('output_urls', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(200) as { data: { project_id: string; output_urls: string[] }[] | null };
 
-    return NextResponse.json({ projects: formatted, user_role: dbUser.role });
+      if (previews) {
+        previews.forEach(g => {
+          if (!previewsMap[g.project_id]) previewsMap[g.project_id] = [];
+          if (previewsMap[g.project_id].length < 4 && g.output_urls?.[0]) {
+            previewsMap[g.project_id].push(g.output_urls[0]);
+          }
+        });
+      }
+    }
+
+    const formatted = projects.map((p: any) => {
+      const counts = contentCountMap[p.id] || { images: 0, videos: 0, flows: 0 };
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        cover_url: p.cover_url,
+        workspace_id: p.workspace_id,
+        workspace_name: (p.workspaces as any)?.name || '',
+        workspace_slug: (p.workspaces as any)?.slug || '',
+        created_at: p.created_at,
+        status: p.status || 'active',
+        is_pinned: p.is_pinned || false,
+        member_count: memberCountMap[p.id] || 0,
+        images_count: counts.images,
+        videos_count: counts.videos,
+        flows_count: counts.flows,
+        generations_count: counts.images + counts.videos,
+        members: p._members || [],
+        previews: previewsMap[p.id] || [],
+      };
+    });
+
+    return NextResponse.json({ projects: formatted, user_role: dbUser.role, status_counts: statusCounts });
   } catch (error) {
     logger.error('Error in GET /api/projects:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

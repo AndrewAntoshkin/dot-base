@@ -184,12 +184,16 @@ export async function PUT(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { name, description, cover_url } = body;
+    const { name, description, cover_url, is_pinned, status } = body;
 
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name.trim();
     if (description !== undefined) updates.description = description?.trim() || null;
     if (cover_url !== undefined) updates.cover_url = cover_url || null;
+    if (is_pinned !== undefined) updates.is_pinned = !!is_pinned;
+    if (status !== undefined && ['active', 'in_progress', 'archived'].includes(status)) {
+      updates.status = status;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
