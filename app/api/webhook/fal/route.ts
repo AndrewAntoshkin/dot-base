@@ -142,7 +142,7 @@ async function postHandler(request: NextRequest) {
 
     const updateData: any = { replicate_output: body };  // Use same column for both providers
 
-    if (status === 'COMPLETED' && payload) {
+    if ((status === 'COMPLETED' || status === 'OK') && payload) {
       let mediaUrls: string[] = [];
       
       // Extract video URL from fal.ai response

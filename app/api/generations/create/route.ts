@@ -495,7 +495,7 @@ async function postHandler(request: NextRequest) {
 
           try {
             const falClient = getFalClient();
-            const falWebhookUrl = process.env.NODE_ENV === 'production'
+            const falWebhookUrl = process.env.NEXTAUTH_URL
               ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
               : undefined;
 
@@ -513,6 +513,8 @@ async function postHandler(request: NextRequest) {
             if (replicateInput.resolution) falInput.resolution = replicateInput.resolution;
             if (replicateInput.output_format) falInput.output_format = replicateInput.output_format === 'jpg' ? 'jpeg' : replicateInput.output_format;
             if (replicateInput.seed) falInput.seed = replicateInput.seed;
+
+            logger.info('[Fal.ai] Webhook URL:', falWebhookUrl || 'NONE');
 
             const { requestId } = await falClient.submitToQueue({
               model: model.falFallbackModel,
