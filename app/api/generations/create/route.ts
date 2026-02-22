@@ -338,46 +338,49 @@ async function postHandler(request: NextRequest) {
           provider: 'higgsfield',
         });
       } else if (provider === 'google') {
-        // Google Generative AI provider (synchronous - returns image immediately)
-        logger.info('[Google AI] Starting generation for model:', model.replicateModel);
-        
-        try {
+        // Google Generative AI provider — 3-level fallback: Google → Replicate → FAL
+        // FAL_ONLY=1 skips Google and Replicate, goes straight to FAL (for testing)
+        const falOnly = process.env.FAL_ONLY === '1' || process.env.FAL_ONLY === 'true';
+        logger.info(`[Google AI] Starting generation for model: ${model.replicateModel}${falOnly ? ' (FAL_ONLY mode)' : ''}`);
+
+        const errors: { provider: string; error: string }[] = [];
+
+        // --- Level 1: Google Direct API (synchronous) ---
+        if (!falOnly) try {
           const googleClient = getGoogleAIClient();
-          
+
           const result = await googleClient.generate({
             model: model.name,
             input: replicateInput,
           });
-          
+
           if (result.success && result.imageBase64) {
             // Upload base64 image to Supabase Storage
             const buffer = Buffer.from(result.imageBase64, 'base64');
             const extension = result.mimeType?.includes('png') ? 'png' : 'jpg';
             const fileName = `${generation.id}.${extension}`;
             const filePath = `generations/${userId}/${fileName}`;
-            
+
             const { error: uploadError } = await supabase.storage
               .from('generations')
               .upload(filePath, buffer, {
                 contentType: result.mimeType || 'image/png',
                 upsert: true,
               });
-            
+
             if (uploadError) {
               logger.error('[Google AI] Storage upload error:', uploadError);
               throw new Error('Failed to save image');
             }
-            
-            // Get public URL
+
             const { data: urlData } = supabase.storage
               .from('generations')
               .getPublicUrl(filePath);
-            
+
             const outputUrl = process.env.STORAGE_PROXY_URL
               ? urlData.publicUrl.replace(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.STORAGE_PROXY_URL)
               : urlData.publicUrl;
-            
-            // Update generation as completed
+
             await (supabase.from('generations') as any)
               .update({
                 replicate_prediction_id: `google-${Date.now()}`,
@@ -386,9 +389,9 @@ async function postHandler(request: NextRequest) {
                 completed_at: new Date().toISOString(),
               })
               .eq('id', generation.id);
-            
+
             logger.info(`[Google AI] Generation completed in ${result.timeMs}ms:`, generation.id);
-            
+
             return NextResponse.json({
               id: generation.id,
               status: 'completed',
@@ -396,71 +399,133 @@ async function postHandler(request: NextRequest) {
               provider: 'google',
               time_ms: result.timeMs,
             });
-          } else {
-            // Google failed - try Replicate fallback
-            throw new Error(result.error || 'Google AI generation failed');
           }
+
+          // No image returned — treat as error
+          throw new Error(result.error || 'Google AI generation failed');
         } catch (googleError: any) {
-          logger.warn(`[Google AI -> Replicate Fallback] Google failed, trying Replicate:`, googleError.message);
+          errors.push({ provider: 'google', error: googleError.message });
+          logger.warn('[Google AI] Failed:', googleError.message);
+        }
+
+        // --- Level 2: Replicate fallback ---
+        if (model.fallbackModel && !falOnly) {
           writeWarningLog({
             path: '/api/generations/create',
             provider: 'google',
             model_name: generation.model_name,
             generation_id: generation.id,
             user_id: generation.user_id,
-            message: `Fallback: Google -> Replicate. Reason: ${googleError.message}`,
-            details: { original_provider: 'google', fallback_provider: 'replicate', error: googleError.message },
+            message: `Fallback: Google -> Replicate. Reason: ${errors[0].error}`,
+            details: { original_provider: 'google', fallback_provider: 'replicate', error: errors[0].error },
           });
 
-          // Fallback to Replicate
-          if (model.fallbackModel) {
+          try {
             const replicateClient = getReplicateClient();
-            const webhookUrl = process.env.NODE_ENV === 'production' 
+            const webhookUrl = process.env.NODE_ENV === 'production'
               ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
               : undefined;
-            
-            try {
-              const { prediction, tokenId } = await replicateClient.run({
-                model: model.fallbackModel,
-                version: model.version,
-                input: replicateInput,
-                webhook: webhookUrl,
-                webhook_events_filter: webhookUrl ? ['completed'] : undefined,
-              });
 
-              logger.info('[Fallback] Replicate generation started:', generation.id, prediction.id);
+            const { prediction, tokenId } = await replicateClient.run({
+              model: model.fallbackModel,
+              version: model.version,
+              input: replicateInput,
+              webhook: webhookUrl,
+              webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+            });
 
-              await (supabase.from('generations') as any)
-                .update({
-                  replicate_prediction_id: prediction.id,
-                  replicate_token_index: tokenId,
-                  replicate_model: model.fallbackModel,
-                  status: 'processing',
-                  settings: { 
-                    ...generation.settings, 
-                    fallback_provider: 'replicate', 
-                    original_provider: 'google',
-                    original_error: googleError.message 
-                  },
-                })
-                .eq('id', generation.id);
+            logger.info('[Fallback] Replicate generation started:', generation.id, prediction.id);
 
-              return NextResponse.json({
-                id: generation.id,
-                prediction_id: prediction.id,
+            await (supabase.from('generations') as any)
+              .update({
+                replicate_prediction_id: prediction.id,
+                replicate_token_index: tokenId,
+                replicate_model: model.fallbackModel,
                 status: 'processing',
-                provider: 'replicate',
-                fallback: true,
-                original_error: googleError.message,
-              });
-            } catch (replicateError: any) {
-              logger.error('[Fallback] Replicate also failed:', replicateError.message);
-              throw replicateError;
-            }
-          } else {
-            throw googleError;
+                settings: {
+                  ...generation.settings,
+                  fallback_provider: 'replicate',
+                  original_provider: 'google',
+                  original_error: errors[0].error,
+                },
+              })
+              .eq('id', generation.id);
+
+            return NextResponse.json({
+              id: generation.id,
+              prediction_id: prediction.id,
+              status: 'processing',
+              provider: 'replicate',
+              fallback: true,
+              original_error: errors[0].error,
+            });
+          } catch (replicateError: any) {
+            errors.push({ provider: 'replicate', error: replicateError.message });
+            logger.warn('[Replicate] Also failed:', replicateError.message);
           }
         }
+
+        // --- Level 3: FAL.ai fallback ---
+        if (model.falFallbackModel) {
+          writeWarningLog({
+            path: '/api/generations/create',
+            provider: 'replicate',
+            model_name: generation.model_name,
+            generation_id: generation.id,
+            user_id: generation.user_id,
+            message: `Fallback: Replicate -> FAL. Reason: ${errors[errors.length - 1].error}`,
+            details: {
+              original_provider: 'google',
+              fallback_provider: 'fal',
+              errors: errors.map(e => `${e.provider}: ${e.error}`),
+            },
+          });
+
+          try {
+            const falClient = getFalClient();
+            const falWebhookUrl = process.env.NODE_ENV === 'production'
+              ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
+              : undefined;
+
+            const { requestId } = await falClient.submitToQueue({
+              model: model.falFallbackModel,
+              input: replicateInput,
+              webhook: falWebhookUrl,
+            });
+
+            logger.info('[Fallback] FAL.ai generation started:', generation.id, requestId);
+
+            await (supabase.from('generations') as any)
+              .update({
+                replicate_prediction_id: requestId,
+                replicate_model: model.falFallbackModel,
+                status: 'processing',
+                settings: {
+                  ...generation.settings,
+                  fallback_provider: 'fal',
+                  original_provider: 'google',
+                  errors: errors.map(e => `${e.provider}: ${e.error}`),
+                },
+              })
+              .eq('id', generation.id);
+
+            return NextResponse.json({
+              id: generation.id,
+              prediction_id: requestId,
+              status: 'processing',
+              provider: 'fal',
+              fallback: true,
+              original_error: errors.map(e => `${e.provider}: ${e.error}`).join(' | '),
+            });
+          } catch (falError: any) {
+            errors.push({ provider: 'fal', error: falError.message });
+            logger.error('[Fallback] FAL.ai also failed:', falError.message);
+          }
+        }
+
+        // All levels exhausted
+        const lastError = errors[errors.length - 1];
+        throw new Error(lastError?.error || 'All providers failed');
       } else {
         // Replicate provider (default)
         const replicateClient = getReplicateClient();

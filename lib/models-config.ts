@@ -45,6 +45,7 @@ export interface Model {
   displayName: string;
   replicateModel: string;  // For fal.ai models, this is the fal model path
   fallbackModel?: string;  // Fallback model for different provider (e.g., Replicate when Fal fails)
+  falFallbackModel?: string;  // Second-level fallback via FAL.ai (e.g., when both primary and Replicate fail)
   version?: string;
   action: ActionType;
   description?: string;
@@ -555,6 +556,7 @@ export const CREATE_MODELS: Model[] = [
     displayName: 'Nano Banana Pro',
     replicateModel: 'gemini-3-pro-image-preview',  // Google model name
     fallbackModel: 'google/nano-banana-pro',       // Replicate fallback
+    falFallbackModel: 'fal-ai/nano-banana-pro',    // FAL.ai fallback (third level)
     action: 'create',
     provider: 'google',  // Direct Google API
     runs: '4.8M runs',
@@ -1772,6 +1774,7 @@ export const EDIT_MODELS: Model[] = [
     displayName: 'Nano Banana Pro',
     replicateModel: 'gemini-3-pro-image-preview',  // Google model name
     fallbackModel: 'google/nano-banana-pro',       // Replicate fallback
+    falFallbackModel: 'fal-ai/nano-banana-pro',    // FAL.ai fallback (third level)
     action: 'edit',
     provider: 'google',  // Direct Google API
     runs: '4.8M runs',
