@@ -72,9 +72,9 @@ fi
 
 # ── Step 5: Switch nginx to the new port ──
 echo "5. Switching nginx to port $NEW_PORT..."
-sed -i "s/server 127\.0\.0\.1:[0-9]\+;/server 127.0.0.1:${NEW_PORT};/" "$NGINX_CONF"
-sed -i "s|proxy_pass http://127\.0\.0\.1:[0-9]\+;|proxy_pass http://127.0.0.1:${NEW_PORT};|" "$NGINX_PROXY_CONF"
-nginx -t && nginx -s reload
+sudo sed -i "s/server 127\.0\.0\.1:[0-9]\+;/server 127.0.0.1:${NEW_PORT};/" "$NGINX_CONF"
+sudo sed -i "s|proxy_pass http://127\.0\.0\.1:[0-9]\+;|proxy_pass http://127.0.0.1:${NEW_PORT};|" "$NGINX_PROXY_CONF"
+sudo nginx -t && sudo nginx -s reload
 
 # ── Step 6: Stop old process ──
 echo "6. Stopping old $OLD_NAME..."
