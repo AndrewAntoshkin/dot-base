@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 NODE=/opt/fnode/bin/node
 NPM=/opt/fnode/bin/npm
-UPSTREAM_CONF="/etc/nginx/conf.d/basecraft_upstream.conf"
+NGINX_CONF="/etc/nginx/fastpanel2-sites/basecraft/basecraft.ru.conf"
 
 BLUE_NAME="basecraft-blue"
 GREEN_NAME="basecraft-green"
@@ -14,11 +14,7 @@ GREEN_PORT=3001
 
 # ── Determine which slot is currently active ──
 get_active_port() {
-  if [ -f "$UPSTREAM_CONF" ]; then
-    grep -oP '127\.0\.0\.1:\K[0-9]+' "$UPSTREAM_CONF" 2>/dev/null || echo "$BLUE_PORT"
-  else
-    echo "$BLUE_PORT"
-  fi
+  grep -oP 'upstream basecraft \{\s*server 127\.0\.0\.1:\K[0-9]+' "$NGINX_CONF" 2>/dev/null || echo "$BLUE_PORT"
 }
 
 ACTIVE_PORT=$(get_active_port)
@@ -73,9 +69,9 @@ if [ $WAITED -ge $MAX_WAIT ]; then
   exit 1
 fi
 
-# ── Step 5: Switch nginx to the new port (atomic) ──
+# ── Step 5: Switch nginx to the new port ──
 echo "5. Switching nginx to port $NEW_PORT..."
-echo "upstream basecraft { server 127.0.0.1:${NEW_PORT}; }" > "$UPSTREAM_CONF"
+sed -i "s/server 127\.0\.0\.1:[0-9]\+;/server 127.0.0.1:${NEW_PORT};/" "$NGINX_CONF"
 nginx -t && nginx -s reload
 
 # ── Step 6: Stop old process ──

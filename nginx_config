@@ -18,9 +18,10 @@ server {
     return 301 https://basecraft.ru$request_uri;
 }
 
-# Active upstream — managed by deploy.sh via /etc/nginx/conf.d/basecraft_upstream.conf
-# That file contains: upstream basecraft { server 127.0.0.1:PORT; }
-# where PORT alternates between 3000 and 3001 on each deploy
+# Blue-green upstream — port is switched by deploy.sh (sed replaces the port number)
+upstream basecraft {
+    server 127.0.0.1:3000;
+}
 
 # Основной HTTPS сервер
 server {
