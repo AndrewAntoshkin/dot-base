@@ -19,6 +19,8 @@
 
 WARNING: Never commit `.env.local` or expose `SUPABASE_SERVICE_ROLE_KEY` to the client.
 
+**Important:** `ecosystem.config.cjs` does NOT parse `.env.local`. Next.js reads `.env.local` automatically on each start. PM2 config only sets `NODE_ENV`, `NODE_OPTIONS`, and `PORT`.
+
 ## Local Development
 
 ```bash
@@ -65,34 +67,83 @@ Function timeouts:
 
 Setup: Import GitHub repo on vercel.com → Set env vars → Deploy.
 
-### Option 2: PM2 Self-Hosted
+### Option 2: PM2 Self-Hosted (Blue-Green)
 
 Config: `ecosystem.config.cjs`, deploy script: `deploy.sh`
 
+#### Blue-Green Strategy
+
+Deploy uses two PM2 slots that alternate on each deploy — zero downtime:
+
+| Slot | PM2 Name | Port | Logs |
+|------|----------|------|------|
+| Blue | `basecraft-blue` | 3000 | `logs/pm2-blue-*.log` |
+| Green | `basecraft-green` | 3001 | `logs/pm2-green-*.log` |
+
 | Setting | Value |
 |---------|-------|
-| Process name | `basecraft` |
 | Memory limit | 3500 MB (auto-restart) |
 | V8 heap limit | 3584 MB (`--max-old-space-size`) |
-| Logs | `logs/pm2-error.log`, `logs/pm2-out.log` |
 | Node path | `/opt/fnode/bin/node` |
+| Script | `node_modules/.bin/next start` (direct, not via npm) |
 
-Deploy command:
-```bash
-./deploy.sh  # git pull → clear cache → build → pm2 reload
+#### Deploy Flow
+
+```
+./deploy.sh
 ```
 
-Key commands:
+1. Detect active slot (reads port from nginx config)
+2. `git pull` latest code
+3. `npm run build` (old server still running)
+4. Start new slot on inactive port
+5. Health check: wait for `/api/health` to respond (max 30s)
+6. `sudo sed` — switch port in nginx configs
+7. `sudo nginx -s reload` — apply new port
+8. Stop old slot
+9. `pm2 save`
+
+If the new slot fails health check — automatic rollback, old slot untouched.
+
+#### Key Commands
+
 ```bash
-pm2 show basecraft        # Process status
-pm2 logs basecraft        # View logs
-pm2 monit                 # Live monitoring
-pm2 reload ecosystem.config.cjs  # Zero-downtime restart
+pm2 list                          # See active slots
+pm2 show basecraft-blue           # Process status
+pm2 show basecraft-green          # Process status
+pm2 logs basecraft-blue           # View logs
+pm2 logs basecraft-green          # View logs
+pm2 monit                         # Live monitoring
 ```
 
-### Nginx (for PM2 option)
+#### Initial Setup (one time)
 
-Config files: `nginx_config`, `nginx_proxy_config` in project root.
+```bash
+# 1. Sudoers — allow deploy.sh to modify nginx configs
+echo 'basecraft ALL=(root) NOPASSWD: /usr/bin/sed, /usr/sbin/nginx' > /etc/sudoers.d/basecraft-deploy
+chmod 440 /etc/sudoers.d/basecraft-deploy
+
+# 2. Copy nginx configs from repo
+cp nginx_config /etc/nginx/fastpanel2-sites/basecraft/basecraft.ru.conf
+cp nginx_proxy_config /etc/nginx/fastpanel2-sites/basecraft/basecraft.wdda.pro.conf
+nginx -t && nginx -s reload
+
+# 3. Start first slot
+pm2 delete basecraft 2>/dev/null || true
+pm2 start ecosystem.config.cjs --only basecraft-blue
+pm2 save
+```
+
+### Nginx
+
+Two config files in project root (reference copies):
+
+| File | Server | Purpose |
+|------|--------|---------|
+| `nginx_config` | basecraft.ru | Main site. Has `upstream basecraft` block with active port. `deploy.sh` changes port via `sed`. |
+| `nginx_proxy_config` | basecraft.wdda.pro | Webhook-only domain. Direct `proxy_pass` to port. `deploy.sh` changes port via `sed`. |
+
+Server configs live at `/etc/nginx/fastpanel2-sites/basecraft/`. The repo files are templates — `deploy.sh` modifies the server copies directly.
 
 ## Supabase Setup
 
@@ -106,6 +157,19 @@ Config files: `nginx_config`, `nginx_proxy_config` in project root.
 
 ## Monitoring
 
+### Logging
+
+Logger levels (`lib/logger.ts`):
+
+| Level | Production | Development |
+|-------|-----------|-------------|
+| `debug` | suppressed | console.log |
+| `info` | console.log | console.log |
+| `warn` | console.warn | console.warn |
+| `error` | console.error | console.error |
+
+All levels except `debug` are visible in PM2 logs on production.
+
 ### Vercel
 - Speed Insights + Web Analytics (enable in Vercel dashboard)
 - Function logs in Vercel → Deployments → Functions
@@ -117,8 +181,8 @@ Config files: `nginx_config`, `nginx_proxy_config` in project root.
 
 ### PM2
 ```bash
-pm2 show basecraft          # Status, memory, restarts
-pm2 logs basecraft --lines 100  # Recent logs
+pm2 show basecraft-blue         # Status, memory, restarts
+pm2 logs basecraft-blue --lines 100  # Recent logs
 ```
 
 ### Admin Dashboard
@@ -149,14 +213,21 @@ pm2 logs basecraft --lines 100  # Recent logs
 
 ### Generations not creating
 1. Check `replicate_tokens` — are tokens active? Any with high `error_count`?
-2. Check Vercel/PM2 logs for errors
-3. Verify Replicate account balances
+2. Check PM2 logs for errors (`pm2 logs basecraft-blue`)
+3. Verify Replicate/FAL account balances
 4. Check webhook URL: `NEXTAUTH_URL` must be accessible from internet
 
 ### Slow or stuck generations
-1. Check `generations` table for `status = 'processing'` older than 10 min
-2. Run `/api/generations/cleanup-stale` to clean stuck records
-3. Check token pool distribution: `SELECT id, request_count, error_count FROM replicate_tokens`
+1. Image generations stuck >5 min are auto-cleaned on next create request
+2. Check `generations` table for `status = 'processing'` older than 10 min
+3. For video generations (no auto-cleanup): run `/api/cron/cleanup`
+4. Check token pool distribution: `SELECT id, request_count, error_count FROM replicate_tokens`
+
+### FAL webhook not working
+1. Check PM2 logs for `[Fal Webhook]` entries
+2. FAL sends `status: "OK"` on success (not "COMPLETED")
+3. Verify nginx proxy config routes `/api/webhook/` to the active port
+4. Test webhook manually: `curl -X POST http://127.0.0.1:PORT/api/webhook/fal -H "Content-Type: application/json" -d '{"request_id":"test","status":"OK","payload":{"images":[{"url":"https://fal.media/test.jpg"}]}}'`
 
 ### Auth errors
 1. Verify `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -166,7 +237,7 @@ pm2 logs basecraft --lines 100  # Recent logs
 ### OOM / Memory issues (PM2)
 1. Check Sharp cache: must be `sharp.cache(false)` in `lib/supabase/storage.ts`
 2. Check concurrent limits: `MAX_CONCURRENT_MEDIA = 2`, `MAX_CONCURRENT_GENERATIONS = 5`
-3. Check PM2 memory: `pm2 show basecraft` — if approaching 3.5GB, investigate
+3. Check PM2 memory: `pm2 show basecraft-blue` — if approaching 3.5GB, investigate
 4. Check Replicate SDK cache: should use `Map<string, Replicate>` in `lib/replicate/client.ts`
 5. See `ARCHITECTURE.md` > Performance Constraints for full list
 
