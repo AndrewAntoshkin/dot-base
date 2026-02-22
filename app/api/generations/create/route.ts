@@ -77,6 +77,16 @@ async function postHandler(request: NextRequest) {
       workspaceId = userWorkspaceIds[0];
     }
 
+    // Auto-cleanup stale image generations (>5 min in pending/processing)
+    const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const imageActions = ['create', 'edit', 'upscale', 'remove_bg', 'inpaint', 'expand'];
+    await (supabase.from('generations') as any)
+      .update({ status: 'failed', error_message: 'Generation timed out', completed_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .in('status', ['pending', 'processing'])
+      .in('action', imageActions)
+      .lt('created_at', staleThreshold);
+
     // Check concurrent limit
     const { count: activeCount } = await supabase
       .from('generations')
