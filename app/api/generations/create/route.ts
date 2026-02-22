@@ -489,9 +489,16 @@ async function postHandler(request: NextRequest) {
               ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
               : undefined;
 
+            // Map image_input → image_urls for FAL.ai Gemini API
+            const falInput = { ...replicateInput };
+            if (falInput.image_input && !falInput.image_urls) {
+              falInput.image_urls = Array.isArray(falInput.image_input) ? falInput.image_input : [falInput.image_input];
+              delete falInput.image_input;
+            }
+
             const { requestId } = await falClient.submitToQueue({
               model: model.falFallbackModel,
-              input: replicateInput,
+              input: falInput,
               webhook: falWebhookUrl,
             });
 
