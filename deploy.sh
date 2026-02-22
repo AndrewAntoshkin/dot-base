@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 NODE=/opt/fnode/bin/node
 NPM=/opt/fnode/bin/npm
 NGINX_CONF="/etc/nginx/fastpanel2-sites/basecraft/basecraft.ru.conf"
+NGINX_PROXY_CONF="/etc/nginx/fastpanel2-sites/basecraft/basecraft.wdda.pro.conf"
 
 BLUE_NAME="basecraft-blue"
 GREEN_NAME="basecraft-green"
@@ -72,6 +73,7 @@ fi
 # ── Step 5: Switch nginx to the new port ──
 echo "5. Switching nginx to port $NEW_PORT..."
 sed -i "s/server 127\.0\.0\.1:[0-9]\+;/server 127.0.0.1:${NEW_PORT};/" "$NGINX_CONF"
+sed -i "s|proxy_pass http://127\.0\.0\.1:[0-9]\+;|proxy_pass http://127.0.0.1:${NEW_PORT};|" "$NGINX_PROXY_CONF"
 nginx -t && nginx -s reload
 
 # ── Step 6: Stop old process ──
