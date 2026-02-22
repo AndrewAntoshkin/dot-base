@@ -489,12 +489,20 @@ async function postHandler(request: NextRequest) {
               ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
               : undefined;
 
-            // Map image_input → image_urls for FAL.ai Gemini API
-            const falInput = { ...replicateInput };
-            if (falInput.image_input && !falInput.image_urls) {
-              falInput.image_urls = Array.isArray(falInput.image_input) ? falInput.image_input : [falInput.image_input];
-              delete falInput.image_input;
+            // Build clean FAL input — only fields that FAL Gemini API accepts
+            const falInput: Record<string, any> = {
+              prompt: replicateInput.prompt,
+            };
+            // image_input → image_urls
+            if (replicateInput.image_input) {
+              falInput.image_urls = Array.isArray(replicateInput.image_input) ? replicateInput.image_input : [replicateInput.image_input];
             }
+            if (replicateInput.aspect_ratio) {
+              falInput.aspect_ratio = replicateInput.aspect_ratio === 'match_input_image' ? 'auto' : replicateInput.aspect_ratio;
+            }
+            if (replicateInput.resolution) falInput.resolution = replicateInput.resolution;
+            if (replicateInput.output_format) falInput.output_format = replicateInput.output_format === 'jpg' ? 'jpeg' : replicateInput.output_format;
+            if (replicateInput.seed) falInput.seed = replicateInput.seed;
 
             const { requestId } = await falClient.submitToQueue({
               model: model.falFallbackModel,
