@@ -1,32 +1,5 @@
-const fs = require('fs');
-const path = require('path');
-
-// Parse .env.local manually (no dotenv dependency needed)
-function parseEnvFile(filePath) {
-  const env = {};
-  try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    for (const line of content.split('\n')) {
-      const trimmed = line.replace(/\r$/, '').trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIndex = trimmed.indexOf('=');
-      if (eqIndex === -1) continue;
-      const key = trimmed.slice(0, eqIndex).trim();
-      let value = trimmed.slice(eqIndex + 1).trim();
-      // Remove surrounding quotes
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))) {
-        value = value.slice(1, -1);
-      }
-      env[key] = value;
-    }
-  } catch (err) {
-    console.error('Failed to read', filePath, err.message);
-  }
-  return env;
-}
-
-const envLocal = parseEnvFile(path.join(__dirname, '.env.local'));
+// Next.js reads .env.local automatically — no need to parse it here.
+// Only set variables that PM2/Node need or that override Next.js defaults.
 
 // Shared config for both blue/green slots
 const sharedConfig = {
@@ -47,7 +20,6 @@ module.exports = {
       ...sharedConfig,
       name: 'basecraft-blue',
       env: {
-        ...envLocal,
         NODE_ENV: 'production',
         NODE_OPTIONS: '--max-old-space-size=3584',
         PORT: 3000,
@@ -59,7 +31,6 @@ module.exports = {
       ...sharedConfig,
       name: 'basecraft-green',
       env: {
-        ...envLocal,
         NODE_ENV: 'production',
         NODE_OPTIONS: '--max-old-space-size=3584',
         PORT: 3001,

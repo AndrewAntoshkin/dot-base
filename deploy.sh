@@ -41,13 +41,13 @@ git pull
 
 # ── Step 2: Build (old server still running, no downtime) ──
 echo "2. Building..."
+rm -rf .next/cache
 $NPM run build
 
 # ── Step 3: Start new process on the inactive port ──
 echo "3. Starting $NEW_NAME on port $NEW_PORT..."
-# Stop old instance of the target slot if it exists
 pm2 delete "$NEW_NAME" 2>/dev/null || true
-pm2 start ecosystem.config.cjs --only "$NEW_NAME"
+pm2 start ecosystem.config.cjs --only "$NEW_NAME" --update-env
 
 # ── Step 4: Wait for new process to be ready ──
 echo "4. Waiting for $NEW_NAME to be ready..."
