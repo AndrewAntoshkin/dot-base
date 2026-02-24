@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import { getReplicateClient } from '@/lib/replicate/client';
+import { getFalClient } from '@/lib/fal/client';
 import { getModelById } from '@/lib/models-config';
 import { calculateCostUsd } from '@/lib/pricing';
 import { startNextKeyframeSegment } from '@/lib/keyframes';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
+import { writeWarningLog } from '@/lib/api-log';
 
 interface GenerationRecord {
   id: string;
@@ -59,6 +61,7 @@ function isRetryableError(error: string | null | undefined, body?: any): boolean
     'timeout', 'timed out', 'deadline exceeded', 'overloaded', 'overload',
     'too many requests', 'temporarily', 'temporary', 'try again',
     'rate limit', '503', '502', '500', '504', 'service unavailable',
+    'currently unavailable', 'high demand',
     'bad gateway', 'connection', 'network', 'socket', 'internal error',
     'worker', 'cold boot', 'starting', 'model is warming', 'warming up',
     'resource exhausted', 'out of memory',
@@ -90,25 +93,107 @@ function canAutoRetry(generation: any, error: string | null | undefined, body?: 
   return isRetryableError(error, body);
 }
 
-async function performAutoRetry(
+/**
+ * Check if this generation's model supports the full Google → Replicate → Fal chain.
+ * For such models, auto-retry should restart the entire chain instead of retrying just Replicate.
+ */
+function isChainFallbackModel(generation: any): boolean {
+  const model = getModelById(generation.model_id);
+  if (!model) return false;
+  return model.provider === 'google' && !!model.falFallbackModel;
+}
+
+/**
+ * For google-primary models (nano-banana-pro): instead of retrying Replicate,
+ * immediately fall back to Fal (the next step in the chain).
+ * This counts as one chain attempt. After 3 chain attempts all fail, generation fails.
+ */
+async function performChainFallback(
   generation: any,
-  supabase: any
-): Promise<{ success: boolean; newPredictionId?: string }> {
+  supabase: any,
+  error: string | null | undefined
+): Promise<{ success: boolean; provider?: string; newId?: string }> {
+  const model = getModelById(generation.model_id);
+  if (!model) return { success: false };
+
+  const newRetryCount = (generation.settings?.auto_retry_count || 0) + 1;
+
+  // Try Fal (next step in chain after Replicate)
+  const falModel = model.falFallbackModel;
+  if (falModel) {
+    try {
+      const falClient = getFalClient();
+      const falWebhookUrl = process.env.NEXTAUTH_URL
+        ? `${process.env.NEXTAUTH_URL}/api/webhook/fal`
+        : undefined;
+
+      const replicateInput = generation.replicate_input || {};
+      const falInput: Record<string, any> = {
+        prompt: replicateInput.prompt,
+      };
+      if (replicateInput.image_input) {
+        falInput.image_urls = Array.isArray(replicateInput.image_input)
+          ? replicateInput.image_input
+          : [replicateInput.image_input];
+      }
+      if (replicateInput.image) {
+        falInput.image_url = replicateInput.image;
+      }
+      if (replicateInput.aspect_ratio) {
+        falInput.aspect_ratio = replicateInput.aspect_ratio === 'match_input_image'
+          ? 'auto'
+          : replicateInput.aspect_ratio;
+      }
+      if (replicateInput.resolution) falInput.resolution = replicateInput.resolution;
+      if (replicateInput.output_format) {
+        falInput.output_format = replicateInput.output_format === 'jpg'
+          ? 'jpeg'
+          : replicateInput.output_format;
+      }
+      if (replicateInput.seed) falInput.seed = replicateInput.seed;
+
+      const { requestId } = await falClient.submitToQueue({
+        model: falModel,
+        input: falInput,
+        webhook: falWebhookUrl,
+      });
+
+      await (supabase.from('generations') as any)
+        .update({
+          replicate_prediction_id: requestId,
+          replicate_model: falModel,
+          status: 'processing',
+          error_message: null,
+          settings: {
+            ...generation.settings,
+            fallback_provider: 'fal',
+            original_provider: 'google',
+            replicate_error: error,
+            auto_retry_count: newRetryCount,
+          },
+        })
+        .eq('id', generation.id);
+
+      logger.info(`[Chain Fallback] Replicate -> Fal (attempt ${newRetryCount}):`, generation.id, requestId);
+      return { success: true, provider: 'fal', newId: requestId };
+    } catch (falError: any) {
+      logger.warn('[Chain Fallback] Fal.ai also failed:', falError.message);
+    }
+  }
+
+  // Fal failed too — try Replicate again as last resort for this attempt
   try {
-    const model = getModelById(generation.model_id);
-    if (!model) return { success: false };
-    
     const replicateClient = getReplicateClient();
-    const webhookUrl = process.env.NODE_ENV === 'production' 
+    const webhookUrl = process.env.NEXTAUTH_URL
       ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
       : undefined;
-    
+
     const replicateInput = generation.replicate_input || {
       prompt: generation.prompt,
       ...generation.settings,
     };
     delete replicateInput.auto_retry_count;
-    
+
     const replicateModel = generation.replicate_model || model.fallbackModel || model.replicateModel;
     const { prediction, tokenId } = await replicateClient.run({
       model: replicateModel,
@@ -117,9 +202,7 @@ async function performAutoRetry(
       webhook: webhookUrl,
       webhook_events_filter: webhookUrl ? ['completed'] : undefined,
     });
-    
-    const newRetryCount = (generation.settings?.auto_retry_count || 0) + 1;
-    
+
     await (supabase.from('generations') as any)
       .update({
         replicate_prediction_id: prediction.id,
@@ -129,7 +212,59 @@ async function performAutoRetry(
         settings: { ...generation.settings, auto_retry_count: newRetryCount },
       })
       .eq('id', generation.id);
-    
+
+    logger.info(`[Chain Fallback] Fal failed, retry Replicate (attempt ${newRetryCount}):`, generation.id, prediction.id);
+    return { success: true, provider: 'replicate', newId: prediction.id };
+  } catch (retryError: any) {
+    logger.error('[Chain Fallback] All providers failed:', retryError.message);
+    return { success: false };
+  }
+}
+
+/**
+ * Standard auto-retry: retry on the same Replicate model.
+ * Used for non-chain models (provider !== 'google' or no falFallbackModel).
+ */
+async function performAutoRetry(
+  generation: any,
+  supabase: any
+): Promise<{ success: boolean; newPredictionId?: string }> {
+  try {
+    const model = getModelById(generation.model_id);
+    if (!model) return { success: false };
+
+    const replicateClient = getReplicateClient();
+    const webhookUrl = process.env.NODE_ENV === 'production'
+      ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
+      : undefined;
+
+    const replicateInput = generation.replicate_input || {
+      prompt: generation.prompt,
+      ...generation.settings,
+    };
+    delete replicateInput.auto_retry_count;
+
+    const replicateModel = generation.replicate_model || model.fallbackModel || model.replicateModel;
+    const { prediction, tokenId } = await replicateClient.run({
+      model: replicateModel,
+      version: model.version,
+      input: replicateInput,
+      webhook: webhookUrl,
+      webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+    });
+
+    const newRetryCount = (generation.settings?.auto_retry_count || 0) + 1;
+
+    await (supabase.from('generations') as any)
+      .update({
+        replicate_prediction_id: prediction.id,
+        replicate_token_index: tokenId,
+        status: 'processing',
+        error_message: null,
+        settings: { ...generation.settings, auto_retry_count: newRetryCount },
+      })
+      .eq('id', generation.id);
+
     logger.info('Auto retry started:', generation.id, 'attempt', newRetryCount);
     return { success: true, newPredictionId: prediction.id };
   } catch (error: any) {
@@ -138,30 +273,13 @@ async function performAutoRetry(
   }
 }
 
-function getUserFriendlyErrorMessage(error: string | null | undefined, body: any): string {
-  const errorLower = (error || '').toLowerCase();
-  const logs = (body?.logs || '').toLowerCase();
-
-  if (errorLower.includes('nsfw') || errorLower.includes('safety') || logs.includes('nsfw')) {
-    return 'Content blocked by safety filter. Try changing your prompt';
+function formatErrorMessage(error: string | null | undefined): string {
+  if (!error || error === '' || error === 'null' || error === 'undefined') {
+    return 'Generation failed';
   }
-  if (errorLower.includes('timeout') || logs.includes('timeout')) {
-    return 'Generation timed out. Try reducing resolution';
-  }
-  if (errorLower.includes('memory') || errorLower.includes('oom') || logs.includes('memory')) {
-    return 'Not enough resources. Try reducing resolution';
-  }
-  if (errorLower.includes('overload') || errorLower.includes('rate limit')) {
-    return 'Server overloaded. Try again in a few minutes';
-  }
-  if (errorLower.includes('invalid') || errorLower.includes('validation')) {
-    return 'Invalid parameters. Check your settings';
-  }
-  if (!error || error === '' || error === 'null') {
-    return 'Generation failed. Try a different model';
-  }
-  if (error.length > 150 || error.includes('stack') || error.includes('Error:')) {
-    return 'An error occurred. Please try again';
+  // Trim very long errors (stack traces, etc.) but keep the raw message
+  if (error.length > 300) {
+    return error.slice(0, 300) + '...';
   }
   return error;
 }
@@ -357,27 +475,71 @@ async function postHandler(request: NextRequest) {
       }
     } else if (status === 'failed') {
       const currentRetryCount = generation.settings?.auto_retry_count || 0;
-      
-      // Try auto-retry
+
       if (canAutoRetry(generation, error, body)) {
-        const retryResult = await performAutoRetry(generation, supabase);
-        if (retryResult.success) {
-          return NextResponse.json({ 
-            success: true, 
-            retried: true,
-            retryCount: currentRetryCount + 1,
-            newPredictionId: retryResult.newPredictionId 
-          });
+        if (isChainFallbackModel(generation)) {
+          // Google-primary model (nano-banana-pro): fall through the chain → Fal
+          const chainResult = await performChainFallback(generation, supabase, error);
+          if (chainResult.success) {
+            writeWarningLog({
+              path: '/api/webhook/replicate',
+              provider: 'replicate',
+              model_name: generation.model_name,
+              generation_id: generation.id,
+              user_id: generation.user_id,
+              message: `Chain fallback attempt ${currentRetryCount + 1}: Replicate -> ${chainResult.provider}. Reason: ${error}`,
+              details: {
+                original_provider: 'google',
+                fallback_provider: chainResult.provider,
+                retry_count: currentRetryCount + 1,
+                error,
+              },
+            });
+            return NextResponse.json({
+              success: true,
+              retried: true,
+              fallback: chainResult.provider,
+              retryCount: currentRetryCount + 1,
+              newId: chainResult.newId,
+            });
+          }
+        } else {
+          // Non-chain model: simple retry on Replicate
+          const retryResult = await performAutoRetry(generation, supabase);
+          if (retryResult.success) {
+            return NextResponse.json({
+              success: true,
+              retried: true,
+              retryCount: currentRetryCount + 1,
+              newPredictionId: retryResult.newPredictionId,
+            });
+          }
         }
       }
-      
+
       updateData.status = 'failed';
-      let errorMessage = getUserFriendlyErrorMessage(error, body);
+      let errorMessage = formatErrorMessage(error);
       if (currentRetryCount > 0) {
         errorMessage = `${errorMessage} (after ${currentRetryCount} retries)`;
       }
       updateData.error_message = errorMessage;
-      
+
+      // Log failed generation to api_logs for admin visibility
+      writeWarningLog({
+        path: '/api/webhook/replicate',
+        provider: 'replicate',
+        model_name: generation.model_name,
+        generation_id: generation.id,
+        user_id: generation.user_id,
+        message: `Generation failed: ${error || 'unknown error'}${currentRetryCount > 0 ? ` (after ${currentRetryCount} retries)` : ''}`,
+        details: {
+          error,
+          retry_count: currentRetryCount,
+          prediction_id: predictionId,
+          raw_error: body?.error,
+        },
+      });
+
       logger.error('Generation failed:', generation.id, error);
     }
 

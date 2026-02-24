@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
+import { getReplicateClient } from '@/lib/replicate/client';
+import { getModelById } from '@/lib/models-config';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
+import { writeWarningLog } from '@/lib/api-log';
 
 interface GenerationRecord {
   id: string;
@@ -40,29 +43,12 @@ async function withRetry<T>(
   throw lastError;
 }
 
-function getUserFriendlyErrorMessage(error: string | null | undefined): string {
-  const errorLower = (error || '').toLowerCase();
-
-  if (errorLower.includes('nsfw') || errorLower.includes('safety')) {
-    return 'Content blocked by safety filter. Try changing your prompt';
+function formatErrorMessage(error: string | null | undefined): string {
+  if (!error || error === '' || error === 'null' || error === 'undefined') {
+    return 'Generation failed';
   }
-  if (errorLower.includes('timeout')) {
-    return 'Generation timed out. Try reducing resolution';
-  }
-  if (errorLower.includes('memory') || errorLower.includes('oom')) {
-    return 'Not enough resources. Try reducing resolution';
-  }
-  if (errorLower.includes('overload') || errorLower.includes('rate limit')) {
-    return 'Server overloaded. Try again in a few minutes';
-  }
-  if (errorLower.includes('invalid') || errorLower.includes('validation')) {
-    return 'Invalid parameters. Check your settings';
-  }
-  if (!error || error === '' || error === 'null') {
-    return 'Generation failed. Try a different model';
-  }
-  if (error.length > 150 || error.includes('stack') || error.includes('Error:')) {
-    return 'An error occurred. Please try again';
+  if (error.length > 300) {
+    return error.slice(0, 300) + '...';
   }
   return error;
 }
@@ -223,9 +209,104 @@ async function postHandler(request: NextRequest) {
         } catch {}
       }
     } else if (status === 'FAILED' || error) {
+      const currentRetryCount = generation.settings?.auto_retry_count || 0;
+      const errorMsg = error || 'Generation failed';
+
+      // Chain retry for google-primary models (nano-banana-pro): Fal failed → retry Replicate
+      const model = getModelById(generation.model_id);
+      const isChainModel = model?.provider === 'google' && !!model.falFallbackModel;
+      const MAX_CHAIN_RETRIES = 3;
+
+      if (isChainModel && currentRetryCount < MAX_CHAIN_RETRIES) {
+        const replicateModel = model.fallbackModel;
+        if (replicateModel) {
+          try {
+            const replicateClient = getReplicateClient();
+            const webhookUrl = process.env.NEXTAUTH_URL
+              ? `${process.env.NEXTAUTH_URL}/api/webhook/replicate`
+              : undefined;
+
+            const replicateInput = generation.replicate_input || {};
+            delete replicateInput.auto_retry_count;
+
+            const { prediction, tokenId } = await replicateClient.run({
+              model: replicateModel,
+              version: model.version,
+              input: replicateInput,
+              webhook: webhookUrl,
+              webhook_events_filter: webhookUrl ? ['completed'] : undefined,
+            });
+
+            const newRetryCount = currentRetryCount + 1;
+            await (supabase.from('generations') as any)
+              .update({
+                replicate_prediction_id: prediction.id,
+                replicate_token_index: tokenId,
+                replicate_model: replicateModel,
+                status: 'processing',
+                error_message: null,
+                settings: {
+                  ...generation.settings,
+                  fallback_provider: 'replicate',
+                  original_provider: 'google',
+                  fal_error: errorMsg,
+                  auto_retry_count: newRetryCount,
+                },
+              })
+              .eq('id', generation.id);
+
+            writeWarningLog({
+              path: '/api/webhook/fal',
+              provider: 'fal',
+              model_name: generation.model_name,
+              generation_id: generation.id,
+              user_id: generation.user_id,
+              message: `Chain fallback attempt ${newRetryCount}: Fal -> Replicate. Reason: ${errorMsg}`,
+              details: {
+                original_provider: 'google',
+                fallback_provider: 'replicate',
+                retry_count: newRetryCount,
+                error: errorMsg,
+              },
+            });
+
+            logger.info(`[Chain Fallback] Fal -> Replicate (attempt ${newRetryCount}):`, generation.id, prediction.id);
+
+            return NextResponse.json({
+              success: true,
+              retried: true,
+              fallback: 'replicate',
+              retryCount: newRetryCount,
+              newPredictionId: prediction.id,
+            });
+          } catch (retryError: any) {
+            logger.error('[Chain Fallback] Replicate also failed:', retryError.message);
+          }
+        }
+      }
+
       updateData.status = 'failed';
-      updateData.error_message = getUserFriendlyErrorMessage(error || 'Generation failed');
-      
+      let errorMessage = formatErrorMessage(errorMsg);
+      if (currentRetryCount > 0) {
+        errorMessage = `${errorMessage} (after ${currentRetryCount} retries)`;
+      }
+      updateData.error_message = errorMessage;
+
+      // Log failed generation to api_logs for admin visibility
+      writeWarningLog({
+        path: '/api/webhook/fal',
+        provider: 'fal',
+        model_name: generation.model_name,
+        generation_id: generation.id,
+        user_id: generation.user_id,
+        message: `Generation failed: ${errorMsg}${currentRetryCount > 0 ? ` (after ${currentRetryCount} retries)` : ''}`,
+        details: {
+          error: errorMsg,
+          retry_count: currentRetryCount,
+          request_id: requestId,
+        },
+      });
+
       logger.error('[Fal Webhook] Generation failed:', generation.id, error);
     }
 
