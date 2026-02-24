@@ -216,6 +216,173 @@ async function postHandler(request, { params }) {
 
 Each step can be a separate PR. Steps 2-6 can be done without breaking existing code (new files only). Step 8 is the switch.
 
+## Step 7: Request Queue (Rate Limit Aware)
+
+### Problem
+
+Каждый провайдер имеет лимиты на количество одновременных запросов (RPM, concurrent predictions). Сейчас при превышении лимита провайдер возвращает 429/503, запрос фейлится, запускается цепочка ретраев и фоллбеков. Это неэффективно — мы тратим попытки впустую и нагружаем провайдеров лишними запросами.
+
+### Solution
+
+Система очередей per-provider: запросы отправляются провайдеру только когда не превышен его лимит, остальные ждут в очереди.
+
+```
+Client request
+  → Queue Manager
+    → check provider capacity
+      → capacity available → submit immediately
+      → at limit → enqueue, process when slot frees up
+```
+
+### Architecture
+
+```typescript
+// lib/providers/queue.ts
+
+interface ProviderLimits {
+  maxConcurrent: number;    // макс. одновременных запросов
+  rpm?: number;             // requests per minute (optional)
+  cooldownMs?: number;      // пауза между запросами (optional)
+}
+
+interface QueuedRequest {
+  id: string;
+  generationId: string;
+  provider: string;
+  params: GenerationParams;
+  priority: number;         // 0 = normal, 1 = retry/fallback
+  enqueuedAt: Date;
+}
+
+class ProviderQueue {
+  private limits: Map<string, ProviderLimits>;
+  private active: Map<string, number>;      // provider → active count
+  private queue: Map<string, QueuedRequest[]>; // provider → pending queue
+
+  async submit(provider: string, params: GenerationParams): Promise<GenerationResult> {
+    const limit = this.limits.get(provider);
+    const currentActive = this.active.get(provider) || 0;
+
+    if (!limit || currentActive < limit.maxConcurrent) {
+      // Slot available — submit immediately
+      this.active.set(provider, currentActive + 1);
+      try {
+        return await providers.get(provider).submit(params);
+      } finally {
+        this.release(provider);
+      }
+    }
+
+    // At limit — enqueue and wait
+    return this.enqueue(provider, params);
+  }
+
+  private release(provider: string) {
+    const current = this.active.get(provider) || 1;
+    this.active.set(provider, current - 1);
+    this.processNext(provider);
+  }
+
+  private async processNext(provider: string) {
+    const queue = this.queue.get(provider);
+    if (!queue || queue.length === 0) return;
+
+    const limit = this.limits.get(provider);
+    const currentActive = this.active.get(provider) || 0;
+    if (limit && currentActive >= limit.maxConcurrent) return;
+
+    const next = queue.shift(); // FIFO, or sort by priority
+    // ... submit next request
+  }
+}
+```
+
+### Provider Limits Config
+
+```typescript
+// lib/providers/limits.ts
+
+export const PROVIDER_LIMITS: Record<string, ProviderLimits> = {
+  google: {
+    maxConcurrent: 5,
+    rpm: 30,
+  },
+  replicate: {
+    maxConcurrent: 10,
+    // RPM managed by Replicate token pool
+  },
+  fal: {
+    maxConcurrent: 5,
+    rpm: 60,
+  },
+  higgsfield: {
+    maxConcurrent: 3,
+  },
+};
+```
+
+### Storage
+
+**Redis** — очередь и счётчики active/RPM хранятся в Redis. Работает с multiple instances, переживает рестарты, атомарные операции через INCR/DECR.
+
+### Integration with Fallback Chain
+
+```typescript
+// В registry.ts generate() — вместо прямого вызова provider.submit()
+async function generate(params: GenerationParams): Promise<GenerationResult> {
+  const chain = params.model.providers;
+
+  for (const name of chain) {
+    const provider = providers.get(name);
+    if (!provider) continue;
+
+    try {
+      // Queue-aware submit — waits if provider is at capacity
+      const result = await providerQueue.submit(name, params);
+      return result;
+    } catch (err) {
+      errors.push({ provider: name, error: err.message });
+    }
+  }
+
+  throw new Error('All providers failed');
+}
+```
+
+### Webhook Chain Retry with Queue
+
+При chain retry (Replicate fail → Fal, Fal fail → Replicate) тоже использовать очередь:
+
+```typescript
+// В webhook handler вместо прямого вызова
+async function performChainFallback(generation, error) {
+  const model = getModelById(generation.model_id);
+  const nextProvider = getNextProviderInChain(model, currentProvider);
+
+  // Submit through queue — if provider is busy, request waits
+  return providerQueue.submit(nextProvider, {
+    model, input: generation.replicate_input, ...
+  });
+}
+```
+
+### Client UX
+
+Пока запрос в очереди, клиент видит статус `queued` (новый статус, между `pending` и `processing`):
+
+```typescript
+// generation statuses: pending → queued → processing → completed/failed
+```
+
+На фронте для `queued` показывать: "In queue, position: N" или просто спиннер с текстом "Waiting for available slot...".
+
+### Migration Steps
+
+1. Определить лимиты для каждого провайдера (замерить текущие 429 ошибки)
+2. Поднять Redis, реализовать `ProviderQueue` с Redis-backed счётчиками и очередью
+3. Добавить статус `queued` в БД и на фронт
+4. Интегрировать queue в `registry.generate()` и webhook chain retry
+
 ## Benefits
 
 - Add new provider: 1 file + model config entry
@@ -223,6 +390,7 @@ Each step can be a separate PR. Steps 2-6 can be done without breaking existing 
 - Testing: each provider testable in isolation
 - Webhook: unified parsing, less duplication
 - route.ts: from 650 lines to ~50
+- Queue: no wasted retries on overloaded providers, predictable throughput
 
 ## Risks
 
@@ -230,3 +398,5 @@ Each step can be a separate PR. Steps 2-6 can be done without breaking existing 
 - Webhook payload formats differ significantly
 - Google is synchronous, others are async — interface must handle both
 - FAL_ONLY env flag needs to work (filter provider chain at runtime)
+- Queue adds latency for waiting requests — need clear UX for "queued" state
+- Redis — дополнительная инфраструктура, нужен мониторинг
