@@ -224,77 +224,321 @@ Each step can be a separate PR. Steps 2-6 can be done without breaking existing 
 
 ### Solution
 
-Система очередей per-provider: запросы отправляются провайдеру только когда не превышен его лимит, остальные ждут в очереди.
+Единая очередь запросов + умный диспетчер, который выбирает провайдера на основе его текущего состояния: лимиты, количество активных запросов, и время "остывания" после ошибки.
+
+### Flow: жизненный цикл запроса
 
 ```
-Client request
-  → Queue Manager
-    → check provider capacity
-      → capacity available → submit immediately
-      → at limit → enqueue, process when slot frees up
+1. Client POST /api/generations/create
+   → auth, validation, create generation (status: "queued")
+   → enqueue job to Redis
+   → return { id, status: "queued" } ← клиент видит спиннер
+
+2. Queue Worker берёт job из Redis (FIFO)
+   → dispatcher.pickProvider(model) — выбирает лучший провайдер
+   → provider.submit(job)
+   → update generation (status: "processing")
+
+3. Webhook приходит от провайдера
+   → success → status: "completed"
+   → fail → dispatcher.reportError(provider) — помечает провайдер как "горячий"
+           → re-enqueue job (если retries < MAX)
+           → worker снова берёт job, pickProvider выберет другой провайдер
 ```
 
-### Architecture
+### Dispatcher: выбор провайдера
+
+Ключевая логика — **не мы решаем, на какой провайдер отправить**. Мы кладём задание в очередь, а диспетчер сам выбирает первый "остывший" провайдер из цепочки модели.
 
 ```typescript
-// lib/providers/queue.ts
+// lib/providers/dispatcher.ts
 
-interface ProviderLimits {
-  maxConcurrent: number;    // макс. одновременных запросов
-  rpm?: number;             // requests per minute (optional)
-  cooldownMs?: number;      // пауза между запросами (optional)
+interface ProviderState {
+  activeCount: number;         // сколько запросов сейчас в работе
+  maxConcurrent: number;       // лимит
+  rpm: number;                 // requests per minute limit
+  requestsThisMinute: number;  // сколько отправлено за текущую минуту
+  lastErrorAt: number | null;  // timestamp последней ошибки (ms)
+  cooldownMs: number;          // время остывания после ошибки (default 5 min)
+  consecutiveErrors: number;   // подряд ошибок (для увеличения cooldown)
 }
 
-interface QueuedRequest {
-  id: string;
-  generationId: string;
-  provider: string;
-  params: GenerationParams;
-  priority: number;         // 0 = normal, 1 = retry/fallback
-  enqueuedAt: Date;
-}
+class ProviderDispatcher {
+  // Redis keys:
+  //   provider:{name}:active     — INCR/DECR при submit/complete
+  //   provider:{name}:rpm        — INCR с TTL 60s (auto-expire каждую минуту)
+  //   provider:{name}:lastError  — SET timestamp
+  //   provider:{name}:errors     — INCR, EXPIRE 10min (сбрасывается если нет ошибок)
 
-class ProviderQueue {
-  private limits: Map<string, ProviderLimits>;
-  private active: Map<string, number>;      // provider → active count
-  private queue: Map<string, QueuedRequest[]>; // provider → pending queue
+  /**
+   * Выбирает лучший провайдер из цепочки модели.
+   * Возвращает null если все провайдеры "горячие" или перегружены.
+   */
+  async pickProvider(chain: string[]): Promise<string | null> {
+    for (const name of chain) {
+      const state = await this.getState(name);
 
-  async submit(provider: string, params: GenerationParams): Promise<GenerationResult> {
-    const limit = this.limits.get(provider);
-    const currentActive = this.active.get(provider) || 0;
+      // 1. Проверяем concurrent лимит
+      if (state.activeCount >= state.maxConcurrent) continue;
 
-    if (!limit || currentActive < limit.maxConcurrent) {
-      // Slot available — submit immediately
-      this.active.set(provider, currentActive + 1);
-      try {
-        return await providers.get(provider).submit(params);
-      } finally {
-        this.release(provider);
+      // 2. Проверяем RPM лимит
+      if (state.rpm && state.requestsThisMinute >= state.rpm) continue;
+
+      // 3. Проверяем остывание — провайдер "горячий" если была ошибка
+      //    и с момента ошибки прошло меньше cooldownMs
+      if (state.lastErrorAt) {
+        const elapsed = Date.now() - state.lastErrorAt;
+        const cooldown = this.calculateCooldown(state);
+        if (elapsed < cooldown) continue;  // ещё не остыл — пропускаем
       }
+
+      return name;  // этот провайдер готов
     }
 
-    // At limit — enqueue and wait
-    return this.enqueue(provider, params);
+    return null;  // все заняты или горячие — job остаётся в очереди
   }
 
-  private release(provider: string) {
-    const current = this.active.get(provider) || 1;
-    this.active.set(provider, current - 1);
-    this.processNext(provider);
+  /**
+   * Cooldown увеличивается с количеством подряд ошибок:
+   *   1 ошибка  → 1 мин
+   *   2 подряд  → 2 мин
+   *   3 подряд  → 5 мин
+   *   4+ подряд → 10 мин
+   */
+  private calculateCooldown(state: ProviderState): number {
+    const base = 60_000; // 1 минута
+    const multipliers = [1, 2, 5, 10];
+    const idx = Math.min(state.consecutiveErrors - 1, multipliers.length - 1);
+    return base * (multipliers[idx] || 10);
   }
 
-  private async processNext(provider: string) {
-    const queue = this.queue.get(provider);
-    if (!queue || queue.length === 0) return;
+  /**
+   * Вызывается при успешном завершении — сбрасывает счётчик ошибок.
+   */
+  async reportSuccess(provider: string): Promise<void> {
+    await redis.del(`provider:${provider}:lastError`);
+    await redis.del(`provider:${provider}:errors`);
+    await redis.decr(`provider:${provider}:active`);
+  }
 
-    const limit = this.limits.get(provider);
-    const currentActive = this.active.get(provider) || 0;
-    if (limit && currentActive >= limit.maxConcurrent) return;
-
-    const next = queue.shift(); // FIFO, or sort by priority
-    // ... submit next request
+  /**
+   * Вызывается при ошибке — помечает провайдер как "горячий".
+   */
+  async reportError(provider: string): Promise<void> {
+    await redis.set(`provider:${provider}:lastError`, Date.now());
+    await redis.incr(`provider:${provider}:errors`);
+    await redis.expire(`provider:${provider}:errors`, 600); // 10 min TTL
+    await redis.decr(`provider:${provider}:active`);
   }
 }
+```
+
+### Queue Worker
+
+```typescript
+// lib/providers/worker.ts
+
+class QueueWorker {
+  private dispatcher: ProviderDispatcher;
+  private pollIntervalMs = 1000;  // проверять очередь каждую секунду
+
+  async run(): Promise<void> {
+    while (true) {
+      // 1. Peek at next job in queue (don't remove yet)
+      const job = await redis.lindex('generation:queue', 0);
+      if (!job) {
+        await sleep(this.pollIntervalMs);
+        continue;
+      }
+
+      // 2. Pick provider for this job's model chain
+      const model = getModelById(job.modelId);
+      const provider = await this.dispatcher.pickProvider(model.providers);
+
+      if (!provider) {
+        // Все провайдеры заняты или горячие — ждём
+        await sleep(this.pollIntervalMs);
+        continue;
+      }
+
+      // 3. Атомарно забираем job из очереди (LPOP)
+      const taken = await redis.lpop('generation:queue');
+      if (!taken) continue;  // другой worker уже забрал
+
+      // 4. Отправляем на провайдер
+      await this.dispatcher.incrementActive(provider);
+      await this.updateGeneration(job.generationId, {
+        status: 'processing',
+        provider,
+      });
+
+      try {
+        await providers.get(provider).submit(job.params);
+      } catch (err) {
+        // Submit failed (не приняли даже запрос) — re-enqueue
+        await this.dispatcher.reportError(provider);
+        if (job.retries < MAX_RETRIES) {
+          job.retries++;
+          await redis.rpush('generation:queue', job);
+        } else {
+          await this.updateGeneration(job.generationId, {
+            status: 'failed',
+            error: err.message,
+          });
+        }
+      }
+    }
+  }
+}
+```
+
+### Webhook → Re-enqueue
+
+Когда провайдер вернул ошибку через webhook, задание возвращается в очередь.
+Диспетчер при следующем `pickProvider` автоматически выберет другой провайдер (тот что вернул ошибку — "горячий").
+
+```typescript
+// app/api/webhook/[provider]/route.ts
+
+async function handleFailedWebhook(generation, provider, error) {
+  const retries = generation.settings?.queue_retries || 0;
+
+  // Помечаем провайдер как горячий
+  await dispatcher.reportError(provider);
+
+  if (retries < MAX_QUEUE_RETRIES) {
+    // Возвращаем в очередь — worker сам выберет следующий провайдер
+    await redis.rpush('generation:queue', {
+      generationId: generation.id,
+      modelId: generation.model_id,
+      params: generation.replicate_input,
+      retries: retries + 1,
+      lastError: { provider, error },
+    });
+
+    await supabase.from('generations').update({
+      status: 'queued',  // обратно в очередь — клиент видит спиннер
+      error_message: null,
+      settings: { ...generation.settings, queue_retries: retries + 1 },
+    }).eq('id', generation.id);
+
+    writeWarningLog({
+      message: `Re-queued after ${provider} error (attempt ${retries + 1}). Reason: ${error}`,
+      details: { provider, error, retries: retries + 1 },
+    });
+  } else {
+    // Исчерпаны все попытки
+    await supabase.from('generations').update({
+      status: 'failed',
+      error_message: error,
+    }).eq('id', generation.id);
+  }
+}
+```
+
+### Круговое переключение провайдеров
+
+Ключевой принцип: **job не привязан к конкретному провайдеру**. Каждый раз когда worker берёт job из очереди, он заново выбирает лучший провайдер через `pickProvider`. Если провайдер упал — job возвращается в ту же очередь, и при следующей попытке worker выберет другой провайдер (упавший "горячий", будет пропущен).
+
+Это создаёт цикл переключения по кругу:
+
+```
+                    ┌─────────────────────────────┐
+                    │        Redis Queue           │
+                    │  (единая очередь заданий)    │
+                    └──────┬──────────────▲────────┘
+                           │              │
+                      worker берёт    re-enqueue
+                           │          при ошибке
+                           ▼              │
+                    ┌──────────────────────┴────────┐
+                    │       pickProvider(chain)      │
+                    │  выбирает первый "остывший"    │
+                    └──┬──────────┬──────────┬──────┘
+                       │          │          │
+                       ▼          ▼          ▼
+                   ┌────────┐ ┌──────────┐ ┌─────┐
+                   │ Google │ │ Replicate│ │ Fal │
+                   └───┬────┘ └────┬─────┘ └──┬──┘
+                       │           │          │
+                  success/fail  success/fail  success/fail
+                       │           │          │
+                       ▼           ▼          ▼
+                  reportSuccess / reportError
+                  (сброс cooldown / пометка "горячий")
+```
+
+**Правила цикла:**
+
+1. Job попадает в очередь. Worker берёт и вызывает `pickProvider(chain)`.
+2. `pickProvider` перебирает цепочку `['google', 'replicate', 'fal']` и возвращает первый провайдер, который:
+   - Не превысил `maxConcurrent`
+   - Не превысил `rpm`
+   - **Остыл** — с момента последней ошибки прошло больше `cooldownMs`
+3. При ошибке (webhook `failed` или исключение при submit):
+   - `reportError(provider)` — помечает горячим, увеличивает `consecutiveErrors`
+   - Job возвращается в очередь (re-enqueue)
+   - На следующей итерации `pickProvider` пропустит этот провайдер и выберет следующий
+4. Если **все провайдеры горячие** — job остаётся в очереди. Worker не берёт его, пока хотя бы один не остынет.
+5. При успехе — `reportSuccess(provider)` сбрасывает cooldown и `consecutiveErrors`.
+
+**Цикл ограничен** `MAX_QUEUE_RETRIES` (например 9). Это значит до 3 полных кругов по цепочке из 3 провайдеров. После исчерпания — `status: failed`.
+
+### Пример: nano-banana-pro, полный цикл
+
+```
+Запрос от клиента → generation создана (status: queued) → job в Redis
+
+── Круг 1 ──────────────────────────────────────────────
+
+Worker берёт job (retry 0/9):
+  pickProvider(['google', 'replicate', 'fal'])
+    → google: остыл ✓, слоты есть ✓ → выбран
+  Submit → Google вернул 429
+  reportError('google') → горячий на 1 мин
+  Re-enqueue (retry 1) → generation.status = queued
+
+Worker берёт job (retry 1/9):
+  pickProvider(['google', 'replicate', 'fal'])
+    → google: горячий ✗, skip
+    → replicate: остыл ✓, слоты есть ✓ → выбран
+  Submit → Replicate принял → generation.status = processing
+  Webhook → failed (E003 high demand)
+  reportError('replicate') → горячий на 1 мин
+  Re-enqueue (retry 2) → generation.status = queued
+
+Worker берёт job (retry 2/9):
+  pickProvider(['google', 'replicate', 'fal'])
+    → google: горячий ✗, skip
+    → replicate: горячий ✗, skip
+    → fal: остыл ✓, слоты есть ✓ → выбран
+  Submit → Fal принял → generation.status = processing
+  Webhook → completed ✓ → generation.status = completed
+  reportSuccess('fal')
+
+── Если бы Fal тоже упал — Круг 2 ─────────────────────
+
+Worker берёт job (retry 3/9):
+  pickProvider → все три горячие → null
+  Job остаётся в очереди, worker ждёт...
+
+  ...проходит 1 минута, google остыл...
+
+Worker берёт job (retry 3/9):
+  pickProvider → google остыл ✓ → выбран
+  Submit → Google → новый круг начался
+
+── И так далее до retry 9/9 или успеха ─────────────────
+```
+
+### Redis Keys
+
+```
+generation:queue                  — LIST, FIFO очередь jobs
+provider:{name}:active            — INT, текущие активные запросы
+provider:{name}:rpm               — INT с TTL 60s, запросы за минуту
+provider:{name}:lastError         — INT (timestamp), когда была последняя ошибка
+provider:{name}:errors            — INT с TTL 600s, подряд ошибок (для cooldown)
 ```
 
 ### Provider Limits Config
@@ -306,82 +550,42 @@ export const PROVIDER_LIMITS: Record<string, ProviderLimits> = {
   google: {
     maxConcurrent: 5,
     rpm: 30,
+    cooldownMs: 60_000,     // 1 мин базовый cooldown
   },
   replicate: {
     maxConcurrent: 10,
     // RPM managed by Replicate token pool
+    cooldownMs: 60_000,
   },
   fal: {
     maxConcurrent: 5,
     rpm: 60,
+    cooldownMs: 60_000,
   },
   higgsfield: {
     maxConcurrent: 3,
+    cooldownMs: 120_000,    // 2 мин — более хрупкий сервис
   },
 };
 ```
 
-### Storage
-
-**Redis** — очередь и счётчики active/RPM хранятся в Redis. Работает с multiple instances, переживает рестарты, атомарные операции через INCR/DECR.
-
-### Integration with Fallback Chain
-
-```typescript
-// В registry.ts generate() — вместо прямого вызова provider.submit()
-async function generate(params: GenerationParams): Promise<GenerationResult> {
-  const chain = params.model.providers;
-
-  for (const name of chain) {
-    const provider = providers.get(name);
-    if (!provider) continue;
-
-    try {
-      // Queue-aware submit — waits if provider is at capacity
-      const result = await providerQueue.submit(name, params);
-      return result;
-    } catch (err) {
-      errors.push({ provider: name, error: err.message });
-    }
-  }
-
-  throw new Error('All providers failed');
-}
-```
-
-### Webhook Chain Retry with Queue
-
-При chain retry (Replicate fail → Fal, Fal fail → Replicate) тоже использовать очередь:
-
-```typescript
-// В webhook handler вместо прямого вызова
-async function performChainFallback(generation, error) {
-  const model = getModelById(generation.model_id);
-  const nextProvider = getNextProviderInChain(model, currentProvider);
-
-  // Submit through queue — if provider is busy, request waits
-  return providerQueue.submit(nextProvider, {
-    model, input: generation.replicate_input, ...
-  });
-}
-```
-
 ### Client UX
 
-Пока запрос в очереди, клиент видит статус `queued` (новый статус, между `pending` и `processing`):
+Статусы генерации: `pending → queued → processing → completed/failed`
 
-```typescript
-// generation statuses: pending → queued → processing → completed/failed
-```
-
-На фронте для `queued` показывать: "In queue, position: N" или просто спиннер с текстом "Waiting for available slot...".
+- `queued` — спиннер + "Waiting..." (клиент не видит деталей про провайдеров)
+- `processing` — спиннер + "Generating..."
+- При re-enqueue (`processing → queued`) клиент продолжает видеть спиннер
 
 ### Migration Steps
 
-1. Определить лимиты для каждого провайдера (замерить текущие 429 ошибки)
-2. Поднять Redis, реализовать `ProviderQueue` с Redis-backed счётчиками и очередью
-3. Добавить статус `queued` в БД и на фронт
-4. Интегрировать queue в `registry.generate()` и webhook chain retry
+1. Поднять Redis (или использовать Upstash для serverless)
+2. Реализовать `ProviderDispatcher` с Redis-backed состоянием провайдеров
+3. Реализовать `QueueWorker` (отдельный process или cron job)
+4. Добавить статус `queued` в БД и на фронт
+5. В `create/route.ts`: вместо прямого вызова провайдера — enqueue в Redis
+6. В webhook handlers: при ошибке — `dispatcher.reportError()` + re-enqueue
+7. При успехе — `dispatcher.reportSuccess()` для сброса cooldown
 
 ## Benefits
 
