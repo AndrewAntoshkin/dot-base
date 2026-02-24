@@ -286,11 +286,7 @@ async function postHandler(request: NextRequest) {
       }
 
       updateData.status = 'failed';
-      let errorMessage = formatErrorMessage(errorMsg);
-      if (currentRetryCount > 0) {
-        errorMessage = `${errorMessage} (after ${currentRetryCount} retries)`;
-      }
-      updateData.error_message = errorMessage;
+      updateData.error_message = formatErrorMessage(errorMsg);
 
       // Log failed generation to api_logs for admin visibility
       writeWarningLog({
