@@ -39,6 +39,11 @@ export interface ModelSetting {
 
 export type ProviderType = 'replicate' | 'fal' | 'higgsfield' | 'google';
 
+export interface ProviderChainEntry {
+  provider: ProviderType;
+  model: string;
+}
+
 export interface Model {
   id: string;
   name: string;
@@ -54,6 +59,7 @@ export interface Model {
   price?: string;
   provider?: ProviderType;  // Default: 'replicate'
   adminOnly?: boolean;  // Only visible to admin/super_admin users
+  providers?: ProviderChainEntry[];  // Fallback chain — order = priority. Overrides provider/fallbackModel/falFallbackModel.
 }
 
 /**
@@ -559,6 +565,11 @@ export const CREATE_MODELS: Model[] = [
     falFallbackModel: 'fal-ai/gemini-3-pro-image-preview',  // FAL.ai fallback (third level)
     action: 'create',
     provider: 'google',  // Direct Google API
+    providers: [
+      { provider: 'replicate', model: 'google/nano-banana-pro' },
+      { provider: 'google', model: 'gemini-3-pro-image-preview' },
+      { provider: 'fal', model: 'fal-ai/gemini-3-pro-image-preview' },
+    ],
     runs: '4.8M runs',
     price: 'Priced by multiple properties',
     description: 'Генерация с текстом и до 14 референсов. ⏱️ ~25 сек',
@@ -1582,6 +1593,7 @@ export const CREATE_MODELS: Model[] = [
     replicateModel: 'higgsfield-ai/soul/standard',
     action: 'create',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'higgsfield-ai/soul/standard' }],
     adminOnly: true,  // Только для админов
     price: '$0.09-0.19',
     description: 'Higgsfield - фотореалистичная генерация с 50+ стилями. Fashion-ready качество!',
@@ -1645,6 +1657,7 @@ export const CREATE_MODELS: Model[] = [
     replicateModel: 'higgsfield-ai/soul/reference',
     action: 'create',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'higgsfield-ai/soul/reference' }],
     adminOnly: true,  // Только для админов
     price: '$0.09-0.19',
     description: 'Higgsfield - генерация с референсами для консистентных персонажей и стилей',
@@ -1715,6 +1728,7 @@ export const CREATE_MODELS: Model[] = [
     replicateModel: 'nano-banana-pro',
     action: 'create',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'nano-banana-pro' }],
     adminOnly: true,  // Только для тестирования
     price: '$0.05',
     description: 'Nano Banana Pro via Higgsfield - Google DeepMind модель с продвинутым рендерингом текста!',
@@ -1777,6 +1791,11 @@ export const EDIT_MODELS: Model[] = [
     falFallbackModel: 'fal-ai/gemini-3-pro-image-preview/edit',  // FAL.ai fallback (third level)
     action: 'edit',
     provider: 'google',  // Direct Google API
+    providers: [
+      { provider: 'replicate', model: 'google/nano-banana-pro' },
+      { provider: 'google', model: 'gemini-3-pro-image-preview' },
+      { provider: 'fal', model: 'fal-ai/gemini-3-pro-image-preview/edit' },
+    ],
     runs: '4.8M runs',
     description: 'Редактирование с текстом на изображении. ⏱️ ~25 сек',
     settings: [
@@ -3332,6 +3351,7 @@ export const VIDEO_CREATE_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/v1/standard/text-to-video',
     action: 'video_create',
     provider: 'fal',
+    providers: [{ provider: 'fal', model: 'fal-ai/kling-video/v1/standard/text-to-video' }],
     description: 'Kling 1.0 — генерация видео из текста',
     settings: [
       {
@@ -3906,6 +3926,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/v1/standard/image-to-video',
     action: 'video_i2v',
     provider: 'fal',
+    providers: [{ provider: 'fal', model: 'fal-ai/kling-video/v1/standard/image-to-video' }],
     description: 'Kling 1.0 — анимация с поддержкой первого и последнего кадра',
     settings: [
       {
@@ -4592,6 +4613,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/v2.6/pro/motion-control',
     action: 'video_i2v',
     provider: 'fal',
+    providers: [{ provider: 'fal', model: 'fal-ai/kling-video/v2.6/pro/motion-control' }],
     description: 'Kling 2.6 Pro — перенос движений с референсного видео на изображение персонажа',
     settings: [
       {
@@ -4644,6 +4666,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'higgsfield-ai/dop/preview',
     action: 'video_i2v',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'higgsfield-ai/dop/preview' }],
     adminOnly: true,  // Только для админов
     price: '$0.56',
     description: 'Higgsfield - премиум качество с 100+ motion-пресетами',
@@ -4728,6 +4751,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'higgsfield-ai/dop/standard',
     action: 'video_i2v',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'higgsfield-ai/dop/standard' }],
     adminOnly: true,  // Только для админов
     price: '$0.56',
     description: 'Higgsfield - лучшее качество анимации с 100+ motion-пресетами',
@@ -4812,6 +4836,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'higgsfield-ai/dop/lite',
     action: 'video_i2v',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'higgsfield-ai/dop/lite' }],
     adminOnly: true,  // Только для админов
     price: '$0.12',
     description: 'Higgsfield - самая дешёвая анимация! 100+ motion-пресетов',
@@ -4882,6 +4907,7 @@ export const VIDEO_I2V_MODELS: Model[] = [
     replicateModel: 'higgsfield-ai/dop/lite',
     action: 'video_i2v',
     provider: 'higgsfield',
+    providers: [{ provider: 'higgsfield', model: 'higgsfield-ai/dop/lite' }],
     adminOnly: true,  // Только для админов
     price: '$0.12',
     description: 'Higgsfield - интерполяция между двумя кадрами. AI создаёт плавный переход!',
@@ -5106,6 +5132,7 @@ export const VIDEO_EDIT_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/o1/standard/video-to-video/reference',
     action: 'video_edit',
     provider: 'fal',
+    providers: [{ provider: 'fal', model: 'fal-ai/kling-video/o1/standard/video-to-video/reference' }],
     description: 'Kling O1 — генерация нового кадра на основе референсного видео',
     settings: [
       {
@@ -5163,6 +5190,7 @@ export const VIDEO_EDIT_MODELS: Model[] = [
     replicateModel: 'fal-ai/kling-video/o1/video-to-video/edit',
     action: 'video_edit',
     provider: 'fal',
+    providers: [{ provider: 'fal', model: 'fal-ai/kling-video/o1/video-to-video/edit' }],
     description: 'Kling O1 Pro — редактирование видео с помощью текстовых инструкций. Замена персонажей, трансформация сцен.',
     settings: [
       {
@@ -5828,6 +5856,54 @@ export function getModelsByAction(action: ActionType, isAdmin: boolean = false):
  */
 export function getModelById(id: string): Model | undefined {
   return ALL_MODELS.find((model) => model.id === id);
+}
+
+/**
+ * Get the provider chain for a model.
+ *
+ * If the model has an explicit `providers` array, returns it directly.
+ * Otherwise, builds the chain from legacy fields: provider, fallbackModel, falFallbackModel.
+ *
+ * This allows incremental migration — models can define `providers` explicitly,
+ * while those still using legacy fields will have their chain computed automatically.
+ */
+export function getProviderChain(model: Model): ProviderChainEntry[] {
+  if (model.providers && model.providers.length > 0) {
+    return model.providers;
+  }
+
+  const provider = model.provider || 'replicate';
+  const chain: ProviderChainEntry[] = [];
+
+  switch (provider) {
+    case 'google':
+      chain.push({ provider: 'google', model: model.replicateModel });
+      if (model.fallbackModel) {
+        chain.push({ provider: 'replicate', model: model.fallbackModel });
+      }
+      if (model.falFallbackModel) {
+        chain.push({ provider: 'fal', model: model.falFallbackModel });
+      }
+      break;
+
+    case 'fal':
+      chain.push({ provider: 'fal', model: model.replicateModel });
+      if (model.fallbackModel) {
+        chain.push({ provider: 'replicate', model: model.fallbackModel });
+      }
+      break;
+
+    case 'higgsfield':
+      chain.push({ provider: 'higgsfield', model: model.replicateModel });
+      break;
+
+    case 'replicate':
+    default:
+      chain.push({ provider: 'replicate', model: model.replicateModel });
+      break;
+  }
+
+  return chain;
 }
 
 /**
