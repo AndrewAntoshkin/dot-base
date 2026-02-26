@@ -3,6 +3,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { saveGenerationMedia } from '@/lib/supabase/storage';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
+import { reportSuccess, reportError } from '@/lib/providers/dispatcher';
 
 interface GenerationRecord {
   id: string;
@@ -223,16 +224,23 @@ async function postHandler(request: NextRequest) {
             credits_param: generation.cost_credits || 1,
           });
         } catch {}
+
+        // Report success to dispatcher (clears cooldown)
+        await reportSuccess('higgsfield').catch(() => {});
       }
     } else if (status === 'failed' || error) {
       updateData.status = 'failed';
       updateData.error_message = getUserFriendlyErrorMessage(error || 'Generation failed');
-      
+
+      // Report error to dispatcher (triggers cooldown)
+      await reportError('higgsfield').catch(() => {});
+
       logger.error('[Higgsfield Webhook] Generation failed:', generation.id, error);
     } else if (status === 'nsfw') {
       updateData.status = 'failed';
       updateData.error_message = 'Content blocked by safety filter';
-      
+
+      // NSFW is not a provider error — don't report to dispatcher
       logger.warn('[Higgsfield Webhook] Generation flagged as NSFW:', generation.id);
     }
 

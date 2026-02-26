@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
-import { generate } from '@/lib/providers/registry';
+import { enqueueJob } from '@/lib/providers/worker';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +80,7 @@ async function postHandler(request: NextRequest) {
     await (supabase.from('generations') as any)
       .update({ status: 'failed', error_message: 'Generation timed out', completed_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .in('status', ['pending', 'processing'])
+      .in('status', ['pending', 'queued', 'processing'])
       .in('action', imageActions)
       .lt('created_at', staleThreshold);
 
@@ -89,7 +89,7 @@ async function postHandler(request: NextRequest) {
       .from('generations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .in('status', ['pending', 'processing']);
+      .in('status', ['pending', 'queued', 'processing']);
 
     if (activeCount !== null && activeCount >= MAX_CONCURRENT_GENERATIONS) {
       return NextResponse.json(
@@ -209,64 +209,33 @@ async function postHandler(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create generation' }, { status: 500 });
     }
 
-    // --- Submit to provider chain ---
-    // generate() iterates through model.providers[], handles fallback and logging internally.
+    // --- Enqueue for worker processing ---
+    // Worker picks up the job, iterates provider chain, handles fallback and DB updates.
     try {
-      const result = await generate({
-        model,
-        input: replicateInput,
+      await enqueueJob({
         generationId: generation.id,
+        modelId: validatedData.model_id,
+        input: replicateInput,
         userId,
       });
 
-      if (result.type === 'sync') {
-        // Synchronous provider (Google) — generation already completed
-        await (supabase.from('generations') as any)
-          .update({
-            replicate_prediction_id: `google-${Date.now()}`,
-            status: 'completed',
-            output_urls: result.outputUrls,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', generation.id);
-
-        return NextResponse.json({
-          id: generation.id,
-          status: 'completed',
-          output_urls: result.outputUrls,
-          provider: 'google',
-          time_ms: result.timeMs,
-        });
-      } else {
-        // Async provider (Replicate, FAL, Higgsfield) — waiting for webhook
-        const updateData: Record<string, any> = {
-          replicate_prediction_id: result.predictionId,
-          status: 'processing',
-        };
-
-        if (result.tokenId !== undefined) {
-          updateData.replicate_token_index = result.tokenId;
-        }
-
-        await (supabase.from('generations') as any)
-          .update(updateData)
-          .eq('id', generation.id);
-
-        return NextResponse.json({
-          id: generation.id,
-          prediction_id: result.predictionId,
-          status: 'processing',
-          provider: result.provider,
-        });
-      }
-    } catch (providerError: any) {
-      const userFacingError = providerError.message || 'Generation failed';
-
+      // Update status to queued
       await (supabase.from('generations') as any)
-        .update({ status: 'failed', error_message: userFacingError })
+        .update({ status: 'queued' })
         .eq('id', generation.id);
 
-      return NextResponse.json({ error: userFacingError }, { status: 500 });
+      return NextResponse.json({
+        id: generation.id,
+        status: 'queued',
+      });
+    } catch (enqueueError: any) {
+      logger.error('Failed to enqueue job:', enqueueError.message);
+
+      await (supabase.from('generations') as any)
+        .update({ status: 'failed', error_message: 'Failed to enqueue generation' })
+        .eq('id', generation.id);
+
+      return NextResponse.json({ error: 'Failed to enqueue generation' }, { status: 500 });
     }
   } catch (error: any) {
     return NextResponse.json(

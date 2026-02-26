@@ -6,6 +6,7 @@ import { getModelById } from '@/lib/models-config';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
 import { writeWarningLog } from '@/lib/api-log';
+import { reportSuccess, reportError } from '@/lib/providers/dispatcher';
 
 interface GenerationRecord {
   id: string;
@@ -207,6 +208,9 @@ async function postHandler(request: NextRequest) {
             credits_param: generation.cost_credits || 1,
           });
         } catch {}
+
+        // Report success to dispatcher (clears cooldown)
+        await reportSuccess('fal').catch(() => {});
       }
     } else if (status === 'FAILED' || error) {
       const currentRetryCount = generation.settings?.auto_retry_count || 0;
@@ -287,6 +291,9 @@ async function postHandler(request: NextRequest) {
 
       updateData.status = 'failed';
       updateData.error_message = formatErrorMessage(errorMsg);
+
+      // Report error to dispatcher (triggers cooldown)
+      await reportError('fal').catch(() => {});
 
       // Log failed generation to api_logs for admin visibility
       writeWarningLog({

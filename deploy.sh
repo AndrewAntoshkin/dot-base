@@ -44,13 +44,21 @@ echo "2. Building..."
 rm -rf .next/cache
 $NPM run build
 
-# ── Step 3: Start new process on the inactive port ──
-echo "3. Starting $NEW_NAME on port $NEW_PORT..."
+# ── Step 3: Reload workers (pick up new code) ──
+echo "3. Reloading gen-worker..."
+if pm2 describe gen-worker > /dev/null 2>&1; then
+  pm2 reload gen-worker --update-env
+else
+  pm2 start ecosystem.config.cjs --only gen-worker --update-env
+fi
+
+# ── Step 4: Start new process on the inactive port ──
+echo "4. Starting $NEW_NAME on port $NEW_PORT..."
 pm2 delete "$NEW_NAME" 2>/dev/null || true
 pm2 start ecosystem.config.cjs --only "$NEW_NAME" --update-env
 
-# ── Step 4: Wait for new process to be ready ──
-echo "4. Waiting for $NEW_NAME to be ready..."
+# ── Step 5: Wait for new process to be ready ──
+echo "5. Waiting for $NEW_NAME to be ready..."
 HEALTH_URL="http://127.0.0.1:${NEW_PORT}/api/health"
 MAX_WAIT=30
 WAITED=0
@@ -70,14 +78,14 @@ if [ $WAITED -ge $MAX_WAIT ]; then
   exit 1
 fi
 
-# ── Step 5: Switch nginx to the new port ──
-echo "5. Switching nginx to port $NEW_PORT..."
+# ── Step 6: Switch nginx to the new port ──
+echo "6. Switching nginx to port $NEW_PORT..."
 sudo sed -i "s/server 127\.0\.0\.1:[0-9]\+;/server 127.0.0.1:${NEW_PORT};/" "$NGINX_CONF"
 sudo sed -i "s|proxy_pass http://127\.0\.0\.1:[0-9]\+;|proxy_pass http://127.0.0.1:${NEW_PORT};|" "$NGINX_PROXY_CONF"
 sudo nginx -t && sudo nginx -s reload
 
-# ── Step 6: Stop old process ──
-echo "6. Stopping old $OLD_NAME..."
+# ── Step 7: Stop old process ──
+echo "7. Stopping old $OLD_NAME..."
 sleep 2
 pm2 delete "$OLD_NAME" 2>/dev/null || true
 pm2 save
