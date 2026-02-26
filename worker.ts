@@ -8,6 +8,9 @@
  *   pm2 start ecosystem.config.cjs --only gen-worker
  */
 
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { QueueWorker } from '@/lib/providers/worker';
 import { closeRedis } from '@/lib/redis/client';
 import logger from '@/lib/logger';
