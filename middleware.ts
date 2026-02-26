@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Timeout fetch для middleware (не импортируем из server.ts — edge runtime)
+const MW_TIMEOUT_MS = 8_000;
+function mwTimeoutFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (init?.signal) return fetch(input, init);
+  return fetch(input, { ...init, signal: AbortSignal.timeout(MW_TIMEOUT_MS) });
+}
+
 // Singleton Service Role Client для middleware
 // Избегаем создания нового клиента на каждый admin-запрос
 let middlewareServiceClient: SupabaseClient | null = null;
@@ -16,6 +23,7 @@ function getServiceClient(): SupabaseClient {
           autoRefreshToken: false,
           persistSession: false,
         },
+        global: { fetch: mwTimeoutFetch },
       }
     );
   }

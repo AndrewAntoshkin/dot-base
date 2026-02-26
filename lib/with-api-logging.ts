@@ -59,6 +59,12 @@ async function extractUserId(): Promise<string | null> {
           getAll: () => cookieStore.getAll(),
           setAll: () => {},
         },
+        global: {
+          fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.signal) return fetch(input, init);
+            return fetch(input, { ...init, signal: AbortSignal.timeout(5_000) });
+          },
+        },
       }
     );
     const { data: { user } } = await supabaseAuth.auth.getUser();

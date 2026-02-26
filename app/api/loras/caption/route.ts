@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { supabaseTimeoutFetch } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { withApiLogging } from '@/lib/with-api-logging';
@@ -26,6 +27,7 @@ async function postHandler(request: NextRequest) {
             } catch {}
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 
@@ -170,6 +172,7 @@ async function putHandler(request: NextRequest) {
             } catch {}
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 

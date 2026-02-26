@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, supabaseTimeoutFetch } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { getFalClient } from '@/lib/fal/client';
 import { getHiggsfieldClient } from '@/lib/higgsfield/client';
@@ -48,6 +48,7 @@ async function postHandler(request: NextRequest) {
             } catch {}
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 

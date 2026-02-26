@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, supabaseTimeoutFetch } from '@/lib/supabase/server';
 import { getReplicateClient } from '@/lib/replicate/client';
 import { KEYFRAME_MODELS } from '@/lib/keyframes';
 import { cookies } from 'next/headers';
@@ -55,6 +55,7 @@ async function postHandler(request: NextRequest) {
             }
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 

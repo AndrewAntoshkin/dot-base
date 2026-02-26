@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServiceRoleClient, supabaseTimeoutFetch } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import logger from '@/lib/logger';
 import { withApiLogging } from '@/lib/with-api-logging';
@@ -34,6 +34,7 @@ async function getHandler(
             }
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 
@@ -102,6 +103,7 @@ async function patchHandler(
             }
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 
@@ -238,6 +240,7 @@ async function putHandler(
             }
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 
@@ -320,6 +323,7 @@ async function deleteHandler(
             }
           },
         },
+        global: { fetch: supabaseTimeoutFetch },
       }
     );
 
