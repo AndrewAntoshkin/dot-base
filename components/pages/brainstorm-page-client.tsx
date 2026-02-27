@@ -24,7 +24,7 @@ export interface BrainstormGeneration {
   id: string;
   modelId: string;
   modelName: string;
-  status: 'pending' | 'processing' | 'succeeded' | 'failed';
+  status: 'pending' | 'queued' | 'processing' | 'succeeded' | 'completed' | 'failed';
   resultUrl?: string;
   error?: string;
   position: { x: number; y: number };
@@ -392,12 +392,14 @@ export default function BrainstormPageClient() {
   
   // Polling for generation status updates
   useEffect(() => {
-    // Include generations that are processing OR succeeded but don't have resultUrl yet
+    // Include generations that are pending/queued/processing OR succeeded/completed but don't have resultUrl yet
     const generationsToCheck = generations.filter(
       g => !g.id.startsWith('temp-') && (
-        g.status === 'pending' || 
+        g.status === 'pending' ||
+        g.status === 'queued' ||
         g.status === 'processing' ||
-        (g.status === 'succeeded' && !g.resultUrl)
+        (g.status === 'succeeded' && !g.resultUrl) ||
+        (g.status === 'completed' && !g.resultUrl)
       )
     );
     
@@ -415,7 +417,12 @@ export default function BrainstormPageClient() {
 
             // Use first output_url from the array
             const mediaUrl = data.output_urls?.[0] || gen.resultUrl;
-            
+
+            // Normalize API status to client status
+            // API returns 'completed' but client uses 'succeeded' for finished generations
+            const normalizedStatus: BrainstormGeneration['status'] =
+              (data.status === 'completed' && mediaUrl) ? 'succeeded' : data.status;
+
             // If we have a new media URL
             if (mediaUrl && mediaUrl !== gen.resultUrl) {
               // For video, just update directly (no need to load for dimensions)
@@ -424,7 +431,7 @@ export default function BrainstormPageClient() {
                   if (g.id === gen.id) {
                     return {
                       ...g,
-                      status: data.status,
+                      status: normalizedStatus,
                       resultUrl: mediaUrl,
                       error: data.error_message,
                     };
@@ -439,7 +446,7 @@ export default function BrainstormPageClient() {
                     if (g.id === gen.id) {
                       return {
                         ...g,
-                        status: data.status,
+                        status: normalizedStatus,
                         resultUrl: mediaUrl,
                         imageSize: { width: img.naturalWidth, height: img.naturalHeight },
                         error: data.error_message,
@@ -453,7 +460,7 @@ export default function BrainstormPageClient() {
                     if (g.id === gen.id) {
                       return {
                         ...g,
-                        status: data.status,
+                        status: normalizedStatus,
                         resultUrl: mediaUrl,
                         error: data.error_message,
                       };
@@ -468,7 +475,7 @@ export default function BrainstormPageClient() {
                 if (g.id === gen.id) {
                   return {
                     ...g,
-                    status: data.status,
+                    status: normalizedStatus,
                     resultUrl: mediaUrl,
                     error: data.error_message,
                   };
@@ -481,7 +488,7 @@ export default function BrainstormPageClient() {
           console.error('Error polling generation:', error);
         }
       }
-    }, 3000); // Оптимизировано для Disk IO (было 2000)
+    }, 3000);
     
     return () => clearInterval(pollInterval);
   }, [generations]);
@@ -760,7 +767,7 @@ export default function BrainstormPageClient() {
   }, [zoom]);
   
   const activeGenerationsCount = generations.filter(
-    g => g.status === 'pending' || g.status === 'processing'
+    g => g.status === 'pending' || g.status === 'queued' || g.status === 'processing'
   ).length;
   
   return (
@@ -869,7 +876,7 @@ export default function BrainstormPageClient() {
                                         }}
                                       />
                                     )
-                                  ) : generation.status === 'pending' || generation.status === 'processing' ? (
+                                  ) : generation.status === 'pending' || generation.status === 'queued' || generation.status === 'processing' ? (
                                     <div className="absolute inset-0 flex items-center justify-center">
                                       <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
                                     </div>
